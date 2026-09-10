@@ -38,7 +38,18 @@ Project documentation lives in [`docs/`](docs), organized by purpose:
 
 ## Getting Started
 
-<!-- TODO: setup / usage instructions -->
+Each week's in-class workshop lives as its own tab in a small React +
+TypeScript + Vite site under [`site/`](site). To run it locally:
+
+```bash
+cd site
+npm install
+npm run dev
+```
+
+Then open the printed `localhost` URL. New weeks are added by dropping a
+folder under `site/src/weeks/` and registering it in
+[`site/src/weeks/registry.ts`](site/src/weeks/registry.ts).
 
 ## Contributing
 
