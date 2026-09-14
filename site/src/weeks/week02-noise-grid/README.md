@@ -75,6 +75,12 @@ inspect grid resolution and triangulation.
 
 ![Perlin noise, wireframe view](screenshots/2026-09-10-perlin-wireframe.jpg)
 
+**2026-09-11** — Added crosshair + pin for the selected coordinate:
+clicking a cell on the 2D noise map drops a pin there and shows the
+matching point on the 3D terrain, with a "Clear pin" button to remove it.
+
+![Pin and crosshair marking a selected coordinate](screenshots/2026-09-11-pin-crosshair.jpg)
+
 ## Files
 
 | File | Purpose |
