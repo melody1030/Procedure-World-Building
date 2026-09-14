@@ -20,3 +20,9 @@ export interface Week1State extends NoiseParams, ShapingParams {
   resolution: number;
   viewMode: ViewMode;
 }
+
+/** A location on the map/terrain, in normalized [0, 1] map coordinates. */
+export interface MapCell {
+  nx: number;
+  ny: number;
+}

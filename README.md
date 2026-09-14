@@ -36,6 +36,27 @@ Project documentation lives in [`docs/`](docs), organized by purpose:
 - [`docs/tutorials`](docs/tutorials) — how-to guides and walkthroughs
 - [`docs/analysis`](docs/analysis) — findings, write-ups, and analysis notes
 
+## Weekly Progress
+
+Each week's in-class workshop lives as its own tab in [`site/`](site).
+Short summary below; each week's folder has its own detailed README.
+
+- **[Week 1 — Three.js Basics](site/src/weeks/week01-threejs-basics/README.md)** —
+  a playground for core Three.js building blocks: swap between primitive
+  geometries (box, sphere, icosahedron, torus, torus knot, cone,
+  cylinder), materials (Standard/Physical PBR, Phong, Toon, unlit Basic),
+  and light types (directional, point, spot) with intensity and shadow
+  controls, plus wireframe and auto-rotate. Goal: build intuition for how
+  geometry, material, and lighting interact before moving into procedural
+  generation.
+- **[Week 2 — Noise Grid & Hydraulic Erosion](site/src/weeks/week02-noise-grid/README.md)** —
+  a 2D/3D terrain viewer driven by a noise stack (White/Perlin/Cellular
+  noise, shaping curves, adjustable grid resolution, linked 2D map ↔ 3D
+  terrain selection), extended into a full Assignment 2 submission with a
+  deterministic, seeded hydraulic (droplet) erosion simulation and a
+  scrubbable timeline player (play/pause, speed control, seek, reset)
+  that reshapes the height field in real time.
+
 ## Getting Started
 
 Each week's in-class workshop lives as its own tab in a small React +

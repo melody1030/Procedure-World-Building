@@ -95,8 +95,8 @@ export default function ControlsPanel({ state, onChange, onResetCamera, onCamera
             <Field label="Seed" description={fieldDescriptions.seed} valueLabel={String(state.seed)}>
               <input
                 type="range"
-                min={0}
-                max={1000}
+                min={1}
+                max={100}
                 step={1}
                 value={state.seed}
                 onChange={(e) => onChange({ seed: parseInt(e.target.value, 10) })}

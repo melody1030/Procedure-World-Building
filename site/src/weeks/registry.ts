@@ -1,5 +1,6 @@
 import type { ComponentType } from "react";
-import Week01NoiseGrid from "./week01-noise-grid";
+import Week01ThreejsBasics from "./week01-threejs-basics";
+import Week02NoiseGrid from "./week02-noise-grid";
 
 export interface Week {
   id: string;
@@ -9,5 +10,6 @@ export interface Week {
 
 // Add one entry per week here as the class progresses.
 export const weeks: Week[] = [
-  { id: "week01", title: "Week 1 — Noise Grid", Component: Week01NoiseGrid },
+  { id: "week01", title: "Week 1 — Three.js Basics", Component: Week01ThreejsBasics },
+  { id: "week02", title: "Week 2 — Noise Grid", Component: Week02NoiseGrid },
 ];
