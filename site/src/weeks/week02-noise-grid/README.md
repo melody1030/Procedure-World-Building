@@ -54,9 +54,6 @@ simulation on top.
 Chronological snapshots of this week's build (this folder was originally
 "Week 1 — Noise Grid"; it was later renamed to Week 2 once Week 1 became
 its own [Three.js basics workshop](../week01-threejs-basics/README.md)).
-The hydraulic erosion simulation and player weren't captured in a
-screenshot as they were built — see [What it does](#what-it-does) above
-for that part of the timeline.
 
 **2026-09-10, 11:50** — First working version: noise stack (here, White
 Noise) with a terracing shaping operation, wireframe view mode, 2D map
@@ -80,6 +77,12 @@ clicking a cell on the 2D noise map drops a pin there and shows the
 matching point on the 3D terrain, with a "Clear pin" button to remove it.
 
 ![Pin and crosshair marking a selected coordinate](screenshots/2026-09-11-pin-crosshair.jpg)
+
+**2026-09-14** — Include hydraulic erosion animation: the droplet-based
+simulation reshaping the terrain in real time via the timeline player.
+
+> _Video pending upload (`2026-09-14-hydraulic-erosion-animation.mov`, ~19.5MB —
+> too large to push automatically from this environment; will be added directly)._
 
 ## Files
 
