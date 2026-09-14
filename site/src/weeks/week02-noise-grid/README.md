@@ -49,6 +49,32 @@ simulation on top.
   noise) on the right.
 - Live droplet count is shown under the transport row.
 
+## Development Log
+
+Chronological snapshots of this week's build (this folder was originally
+"Week 1 — Noise Grid"; it was later renamed to Week 2 once Week 1 became
+its own [Three.js basics workshop](../week01-threejs-basics/README.md)).
+The hydraulic erosion simulation and player weren't captured in a
+screenshot as they were built — see [What it does](#what-it-does) above
+for that part of the timeline.
+
+**2026-09-10, 11:50** — First working version: noise stack (here, White
+Noise) with a terracing shaping operation, wireframe view mode, 2D map
+linked to the 3D terrain.
+
+![White noise, terraced, wireframe view](screenshots/2026-09-10-white-noise-terrace-wireframe.jpg)
+
+**2026-09-10, 12:31** — Switched to Perlin noise with the smooth
+Heightmap view mode — the default, most-readable display of shape and
+elevation.
+
+![Perlin noise, heightmap view](screenshots/2026-09-10-perlin-heightmap.jpg)
+
+**2026-09-10, 12:31** — Same Perlin terrain, toggled to Wireframe view to
+inspect grid resolution and triangulation.
+
+![Perlin noise, wireframe view](screenshots/2026-09-10-perlin-wireframe.jpg)
+
 ## Files
 
 | File | Purpose |

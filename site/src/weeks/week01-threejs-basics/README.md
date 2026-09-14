@@ -40,6 +40,19 @@ drag/scroll. A floating control panel lets you swap:
   closed over from `state`) so the `requestAnimationFrame` loop, created
   once on mount, always sees the latest toggle value.
 
+## Development Log
+
+**2026-09-14, 09:20** — Torus knot with the Standard (PBR) material,
+directional lighting, and shadows enabled — shadow falls onto the ground
+plane via the `ShadowMaterial`.
+
+![Torus knot, directional light, shadows on](screenshots/2026-09-14-torus-knot-directional-shadows.jpg)
+
+**2026-09-14, 09:28** — Default state: icosahedron under a point light,
+auto-rotate paused (play button top-right), no shadows.
+
+![Icosahedron under a point light](screenshots/2026-09-14-icosahedron-point-light.jpg)
+
 ## Files
 
 | File | Purpose |
