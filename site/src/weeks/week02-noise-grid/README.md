@@ -82,8 +82,6 @@ matching point on the 3D terrain, with a "Clear pin" button to remove it.
 
 https://github.com/user-attachments/assets/2e8edf29-6f85-418c-937b-a8930ddf61e5
 
-
-
 ## Files
 
 | File | Purpose |
