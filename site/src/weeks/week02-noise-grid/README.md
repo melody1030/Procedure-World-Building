@@ -78,11 +78,11 @@ matching point on the 3D terrain, with a "Clear pin" button to remove it.
 
 ![Pin and crosshair marking a selected coordinate](screenshots/2026-09-11-pin-crosshair.jpg)
 
-**2026-09-14** — Include hydraulic erosion animation: the droplet-based
-simulation reshaping the terrain in real time via the timeline player.
+**2026-09-14** — Include hydraulic erosion animation: the droplet-based simulation reshaping the terrain in real time via the timeline player.
 
-> _Video pending upload (`2026-09-14-hydraulic-erosion-animation.mov`, ~19.5MB —
-> too large to push automatically from this environment; will be added directly)._
+https://github.com/user-attachments/assets/2e8edf29-6f85-418c-937b-a8930ddf61e5
+
+
 
 ## Files
 
