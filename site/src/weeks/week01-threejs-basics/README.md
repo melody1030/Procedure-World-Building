@@ -53,32 +53,6 @@ auto-rotate paused (play button top-right), no shadows.
 
 ![Icosahedron under a point light](screenshots/2026-09-14-icosahedron-point-light.jpg)
 
-**2026-09-14, 16:09** — Added a set of Presets (Default, Metallic, Glass,
-Stone, Neon, Matte) that set material + lighting together in one click —
-shown here mid-redesign, still on the original boxy panel layout, with
-Metallic applied to the icosahedron (Physical material, roughness 0.15,
-metalness 1.00).
-
-![Metallic preset applied to the icosahedron](screenshots/2026-09-14-metallic-preset-icosahedron.jpg)
-
-**2026-09-14, 17:13** — Redesigned the control panel into collapsible
-dark-navy sections with a label-beside-control row layout (Shape/Color,
-Type/Wireframe, Type/Shadows each share a row) instead of the earlier
-stacked, label-above-control fields.
-
-![Redesigned panel with label-beside-control row layout](screenshots/2026-09-14-redesigned-panel-row-layout.jpg)
-
-**2026-09-14, 17:29** — Exposed each shape's construction parameters as
-sliders with typable numeric boxes — torus shown here with Radius, Tube
-Radius, Radial Segments, and Tubular Segments.
-
-![Torus with its construction parameters exposed](screenshots/2026-09-14-torus-parameters-panel.jpg)
-
-Adjusting those parameters (radius 1.4, tube 0.85, 21 radial segments)
-reshapes the torus in real time.
-
-![Torus reshaped via its construction parameters](screenshots/2026-09-14-torus-parameters-zoomed.jpg)
-
 ## Files
 
 | File | Purpose |
