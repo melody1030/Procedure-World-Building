@@ -1,5 +1,29 @@
 :root {
   color-scheme: dark;
+
+  /* Design tokens — deep navy/indigo dark theme, purple/blue accent. */
+  --bg-app: #080914;
+  --bg-panel: #111326;
+  --bg-panel-secondary: #15182d;
+  --bg-elevated: #1a1d35;
+  --border: #292d4a;
+
+  --accent: #6366f1;
+  --accent-hover: #818cf8;
+  --accent-bright: #a5b4fc;
+
+  --text-primary: #f1f3ff;
+  --text-secondary: #a5a9c7;
+  --text-muted: #6f7495;
+
+  --radius-lg: 16px;
+  --radius-md: 12px;
+  --radius-sm: 8px;
+
+  --space-1: 0.5rem;
+  --space-2: 0.75rem;
+  --space-3: 1rem;
+  --space-4: 1.5rem;
 }
 
 * {
@@ -8,9 +32,11 @@
 
 body {
   margin: 0;
-  background: #080810;
-  color: #e6e6f0;
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: var(--bg-app);
+  color: var(--text-primary);
+  font-family:
+    -apple-system, "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
 .app {
@@ -22,57 +48,65 @@ body {
 .tab-bar {
   display: flex;
   align-items: center;
-  gap: 1.5rem;
-  padding: 0.75rem 1.25rem;
-  background: #10101a;
-  border-bottom: 1px solid #23233a;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-4);
+  background: var(--bg-app);
+  border-bottom: 1px solid var(--border);
 }
 
 .tab-bar-title {
-  font-weight: 600;
-  color: #9a9ad6;
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
   white-space: nowrap;
 }
 
 .tabs {
   display: flex;
-  gap: 0.5rem;
+  gap: var(--space-1);
   flex-wrap: wrap;
 }
 
 .tab {
   background: transparent;
-  border: 1px solid #2a2a45;
-  color: #c4c4e0;
-  border-radius: 6px;
-  padding: 0.4rem 0.9rem;
-  font-size: 0.9rem;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  border-radius: var(--radius-sm);
+  padding: 0.45rem 0.95rem;
+  font-size: 0.85rem;
+  font-weight: 500;
   cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .tab:hover {
-  background: #1a1a2c;
+  background: var(--bg-panel);
+  color: var(--text-primary);
+  border-color: var(--border);
 }
 
 .tab.active {
-  background: #6666cc;
-  border-color: #6666cc;
-  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--text-primary);
+  font-weight: 600;
 }
 
 .content {
   flex: 1;
   display: flex;
   flex-direction: column;
-  padding: 1.5rem;
+  padding: var(--space-3);
 }
 
 .empty-state {
-  color: #8888a8;
+  color: var(--text-secondary);
 }
 
 .empty-state code {
-  background: #1a1a2c;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
   padding: 0.15rem 0.4rem;
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
