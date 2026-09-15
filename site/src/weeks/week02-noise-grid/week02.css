@@ -44,17 +44,62 @@
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
 }
 
-.week02 .controls-panel h3 {
-  margin: 0 0 var(--space-2);
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.week02 .controls-panel section + section {
+.week02 .panel-section + .panel-section {
   margin-top: var(--space-1);
   padding-top: var(--space-3);
   border-top: 1px solid var(--border);
+}
+
+.week02 .panel-section-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0 0 var(--space-2);
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  text-align: left;
+}
+
+.week02 .panel-section-icon {
+  display: flex;
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  color: var(--text-secondary);
+}
+
+.week02 .panel-section-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.week02 .panel-section-title {
+  flex: 1;
+}
+
+.week02 .panel-section-chevron {
+  flex-shrink: 0;
+  width: 15px;
+  height: 15px;
+  color: var(--text-muted);
+  transition: transform 0.15s ease;
+}
+
+.week02 .panel-section-chevron.collapsed {
+  transform: rotate(-90deg);
+}
+
+.week02 .panel-section-body {
+  display: flex;
+  flex-direction: column;
 }
 
 .week02 .panel-tabs {
@@ -125,10 +170,9 @@
 
 .week02 .field {
   display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.35rem;
   margin-bottom: var(--space-2);
   font-size: 0.82rem;
 }
@@ -136,10 +180,9 @@
 .week02 .field-label {
   position: relative;
   display: flex;
-  flex-shrink: 0;
   justify-content: space-between;
   cursor: help;
-  width: fit-content;
+  width: 100%;
   color: var(--text-secondary);
   font-weight: 500;
 }
@@ -177,13 +220,8 @@
   opacity: 1;
 }
 
-.week02 .field select,
-.week02 .field input[type="range"] {
-  flex: 1;
-  min-width: 0;
-}
-
 .week02 .field select {
+  width: 100%;
   background: var(--bg-panel-secondary);
   color: var(--text-primary);
   border: 1px solid var(--border);
@@ -205,8 +243,34 @@
 }
 
 .week02 .field input[type="range"] {
+  width: 100%;
   accent-color: var(--accent);
   height: 4px;
+}
+
+.week02 .param-control {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.week02 .param-control input[type="range"] {
+  flex: 1;
+  min-width: 0;
+}
+
+.week02 .param-value {
+  flex-shrink: 0;
+  min-width: 2.75rem;
+  text-align: center;
+  background: var(--bg-panel-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.35rem 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
 }
 
 .week02 .field-note {
@@ -240,10 +304,20 @@
 }
 
 .week02 .noise-map-2d h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
   margin: 0;
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--text-primary);
+}
+
+.week02 .noise-map-2d-icon {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  color: var(--text-secondary);
 }
 
 .week02 .noise-map-2d-clear {

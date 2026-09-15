@@ -3,6 +3,8 @@ import type { CameraPreset, Week1State, NoiseType, ShapingType, ViewMode } from 
 import { noiseConfig, viewModeConfig, cameraPresetConfig, fieldDescriptions } from "./config";
 import { shapingConfig } from "./shaping";
 import Field from "./Field";
+import Section from "./Section";
+import { CameraIcon, GridIcon, MonitorIcon, ShapingIcon, WaveformIcon } from "./icons";
 
 interface ControlsPanelProps {
   state: Week1State;
@@ -38,9 +40,7 @@ export default function ControlsPanel({ state, onChange, onResetCamera, onCamera
 
       {activeTab === "noise" && (
         <>
-          <section>
-            <h3>Noise</h3>
-
+          <Section icon={<WaveformIcon />} title="Noise">
             <Field label="Type" description={fieldDescriptions.noiseType}>
               <select
                 value={state.noiseType}
@@ -56,25 +56,31 @@ export default function ControlsPanel({ state, onChange, onResetCamera, onCamera
             <p className="field-note">{noiseConfig[state.noiseType].description}</p>
 
             <Field label="Scale" description={fieldDescriptions.scale} valueLabel={state.scale.toFixed(1)}>
-              <input
-                type="range"
-                min={0.5}
-                max={10}
-                step={0.1}
-                value={state.scale}
-                onChange={(e) => onChange({ scale: parseFloat(e.target.value) })}
-              />
+              <div className="param-control">
+                <input
+                  type="range"
+                  min={0.5}
+                  max={10}
+                  step={0.1}
+                  value={state.scale}
+                  onChange={(e) => onChange({ scale: parseFloat(e.target.value) })}
+                />
+                <span className="param-value">{state.scale.toFixed(1)}</span>
+              </div>
             </Field>
 
             <Field label="Octaves" description={fieldDescriptions.octaves} valueLabel={String(state.octaves)}>
-              <input
-                type="range"
-                min={1}
-                max={6}
-                step={1}
-                value={state.octaves}
-                onChange={(e) => onChange({ octaves: parseInt(e.target.value, 10) })}
-              />
+              <div className="param-control">
+                <input
+                  type="range"
+                  min={1}
+                  max={6}
+                  step={1}
+                  value={state.octaves}
+                  onChange={(e) => onChange({ octaves: parseInt(e.target.value, 10) })}
+                />
+                <span className="param-value">{state.octaves}</span>
+              </div>
             </Field>
 
             <Field
@@ -82,48 +88,55 @@ export default function ControlsPanel({ state, onChange, onResetCamera, onCamera
               description={fieldDescriptions.persistence}
               valueLabel={state.persistence.toFixed(2)}
             >
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.05}
-                value={state.persistence}
-                onChange={(e) => onChange({ persistence: parseFloat(e.target.value) })}
-              />
+              <div className="param-control">
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={state.persistence}
+                  onChange={(e) => onChange({ persistence: parseFloat(e.target.value) })}
+                />
+                <span className="param-value">{state.persistence.toFixed(2)}</span>
+              </div>
             </Field>
 
             <Field label="Seed" description={fieldDescriptions.seed} valueLabel={String(state.seed)}>
-              <input
-                type="range"
-                min={1}
-                max={100}
-                step={1}
-                value={state.seed}
-                onChange={(e) => onChange({ seed: parseInt(e.target.value, 10) })}
-              />
+              <div className="param-control">
+                <input
+                  type="range"
+                  min={1}
+                  max={100}
+                  step={1}
+                  value={state.seed}
+                  onChange={(e) => onChange({ seed: parseInt(e.target.value, 10) })}
+                />
+                <span className="param-value">{state.seed}</span>
+              </div>
             </Field>
-          </section>
+          </Section>
 
-          <section>
-            <h3>Grid</h3>
+          <Section icon={<GridIcon />} title="Grid">
             <Field
               label="Resolution"
               description={fieldDescriptions.resolution}
               valueLabel={`${state.resolution}×${state.resolution}`}
             >
-              <input
-                type="range"
-                min={4}
-                max={100}
-                step={1}
-                value={state.resolution}
-                onChange={(e) => onChange({ resolution: parseInt(e.target.value, 10) })}
-              />
+              <div className="param-control">
+                <input
+                  type="range"
+                  min={4}
+                  max={100}
+                  step={1}
+                  value={state.resolution}
+                  onChange={(e) => onChange({ resolution: parseInt(e.target.value, 10) })}
+                />
+                <span className="param-value">{state.resolution}</span>
+              </div>
             </Field>
-          </section>
+          </Section>
 
-          <section>
-            <h3>Shaping</h3>
+          <Section icon={<ShapingIcon />} title="Shaping">
             <Field label="Operation" description={fieldDescriptions.shapingType}>
               <select
                 value={state.shapingType}
@@ -147,24 +160,26 @@ export default function ControlsPanel({ state, onChange, onResetCamera, onCamera
                 description={shaping.description}
                 valueLabel={state.amount.toFixed(2)}
               >
-                <input
-                  type="range"
-                  min={shaping.min}
-                  max={shaping.max}
-                  step={shaping.step}
-                  value={state.amount}
-                  onChange={(e) => onChange({ amount: parseFloat(e.target.value) })}
-                />
+                <div className="param-control">
+                  <input
+                    type="range"
+                    min={shaping.min}
+                    max={shaping.max}
+                    step={shaping.step}
+                    value={state.amount}
+                    onChange={(e) => onChange({ amount: parseFloat(e.target.value) })}
+                  />
+                  <span className="param-value">{state.amount.toFixed(2)}</span>
+                </div>
               </Field>
             )}
-          </section>
+          </Section>
         </>
       )}
 
       {activeTab === "camera" && (
         <>
-          <section>
-            <h3>Display</h3>
+          <Section icon={<MonitorIcon />} title="Display">
             <Field label="View" description={fieldDescriptions.viewMode}>
               <select
                 value={state.viewMode}
@@ -178,10 +193,9 @@ export default function ControlsPanel({ state, onChange, onResetCamera, onCamera
               </select>
             </Field>
             <p className="field-note">{viewModeConfig[state.viewMode].description}</p>
-          </section>
+          </Section>
 
-          <section>
-            <h3>Camera</h3>
+          <Section icon={<CameraIcon />} title="Camera">
             <p className="field-note">Drag to orbit, scroll to zoom, right-drag to pan.</p>
             <div className="button-row">
               {Object.entries(cameraPresetConfig).map(([key, cfg]) => (
@@ -198,7 +212,7 @@ export default function ControlsPanel({ state, onChange, onResetCamera, onCamera
             <button className="panel-button panel-button-full" onClick={onResetCamera}>
               Reset Camera
             </button>
-          </section>
+          </Section>
         </>
       )}
     </aside>

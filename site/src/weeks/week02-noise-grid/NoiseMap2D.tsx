@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import { sampleHeightField } from "./erosion";
+import { MapIcon } from "./icons";
 import type { MapCell } from "./types";
 
 const MAP_SIZE = 256;
@@ -123,7 +124,10 @@ export default function NoiseMap2D({
   return (
     <div className="noise-map-2d">
       <div className="noise-map-2d-header">
-        <h3>2D Noise Map</h3>
+        <h3>
+          <MapIcon className="noise-map-2d-icon" />
+          2D Noise Map
+        </h3>
         {selectedCell && (
           <button className="noise-map-2d-clear" onClick={onClearSelection} title="Remove the pin and crosshair">
             Clear pin
