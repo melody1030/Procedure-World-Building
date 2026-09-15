@@ -1,10 +1,22 @@
-import { fieldDescriptions, lightConfig, materialConfig, shapeConfig } from "./config";
+import { useState } from "react";
+import { fieldDescriptions, geometryParamsConfig, lightConfig, materialConfig, presetConfig, shapeConfig } from "./config";
+import ColorField from "./ColorField";
 import Field from "./Field";
-import type { LightType, MaterialType, ShapeType, Week1BasicsState } from "./types";
+import { CubeIcon, DiamondIcon, DiceIcon, DropletIcon, StarIcon, SunIcon } from "./icons";
+import ParamRow from "./ParamRow";
+import { randomizePatch } from "./randomize";
+import Section from "./Section";
+import type { GeometryParams, LightType, MaterialType, ParamShapeType, PresetKey, ShapeType, Week1BasicsState } from "./types";
 
 interface ControlsPanelProps {
   state: Week1BasicsState;
   onChange: (patch: Partial<Week1BasicsState>) => void;
+}
+
+const PARAM_SHAPES: readonly ParamShapeType[] = ["box", "sphere", "icosahedron", "torus", "torusKnot", "cone", "cylinder"];
+
+function isParamShape(shape: ShapeType): shape is ParamShapeType {
+  return (PARAM_SHAPES as readonly string[]).includes(shape);
 }
 
 export default function ControlsPanel({ state, onChange }: ControlsPanelProps) {
@@ -12,12 +24,44 @@ export default function ControlsPanel({ state, onChange }: ControlsPanelProps) {
   const light = lightConfig[state.lightType];
   const showRoughnessMetalness = state.materialType === "standard" || state.materialType === "physical";
   const showShininess = state.materialType === "phong";
+  // Shows whichever preset was last chosen, so picking one is reflected in the dropdown
+  // instead of silently reverting to the placeholder.
+  const [presetSelection, setPresetSelection] = useState("");
+
+  const updateGeometryParam = (shape: ParamShapeType, key: string, value: number) => {
+    const shapeParams = state.geometryParams[shape] as unknown as Record<string, number>;
+    onChange({
+      geometryParams: {
+        ...state.geometryParams,
+        [shape]: { ...shapeParams, [key]: value },
+      } as GeometryParams,
+    });
+  };
 
   return (
     <aside className="controls-panel">
-      <section>
-        <h3>Geometry</h3>
+      <Section icon={<StarIcon />} title="Presets">
+        <select
+          className="preset-select"
+          value={presetSelection}
+          onChange={(e) => {
+            const key = e.target.value as PresetKey;
+            setPresetSelection(key);
+            onChange(presetConfig[key].patch);
+          }}
+        >
+          <option value="" disabled>
+            Choose a preset…
+          </option>
+          {Object.entries(presetConfig).map(([key, preset]) => (
+            <option key={key} value={key}>
+              {preset.emoji} {preset.label}
+            </option>
+          ))}
+        </select>
+      </Section>
 
+      <Section icon={<CubeIcon />} title="Geometry">
         <Field label="Shape" description={fieldDescriptions.shape}>
           <select value={state.shape} onChange={(e) => onChange({ shape: e.target.value as ShapeType })}>
             {Object.entries(shapeConfig).map(([key, cfg]) => (
@@ -28,14 +72,40 @@ export default function ControlsPanel({ state, onChange }: ControlsPanelProps) {
           </select>
         </Field>
 
-        <Field label="Color" description={fieldDescriptions.color}>
-          <input type="color" value={state.color} onChange={(e) => onChange({ color: e.target.value })} />
-        </Field>
-      </section>
+        <ColorField
+          label="Color"
+          description={fieldDescriptions.color}
+          value={state.color}
+          onChange={(color) => onChange({ color })}
+        />
 
-      <section>
-        <h3>Material</h3>
+        {isParamShape(state.shape) && (
+          <div className="param-section">
+            <div className="param-section-header">
+              <DiamondIcon />
+              Parameters
+            </div>
+            {geometryParamsConfig[state.shape].map((def) => {
+              const shape = state.shape as ParamShapeType;
+              const shapeParams = state.geometryParams[shape] as unknown as Record<string, number>;
+              return (
+                <ParamRow
+                  key={def.key}
+                  label={def.label}
+                  min={def.min}
+                  max={def.max}
+                  step={def.step}
+                  decimals={def.decimals}
+                  value={shapeParams[def.key]}
+                  onChange={(value) => updateGeometryParam(shape, def.key, value)}
+                />
+              );
+            })}
+          </div>
+        )}
+      </Section>
 
+      <Section icon={<DropletIcon />} title="Material">
         <Field label="Type" description={fieldDescriptions.materialType}>
           <select
             value={state.materialType}
@@ -48,7 +118,6 @@ export default function ControlsPanel({ state, onChange }: ControlsPanelProps) {
             ))}
           </select>
         </Field>
-        <p className="field-note">{material.description}</p>
 
         <Field label="Wireframe" description={fieldDescriptions.wireframe}>
           <input
@@ -57,6 +126,8 @@ export default function ControlsPanel({ state, onChange }: ControlsPanelProps) {
             onChange={(e) => onChange({ wireframe: e.target.checked })}
           />
         </Field>
+
+        <p className="field-note">{material.description}</p>
 
         {showRoughnessMetalness && (
           <>
@@ -104,11 +175,9 @@ export default function ControlsPanel({ state, onChange }: ControlsPanelProps) {
             />
           </Field>
         )}
-      </section>
+      </Section>
 
-      <section>
-        <h3>Lighting</h3>
-
+      <Section icon={<SunIcon />} title="Lighting">
         <Field label="Type" description={fieldDescriptions.lightType}>
           <select
             value={state.lightType}
@@ -124,6 +193,15 @@ export default function ControlsPanel({ state, onChange }: ControlsPanelProps) {
             ))}
           </select>
         </Field>
+
+        <Field label="Shadows" description={fieldDescriptions.shadowsEnabled}>
+          <input
+            type="checkbox"
+            checked={state.shadowsEnabled}
+            onChange={(e) => onChange({ shadowsEnabled: e.target.checked })}
+          />
+        </Field>
+
         <p className="field-note">{light.description}</p>
 
         <Field
@@ -140,15 +218,12 @@ export default function ControlsPanel({ state, onChange }: ControlsPanelProps) {
             onChange={(e) => onChange({ lightIntensity: parseFloat(e.target.value) })}
           />
         </Field>
+      </Section>
 
-        <Field label="Shadows" description={fieldDescriptions.shadowsEnabled}>
-          <input
-            type="checkbox"
-            checked={state.shadowsEnabled}
-            onChange={(e) => onChange({ shadowsEnabled: e.target.checked })}
-          />
-        </Field>
-      </section>
+      <button className="randomize-button" onClick={() => onChange(randomizePatch())}>
+        <DiceIcon />
+        Randomize
+      </button>
     </aside>
   );
 }

@@ -78,7 +78,7 @@ export default function Scene3D({ state }: Scene3DProps) {
     controls.enableDamping = true;
     controls.target.set(0, 0.5, 0);
 
-    const light = createLight(state.lightType, state.lightIntensity);
+    const light = createLight(state.lightType, state.lightIntensity, state.lightPosition);
     light.castShadow = state.shadowsEnabled;
     scene.add(light);
     if ("target" in light) scene.add(light.target);
@@ -88,7 +88,7 @@ export default function Scene3D({ state }: Scene3DProps) {
     const fillLight = new THREE.HemisphereLight(0xaeb4ff, 0x1a1a2e, 0.9);
     scene.add(fillLight);
 
-    const geometry = createGeometry(state.shape);
+    const geometry = createGeometry(state.shape, state.geometryParams);
     const material = createMaterial(state);
     const mesh = new THREE.Mesh(geometry, material);
     mesh.position.y = groundedY(geometry);
@@ -152,16 +152,17 @@ export default function Scene3D({ state }: Scene3DProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Shape changed: swap the mesh's geometry and re-settle it on the ground plane.
+  // Shape or its construction parameters changed: swap the mesh's geometry and re-settle
+  // it on the ground plane (a param edit reshapes the geometry the same as a shape swap).
   useEffect(() => {
     const refs = sceneRefs.current;
     if (!refs) return;
     const oldGeometry = refs.mesh.geometry;
-    const geometry = createGeometry(state.shape);
+    const geometry = createGeometry(state.shape, state.geometryParams);
     refs.mesh.geometry = geometry;
     refs.mesh.position.y = groundedY(geometry);
     oldGeometry.dispose();
-  }, [state.shape]);
+  }, [state.shape, state.geometryParams]);
 
   // Material type or wireframe changed: these aren't just property tweaks — wireframe
   // swaps to a flat unlit material entirely, so both cases rebuild the material.
@@ -179,7 +180,7 @@ export default function Scene3D({ state }: Scene3DProps) {
     const refs = sceneRefs.current;
     if (!refs) return;
     updateMaterial(refs.mesh.material as THREE.Material, state);
-  }, [state.color, state.roughness, state.metalness, state.shininess]);
+  }, [state.color, state.roughness, state.metalness, state.shininess, state.transmission, state.emissiveIntensity]);
 
   // Light type changed: THREE.Light subclasses aren't interchangeable, so build a fresh one.
   useEffect(() => {
@@ -189,7 +190,7 @@ export default function Scene3D({ state }: Scene3DProps) {
     if ("target" in refs.light) refs.scene.remove(refs.light.target);
     refs.light.shadow.dispose();
 
-    const light = createLight(state.lightType, state.lightIntensity);
+    const light = createLight(state.lightType, state.lightIntensity, state.lightPosition);
     light.castShadow = state.shadowsEnabled;
     refs.scene.add(light);
     if ("target" in light) refs.scene.add(light.target);
@@ -197,12 +198,13 @@ export default function Scene3D({ state }: Scene3DProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.lightType]);
 
-  // Same light instance, just intensity.
+  // Same light instance, just intensity/position.
   useEffect(() => {
     const refs = sceneRefs.current;
     if (!refs) return;
     refs.light.intensity = state.lightIntensity;
-  }, [state.lightIntensity, state.lightType]);
+    refs.light.position.set(...state.lightPosition);
+  }, [state.lightIntensity, state.lightPosition, state.lightType]);
 
   // Shadows toggled: flip casting/receiving without rebuilding anything.
   useEffect(() => {
