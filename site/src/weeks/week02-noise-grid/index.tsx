@@ -9,7 +9,12 @@ import { defaultWeek1State } from "./config";
 import type { MapCell, Week1State } from "./types";
 import "./week02.css";
 
-export const MAX_TIMELINE_DROPLETS = 20000;
+// Around half a droplet per grid node is roughly where this simulation's erosion settles into
+// a detailed, channel-carved equilibrium (matches the ratio used in the reference Lague-style
+// demos); scaling the timeline's max to the current resolution keeps that same "well eroded but
+// still recognizable" endpoint no matter how coarse or fine the grid is set — a fixed droplet
+// count either does nothing on a fine grid or flattens a coarse one to a plane.
+const DROPLETS_PER_NODE = 0.5;
 const EROSION_SEED = 1337;
 
 export default function Week02NoiseGrid() {
@@ -36,6 +41,7 @@ export default function Week02NoiseGrid() {
     if (dropletCount !== 0) setDropletCount(0);
   }
   const heightField = heightFieldRef.current!;
+  const maxTimelineDroplets = Math.round((state.resolution + 1) ** 2 * DROPLETS_PER_NODE);
 
   const onChange = (patch: Partial<Week1State>) => {
     setState((prev) => ({ ...prev, ...patch }));
@@ -77,12 +83,14 @@ export default function Week02NoiseGrid() {
         isSimulating={isSimulating}
         speed={speed}
         dropletCount={dropletCount}
+        maxDropletCount={maxTimelineDroplets}
         onDropletCountChange={setDropletCount}
+        onReachMaxDropletCount={() => setIsSimulating(false)}
       />
       <SimulationPlayer
         isSimulating={isSimulating}
         dropletCount={dropletCount}
-        maxTimelineDroplets={MAX_TIMELINE_DROPLETS}
+        maxTimelineDroplets={maxTimelineDroplets}
         speed={speed}
         onTogglePlay={() => setIsSimulating((prev) => !prev)}
         onReset={handleResetSimulation}

@@ -5,7 +5,7 @@ import type { Week1State } from "./types";
 export interface ErosionParams {
   inertia: number;
   capacityFactor: number;
-  minSlope: number;
+  minSedimentCapacity: number;
   erodeSpeed: number;
   depositSpeed: number;
   evaporateSpeed: number;
@@ -13,19 +13,21 @@ export interface ErosionParams {
   maxLifetime: number;
   initialWater: number;
   initialSpeed: number;
+  erosionRadius: number;
 }
 
 export const defaultErosionParams: ErosionParams = {
   inertia: 0.05,
-  capacityFactor: 1.5,
-  minSlope: 0.01,
-  erodeSpeed: 0.08,
-  depositSpeed: 0.15,
-  evaporateSpeed: 0.02,
+  capacityFactor: 4,
+  minSedimentCapacity: 0.01,
+  erodeSpeed: 0.3,
+  depositSpeed: 0.3,
+  evaporateSpeed: 0.01,
   gravity: 4,
   maxLifetime: 30,
   initialWater: 1,
   initialSpeed: 1,
+  erosionRadius: 1,
 };
 
 /** Samples the noise/shaping stack onto a (resolution+1)^2 grid — the starting point for erosion. */
@@ -88,6 +90,42 @@ function depositAt(field: Float32Array, resolution: number, x: number, y: number
   field[(y0 + 1) * cols + x0 + 1] += amount * fx * fy;
 }
 
+/**
+ * Removes `amount` of height, spread over every node within `radius` cells of (x, y) and
+ * weighted by distance (closer nodes lose more). Without this radius, erosion only ever
+ * touches the 4 corners of whatever cell the droplet is passing through — the eroded
+ * material gets smeared thinly across every cell a droplet crosses instead of carving a
+ * visible channel, which is what "hydraulic erosion" is supposed to look like.
+ */
+function erodeAt(field: Float32Array, resolution: number, x: number, y: number, amount: number, radius: number) {
+  const cols = resolution + 1;
+  const x0 = Math.floor(x);
+  const y0 = Math.floor(y);
+  const minIx = Math.max(0, x0 - radius);
+  const maxIx = Math.min(resolution, x0 + radius);
+  const minIy = Math.max(0, y0 - radius);
+  const maxIy = Math.min(resolution, y0 + radius);
+
+  let weightSum = 0;
+  for (let iy = minIy; iy <= maxIy; iy++) {
+    for (let ix = minIx; ix <= maxIx; ix++) {
+      const dist = Math.hypot(ix - x, iy - y);
+      if (dist >= radius) continue;
+      weightSum += radius - dist;
+    }
+  }
+  if (weightSum <= 0) return;
+
+  for (let iy = minIy; iy <= maxIy; iy++) {
+    for (let ix = minIx; ix <= maxIx; ix++) {
+      const dist = Math.hypot(ix - x, iy - y);
+      if (dist >= radius) continue;
+      const weight = (radius - dist) / weightSum;
+      field[iy * cols + ix] -= amount * weight;
+    }
+  }
+}
+
 /** Simulates a single water droplet's path, eroding and depositing sediment as it flows downhill. */
 function simulateDroplet(field: Float32Array, resolution: number, rng: () => number, params: ErosionParams) {
   let x = rng() * resolution;
@@ -124,7 +162,11 @@ function simulateDroplet(field: Float32Array, resolution: number, rng: () => num
 
     const newHeight = heightAndGradient(field, resolution, x, y).height;
     const deltaHeight = newHeight - oldHeight;
-    const capacity = Math.max(-deltaHeight, params.minSlope) * speed * water * params.capacityFactor;
+    // Capacity itself is floored at minSedimentCapacity, not the slope — otherwise a
+    // droplet that's still carrying speed from an earlier descent keeps a large capacity
+    // even once the ground flattens out, so it goes on eroding flat ground instead of
+    // settling into channels.
+    const capacity = Math.max(-deltaHeight * speed * water * params.capacityFactor, params.minSedimentCapacity);
 
     if (deltaHeight > 0 || sediment > capacity) {
       const depositAmount =
@@ -133,7 +175,7 @@ function simulateDroplet(field: Float32Array, resolution: number, rng: () => num
       depositAt(field, resolution, prevX, prevY, depositAmount);
     } else {
       const erodeAmount = Math.min((capacity - sediment) * params.erodeSpeed, -deltaHeight);
-      depositAt(field, resolution, prevX, prevY, -erodeAmount);
+      erodeAt(field, resolution, prevX, prevY, erodeAmount, params.erosionRadius);
       sediment += erodeAmount;
     }
 

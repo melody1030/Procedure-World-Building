@@ -131,7 +131,9 @@ interface GridScene3DProps {
   isSimulating: boolean;
   speed: number;
   dropletCount: number;
+  maxDropletCount: number;
   onDropletCountChange: (count: number) => void;
+  onReachMaxDropletCount: () => void;
 }
 
 interface SceneRefs {
@@ -148,7 +150,18 @@ interface SceneRefs {
 }
 
 const GridScene3D = forwardRef<GridScene3DHandle, GridScene3DProps>(function GridScene3D(
-  { state, heightField, hoverCell, selectedCell, isSimulating, speed, dropletCount, onDropletCountChange },
+  {
+    state,
+    heightField,
+    hoverCell,
+    selectedCell,
+    isSimulating,
+    speed,
+    dropletCount,
+    maxDropletCount,
+    onDropletCountChange,
+    onReachMaxDropletCount,
+  },
   ref,
 ) {
   const mountRef = useRef<HTMLDivElement>(null);
@@ -166,8 +179,12 @@ const GridScene3D = forwardRef<GridScene3DHandle, GridScene3DProps>(function Gri
   // simulation continues counting from wherever the count actually is.
   const dropletCountRef = useRef(dropletCount);
   dropletCountRef.current = dropletCount;
+  const maxDropletCountRef = useRef(maxDropletCount);
+  maxDropletCountRef.current = maxDropletCount;
   const onDropletCountChangeRef = useRef(onDropletCountChange);
   onDropletCountChangeRef.current = onDropletCountChange;
+  const onReachMaxDropletCountRef = useRef(onReachMaxDropletCount);
+  onReachMaxDropletCountRef.current = onReachMaxDropletCount;
   const cameraAnimationRef = useRef<number | null>(null);
   const erosionRngRef = useRef(createRng(1337));
 
@@ -181,16 +198,23 @@ const GridScene3D = forwardRef<GridScene3DHandle, GridScene3DProps>(function Gri
     [],
   );
 
-  /** Runs one batch of droplets (scaled by the current speed) and rebuilds the mesh from the result. */
+  /**
+   * Runs one batch of droplets (scaled by the current speed) and rebuilds the mesh from the
+   * result. Stops advancing once maxDropletCount is reached — past that point the terrain has
+   * reached the same eroded-but-still-detailed equilibrium the timeline caps out at, and
+   * running indefinitely more droplets would just keep wearing it down toward a flat plane.
+   */
   function runErosionTick() {
     const field = heightFieldRef.current;
-    if (!field) return;
-    const dropletsThisTick = Math.max(1, Math.round(DROPLETS_PER_TICK * speedRef.current));
+    if (!field || dropletCountRef.current >= maxDropletCountRef.current) return;
+    const remaining = maxDropletCountRef.current - dropletCountRef.current;
+    const dropletsThisTick = Math.min(remaining, Math.max(1, Math.round(DROPLETS_PER_TICK * speedRef.current)));
     erodeDroplets(field, stateRef.current.resolution, dropletsThisTick, defaultErosionParams, erosionRngRef.current);
     const newCount = dropletCountRef.current + dropletsThisTick;
     dropletCountRef.current = newCount;
     onDropletCountChangeRef.current(newCount);
     rebuildGeometryRef.current();
+    if (newCount >= maxDropletCountRef.current) onReachMaxDropletCountRef.current();
   }
 
   /** Smoothly moves the camera position + orbit target to their new values. */
