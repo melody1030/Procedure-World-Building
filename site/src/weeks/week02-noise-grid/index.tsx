@@ -4,7 +4,7 @@ import NoiseMap2D from "./NoiseMap2D";
 import GridScene3D from "./GridScene3D";
 import type { GridScene3DHandle } from "./GridScene3D";
 import SimulationPlayer from "./SimulationPlayer";
-import { createRng, defaultErosionParams, erodeDroplets, generateHeightField } from "./erosion";
+import { createRng, erodeDroplets, generateHeightField } from "./erosion";
 import { defaultWeek1State } from "./config";
 import type { MapCell, Week1State } from "./types";
 import "./week02.css";
@@ -66,7 +66,7 @@ export default function Week02NoiseGrid() {
   const handleSeek = (targetCount: number) => {
     const field = generateHeightField(state.resolution, state);
     const rng = createRng(EROSION_SEED);
-    erodeDroplets(field, state.resolution, targetCount, defaultErosionParams, rng);
+    erodeDroplets(field, state.resolution, targetCount, state.erosionParams, rng);
     heightFieldRef.current = field;
     setDropletCount(targetCount);
     setIsSimulating(false);

@@ -1,10 +1,11 @@
 import { useState } from "react";
 import type { CameraPreset, Week1State, NoiseType, ShapingType, ViewMode } from "./types";
+import type { ErosionParams } from "./erosion";
 import { noiseConfig, viewModeConfig, cameraPresetConfig, fieldDescriptions } from "./config";
 import { shapingConfig } from "./shaping";
 import Field from "./Field";
 import Section from "./Section";
-import { CameraIcon, GridIcon, MonitorIcon, ShapingIcon, WaveformIcon } from "./icons";
+import { CameraIcon, DropletIcon, GridIcon, MonitorIcon, ShapingIcon, WaveformIcon } from "./icons";
 
 interface ControlsPanelProps {
   state: Week1State;
@@ -23,6 +24,10 @@ const PANEL_TABS: Array<{ id: PanelTab; label: string }> = [
 export default function ControlsPanel({ state, onChange, onResetCamera, onCameraPreset }: ControlsPanelProps) {
   const [activeTab, setActiveTab] = useState<PanelTab>("noise");
   const shaping = shapingConfig[state.shapingType];
+
+  const updateErosionParam = <K extends keyof ErosionParams>(key: K, value: ErosionParams[K]) => {
+    onChange({ erosionParams: { ...state.erosionParams, [key]: value } });
+  };
 
   return (
     <aside className="controls-panel">
@@ -181,6 +186,162 @@ export default function ControlsPanel({ state, onChange, onResetCamera, onCamera
               </select>
             </Field>
             <p className="field-note">{viewModeConfig[state.viewMode].description}</p>
+          </Section>
+
+          <Section icon={<DropletIcon />} title="Erosion" defaultExpanded={false}>
+            <Field label="Inertia" description={fieldDescriptions.inertia}>
+              <div className="param-control">
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={state.erosionParams.inertia}
+                  onChange={(e) => updateErosionParam("inertia", parseFloat(e.target.value))}
+                />
+                <span className="param-value">{state.erosionParams.inertia.toFixed(2)}</span>
+              </div>
+            </Field>
+
+            <Field label="Capacity Factor" description={fieldDescriptions.capacityFactor}>
+              <div className="param-control">
+                <input
+                  type="range"
+                  min={0.5}
+                  max={10}
+                  step={0.5}
+                  value={state.erosionParams.capacityFactor}
+                  onChange={(e) => updateErosionParam("capacityFactor", parseFloat(e.target.value))}
+                />
+                <span className="param-value">{state.erosionParams.capacityFactor.toFixed(1)}</span>
+              </div>
+            </Field>
+
+            <Field label="Min Capacity" description={fieldDescriptions.minSedimentCapacity}>
+              <div className="param-control">
+                <input
+                  type="range"
+                  min={0}
+                  max={0.1}
+                  step={0.005}
+                  value={state.erosionParams.minSedimentCapacity}
+                  onChange={(e) => updateErosionParam("minSedimentCapacity", parseFloat(e.target.value))}
+                />
+                <span className="param-value">{state.erosionParams.minSedimentCapacity.toFixed(3)}</span>
+              </div>
+            </Field>
+
+            <Field label="Erode Speed" description={fieldDescriptions.erodeSpeed}>
+              <div className="param-control">
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={state.erosionParams.erodeSpeed}
+                  onChange={(e) => updateErosionParam("erodeSpeed", parseFloat(e.target.value))}
+                />
+                <span className="param-value">{state.erosionParams.erodeSpeed.toFixed(2)}</span>
+              </div>
+            </Field>
+
+            <Field label="Deposit Speed" description={fieldDescriptions.depositSpeed}>
+              <div className="param-control">
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={state.erosionParams.depositSpeed}
+                  onChange={(e) => updateErosionParam("depositSpeed", parseFloat(e.target.value))}
+                />
+                <span className="param-value">{state.erosionParams.depositSpeed.toFixed(2)}</span>
+              </div>
+            </Field>
+
+            <Field label="Evaporate Speed" description={fieldDescriptions.evaporateSpeed}>
+              <div className="param-control">
+                <input
+                  type="range"
+                  min={0}
+                  max={0.1}
+                  step={0.005}
+                  value={state.erosionParams.evaporateSpeed}
+                  onChange={(e) => updateErosionParam("evaporateSpeed", parseFloat(e.target.value))}
+                />
+                <span className="param-value">{state.erosionParams.evaporateSpeed.toFixed(3)}</span>
+              </div>
+            </Field>
+
+            <Field label="Gravity" description={fieldDescriptions.gravity}>
+              <div className="param-control">
+                <input
+                  type="range"
+                  min={1}
+                  max={10}
+                  step={0.5}
+                  value={state.erosionParams.gravity}
+                  onChange={(e) => updateErosionParam("gravity", parseFloat(e.target.value))}
+                />
+                <span className="param-value">{state.erosionParams.gravity.toFixed(1)}</span>
+              </div>
+            </Field>
+
+            <Field label="Max Lifetime" description={fieldDescriptions.maxLifetime}>
+              <div className="param-control">
+                <input
+                  type="range"
+                  min={5}
+                  max={100}
+                  step={1}
+                  value={state.erosionParams.maxLifetime}
+                  onChange={(e) => updateErosionParam("maxLifetime", parseInt(e.target.value, 10))}
+                />
+                <span className="param-value">{state.erosionParams.maxLifetime}</span>
+              </div>
+            </Field>
+
+            <Field label="Initial Water" description={fieldDescriptions.initialWater}>
+              <div className="param-control">
+                <input
+                  type="range"
+                  min={0.5}
+                  max={3}
+                  step={0.1}
+                  value={state.erosionParams.initialWater}
+                  onChange={(e) => updateErosionParam("initialWater", parseFloat(e.target.value))}
+                />
+                <span className="param-value">{state.erosionParams.initialWater.toFixed(1)}</span>
+              </div>
+            </Field>
+
+            <Field label="Initial Speed" description={fieldDescriptions.initialSpeed}>
+              <div className="param-control">
+                <input
+                  type="range"
+                  min={0.1}
+                  max={3}
+                  step={0.1}
+                  value={state.erosionParams.initialSpeed}
+                  onChange={(e) => updateErosionParam("initialSpeed", parseFloat(e.target.value))}
+                />
+                <span className="param-value">{state.erosionParams.initialSpeed.toFixed(1)}</span>
+              </div>
+            </Field>
+
+            <Field label="Erosion Radius" description={fieldDescriptions.erosionRadius}>
+              <div className="param-control">
+                <input
+                  type="range"
+                  min={1}
+                  max={5}
+                  step={1}
+                  value={state.erosionParams.erosionRadius}
+                  onChange={(e) => updateErosionParam("erosionRadius", parseInt(e.target.value, 10))}
+                />
+                <span className="param-value">{state.erosionParams.erosionRadius}</span>
+              </div>
+            </Field>
           </Section>
 
           <Section icon={<CameraIcon />} title="Camera">

@@ -1,3 +1,4 @@
+import { defaultErosionParams } from "./erosion";
 import type { CameraPreset, NoiseType, ViewMode, Week1State } from "./types";
 
 export const noiseConfig: Record<NoiseType, { label: string; description: string }> = {
@@ -50,6 +51,17 @@ export const fieldDescriptions = {
   seed: "Changes the random pattern without changing its overall character — same settings, different result.",
   resolution: "Number of grid subdivisions in the 3D view. Higher resolution shows finer detail but costs more to compute.",
   shapingType: "An optional curve applied to the noise values after generation, to reshape the terrain.",
+  inertia: "How much a droplet keeps its previous direction versus turning to follow the slope. Higher values carve straighter, more meandering channels.",
+  capacityFactor: "Multiplier on how much sediment a droplet can carry for a given slope/speed/water. Higher values erode more aggressively.",
+  minSedimentCapacity: "A floor on carrying capacity so droplets can still pick up a little sediment even on nearly flat ground.",
+  erodeSpeed: "Fraction of the capacity gap eroded from the terrain per step. Higher values cut channels faster.",
+  depositSpeed: "Fraction of excess sediment dropped back onto the terrain per step. Higher values fill in low spots faster.",
+  evaporateSpeed: "How quickly a droplet's water evaporates. Higher values shorten a droplet's effective reach.",
+  gravity: "How strongly downhill slope converts into speed. Higher values make droplets accelerate faster on steep terrain.",
+  maxLifetime: "Maximum number of steps a single droplet simulates before stopping.",
+  initialWater: "Starting water volume for each droplet.",
+  initialSpeed: "Starting speed for each droplet.",
+  erosionRadius: "How many nearby grid cells share each erosion event, weighted by distance. Wider radii carve smoother, broader channels.",
 };
 
 export const defaultWeek1State: Week1State = {
@@ -62,4 +74,5 @@ export const defaultWeek1State: Week1State = {
   shapingType: "none",
   amount: 0,
   viewMode: "heightmap",
+  erosionParams: defaultErosionParams,
 };

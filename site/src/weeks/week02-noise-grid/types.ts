@@ -1,3 +1,5 @@
+import type { ErosionParams } from "./erosion";
+
 export type NoiseType = "white" | "perlin" | "cellular";
 export type ShapingType = "none" | "power" | "terrace" | "ridge";
 export type ViewMode = "heightmap" | "wireframe";
@@ -19,6 +21,7 @@ export interface ShapingParams {
 export interface Week1State extends NoiseParams, ShapingParams {
   resolution: number;
   viewMode: ViewMode;
+  erosionParams: ErosionParams;
 }
 
 /** A location on the map/terrain, in normalized [0, 1] map coordinates. */

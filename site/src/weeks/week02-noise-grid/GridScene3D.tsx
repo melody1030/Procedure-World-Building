@@ -6,7 +6,7 @@ import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { SSAOPass } from "three/examples/jsm/postprocessing/SSAOPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { elevationColor } from "./colorRamp";
-import { createRng, defaultErosionParams, erodeDroplets, sampleHeightField } from "./erosion";
+import { createRng, erodeDroplets, sampleHeightField } from "./erosion";
 import type { CameraPreset, MapCell, Week1State } from "./types";
 
 const GRID_SIZE = 14;
@@ -194,7 +194,13 @@ const GridScene3D = forwardRef<GridScene3DHandle, GridScene3DProps>(function Gri
     if (!field || dropletCountRef.current >= maxDropletCountRef.current) return;
     const remaining = maxDropletCountRef.current - dropletCountRef.current;
     const dropletsThisTick = Math.min(remaining, Math.max(1, Math.round(DROPLETS_PER_TICK * speedRef.current)));
-    erodeDroplets(field, stateRef.current.resolution, dropletsThisTick, defaultErosionParams, erosionRngRef.current);
+    erodeDroplets(
+      field,
+      stateRef.current.resolution,
+      dropletsThisTick,
+      stateRef.current.erosionParams,
+      erosionRngRef.current,
+    );
     const newCount = dropletCountRef.current + dropletsThisTick;
     dropletCountRef.current = newCount;
     onDropletCountChangeRef.current(newCount);

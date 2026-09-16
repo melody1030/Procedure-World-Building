@@ -40,6 +40,14 @@ export function ShapingIcon({ className }: IconProps) {
   );
 }
 
+export function DropletIcon({ className }: IconProps) {
+  return (
+    <svg {...BASE_PROPS} className={className}>
+      <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z" />
+    </svg>
+  );
+}
+
 export function MonitorIcon({ className }: IconProps) {
   return (
     <svg {...BASE_PROPS} className={className}>
