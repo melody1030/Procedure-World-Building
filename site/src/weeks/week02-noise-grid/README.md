@@ -82,6 +82,12 @@ matching point on the 3D terrain, with a "Clear pin" button to remove it.
 
 https://github.com/user-attachments/assets/2e8edf29-6f85-418c-937b-a8930ddf61e5
 
+**2026-09-15** — Redesigned the control panel to match Week 1's style:
+collapsible, icon-led section cards (Noise/Grid/Shaping, each in its own
+bordered box) and a boxed numeric readout alongside every slider.
+
+![Redesigned control panel with boxed sections](screenshots/2026-09-15-ui-redesign-boxed-sections.jpg)
+
 ## Files
 
 | File | Purpose |
