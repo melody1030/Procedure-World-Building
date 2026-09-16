@@ -188,8 +188,8 @@ export default function ControlsPanel({ state, onChange, onResetCamera, onCamera
             <p className="field-note">{viewModeConfig[state.viewMode].description}</p>
           </Section>
 
-          <Section icon={<DropletIcon />} title="Erosion" defaultExpanded={false}>
-            <Field label="Inertia" description={fieldDescriptions.inertia}>
+          <Section icon={<DropletIcon />} title="Hydraulic Erosion" defaultExpanded={false}>
+            <Field label="Intensity" description={fieldDescriptions.inertia}>
               <div className="param-control">
                 <input
                   type="range"
@@ -200,34 +200,6 @@ export default function ControlsPanel({ state, onChange, onResetCamera, onCamera
                   onChange={(e) => updateErosionParam("inertia", parseFloat(e.target.value))}
                 />
                 <span className="param-value">{state.erosionParams.inertia.toFixed(2)}</span>
-              </div>
-            </Field>
-
-            <Field label="Capacity Factor" description={fieldDescriptions.capacityFactor}>
-              <div className="param-control">
-                <input
-                  type="range"
-                  min={0.5}
-                  max={10}
-                  step={0.5}
-                  value={state.erosionParams.capacityFactor}
-                  onChange={(e) => updateErosionParam("capacityFactor", parseFloat(e.target.value))}
-                />
-                <span className="param-value">{state.erosionParams.capacityFactor.toFixed(1)}</span>
-              </div>
-            </Field>
-
-            <Field label="Min Capacity" description={fieldDescriptions.minSedimentCapacity}>
-              <div className="param-control">
-                <input
-                  type="range"
-                  min={0}
-                  max={0.1}
-                  step={0.005}
-                  value={state.erosionParams.minSedimentCapacity}
-                  onChange={(e) => updateErosionParam("minSedimentCapacity", parseFloat(e.target.value))}
-                />
-                <span className="param-value">{state.erosionParams.minSedimentCapacity.toFixed(3)}</span>
               </div>
             </Field>
 
@@ -259,34 +231,6 @@ export default function ControlsPanel({ state, onChange, onResetCamera, onCamera
               </div>
             </Field>
 
-            <Field label="Evaporate Speed" description={fieldDescriptions.evaporateSpeed}>
-              <div className="param-control">
-                <input
-                  type="range"
-                  min={0}
-                  max={0.1}
-                  step={0.005}
-                  value={state.erosionParams.evaporateSpeed}
-                  onChange={(e) => updateErosionParam("evaporateSpeed", parseFloat(e.target.value))}
-                />
-                <span className="param-value">{state.erosionParams.evaporateSpeed.toFixed(3)}</span>
-              </div>
-            </Field>
-
-            <Field label="Gravity" description={fieldDescriptions.gravity}>
-              <div className="param-control">
-                <input
-                  type="range"
-                  min={1}
-                  max={10}
-                  step={0.5}
-                  value={state.erosionParams.gravity}
-                  onChange={(e) => updateErosionParam("gravity", parseFloat(e.target.value))}
-                />
-                <span className="param-value">{state.erosionParams.gravity.toFixed(1)}</span>
-              </div>
-            </Field>
-
             <Field label="Max Lifetime" description={fieldDescriptions.maxLifetime}>
               <div className="param-control">
                 <input
@@ -312,34 +256,6 @@ export default function ControlsPanel({ state, onChange, onResetCamera, onCamera
                   onChange={(e) => updateErosionParam("initialWater", parseFloat(e.target.value))}
                 />
                 <span className="param-value">{state.erosionParams.initialWater.toFixed(1)}</span>
-              </div>
-            </Field>
-
-            <Field label="Initial Speed" description={fieldDescriptions.initialSpeed}>
-              <div className="param-control">
-                <input
-                  type="range"
-                  min={0.1}
-                  max={3}
-                  step={0.1}
-                  value={state.erosionParams.initialSpeed}
-                  onChange={(e) => updateErosionParam("initialSpeed", parseFloat(e.target.value))}
-                />
-                <span className="param-value">{state.erosionParams.initialSpeed.toFixed(1)}</span>
-              </div>
-            </Field>
-
-            <Field label="Erosion Radius" description={fieldDescriptions.erosionRadius}>
-              <div className="param-control">
-                <input
-                  type="range"
-                  min={1}
-                  max={5}
-                  step={1}
-                  value={state.erosionParams.erosionRadius}
-                  onChange={(e) => updateErosionParam("erosionRadius", parseInt(e.target.value, 10))}
-                />
-                <span className="param-value">{state.erosionParams.erosionRadius}</span>
               </div>
             </Field>
           </Section>
