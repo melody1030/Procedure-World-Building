@@ -12,7 +12,6 @@ import type { CameraPreset, MapCell, Week1State } from "./types";
 const GRID_SIZE = 14;
 const HEIGHT_SCALE = 2.5;
 const WIREFRAME_COLOR = 0x9a9a9a;
-const WIREFRAME_OPACITY_SUBTLE = 0.1;
 const WIREFRAME_OPACITY_BOLD = 0.4;
 const TERRAIN_OPACITY_HEIGHTMAP = 1;
 const TERRAIN_OPACITY_WIREFRAME = 0.5;
@@ -300,8 +299,11 @@ const GridScene3D = forwardRef<GridScene3DHandle, GridScene3DProps>(function Gri
       ? TERRAIN_OPACITY_WIREFRAME
       : TERRAIN_OPACITY_HEIGHTMAP;
 
+    // Grid-line overlay only shows in Wireframe view — Heightmap is meant to read as a
+    // clean, flat-shaded surface with no line clutter on top.
+    refs.wireframe.visible = isWireframeMode;
     const wireframeMaterial = refs.wireframe.material as THREE.LineBasicMaterial;
-    wireframeMaterial.opacity = isWireframeMode ? WIREFRAME_OPACITY_BOLD : WIREFRAME_OPACITY_SUBTLE;
+    wireframeMaterial.opacity = WIREFRAME_OPACITY_BOLD;
   }
   const rebuildGeometryRef = useRef(rebuildGeometry);
   rebuildGeometryRef.current = rebuildGeometry;
@@ -349,9 +351,10 @@ const GridScene3D = forwardRef<GridScene3DHandle, GridScene3DProps>(function Gri
     const wireframeMaterial = new THREE.LineBasicMaterial({
       color: WIREFRAME_COLOR,
       transparent: true,
-      opacity: WIREFRAME_OPACITY_SUBTLE,
+      opacity: WIREFRAME_OPACITY_BOLD,
     });
     const wireframe = new THREE.LineSegments(buildGridLines(geometry, 1), wireframeMaterial);
+    wireframe.visible = false;
     wireframe.rotation.x = -Math.PI / 2;
     scene.add(wireframe);
 
