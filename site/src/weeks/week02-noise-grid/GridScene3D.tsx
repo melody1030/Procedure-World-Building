@@ -321,15 +321,17 @@ const GridScene3D = forwardRef<GridScene3DHandle, GridScene3DProps>(function Gri
     // dissolves it into the backdrop toward the horizon instead of ending in a hard edge.
     scene.fog = new THREE.Fog(BACKGROUND_COLOR, FOG_NEAR, FOG_FAR);
 
+    // Grid sits at y=0 and the ground plane just below it — coplanar surfaces at the same
+    // depth z-fight (flicker unpredictably as the camera distance changes), so they need a
+    // small vertical gap between them, same as Week 1's scene.
     const groundGeometry = new THREE.PlaneGeometry(GROUND_SIZE, GROUND_SIZE);
     const groundMaterial = new THREE.MeshBasicMaterial({ color: BACKGROUND_COLOR });
     const ground = new THREE.Mesh(groundGeometry, groundMaterial);
     ground.rotation.x = -Math.PI / 2;
-    ground.position.y = -0.05;
+    ground.position.y = -0.01;
     scene.add(ground);
 
     const gridHelper = new THREE.GridHelper(GRID_HELPER_SIZE, GRID_HELPER_DIVISIONS, 0x8888aa, 0x44445a);
-    gridHelper.position.y = -0.05;
     scene.add(gridHelper);
 
     const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
