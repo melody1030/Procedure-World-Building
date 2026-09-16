@@ -30,7 +30,7 @@
   left: 0.9rem;
   bottom: 0.9rem;
   z-index: 10;
-  width: 336px;
+  width: 280px;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
