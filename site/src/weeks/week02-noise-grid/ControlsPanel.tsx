@@ -55,7 +55,7 @@ export default function ControlsPanel({ state, onChange, onResetCamera, onCamera
             </Field>
             <p className="field-note">{noiseConfig[state.noiseType].description}</p>
 
-            <Field label="Scale" description={fieldDescriptions.scale} valueLabel={state.scale.toFixed(1)}>
+            <Field label="Scale" description={fieldDescriptions.scale}>
               <div className="param-control">
                 <input
                   type="range"
@@ -69,7 +69,7 @@ export default function ControlsPanel({ state, onChange, onResetCamera, onCamera
               </div>
             </Field>
 
-            <Field label="Octaves" description={fieldDescriptions.octaves} valueLabel={String(state.octaves)}>
+            <Field label="Octaves" description={fieldDescriptions.octaves}>
               <div className="param-control">
                 <input
                   type="range"
@@ -83,11 +83,7 @@ export default function ControlsPanel({ state, onChange, onResetCamera, onCamera
               </div>
             </Field>
 
-            <Field
-              label="Persistence"
-              description={fieldDescriptions.persistence}
-              valueLabel={state.persistence.toFixed(2)}
-            >
+            <Field label="Persistence" description={fieldDescriptions.persistence}>
               <div className="param-control">
                 <input
                   type="range"
@@ -101,7 +97,7 @@ export default function ControlsPanel({ state, onChange, onResetCamera, onCamera
               </div>
             </Field>
 
-            <Field label="Seed" description={fieldDescriptions.seed} valueLabel={String(state.seed)}>
+            <Field label="Seed" description={fieldDescriptions.seed}>
               <div className="param-control">
                 <input
                   type="range"
@@ -117,11 +113,7 @@ export default function ControlsPanel({ state, onChange, onResetCamera, onCamera
           </Section>
 
           <Section icon={<GridIcon />} title="Grid">
-            <Field
-              label="Resolution"
-              description={fieldDescriptions.resolution}
-              valueLabel={`${state.resolution}×${state.resolution}`}
-            >
+            <Field label="Resolution" description={fieldDescriptions.resolution}>
               <div className="param-control">
                 <input
                   type="range"
@@ -155,11 +147,7 @@ export default function ControlsPanel({ state, onChange, onResetCamera, onCamera
             <p className="field-note">{shaping.description}</p>
 
             {state.shapingType !== "none" && (
-              <Field
-                label={shaping.amountLabel}
-                description={shaping.description}
-                valueLabel={state.amount.toFixed(2)}
-              >
+              <Field label={shaping.amountLabel} description={shaping.description}>
                 <div className="param-control">
                   <input
                     type="range"
