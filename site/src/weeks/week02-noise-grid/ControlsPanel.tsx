@@ -118,7 +118,7 @@ export default function ControlsPanel({ state, onChange, onResetCamera, onCamera
                 <input
                   type="range"
                   min={4}
-                  max={100}
+                  max={500}
                   step={1}
                   value={state.resolution}
                   onChange={(e) => onChange({ resolution: parseInt(e.target.value, 10) })}
