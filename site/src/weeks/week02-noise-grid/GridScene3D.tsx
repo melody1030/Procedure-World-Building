@@ -18,10 +18,14 @@ const TERRAIN_OPACITY_HEIGHTMAP = 1;
 const TERRAIN_OPACITY_WIREFRAME = 0.5;
 const MARKER_COLOR = 0xffffff;
 const CAMERA_MOVE_DURATION_MS = 700;
-const SKY_TOP_COLOR = "#080810";
-const SKY_HORIZON_COLOR = "#181840";
-const GROUND_COLOR = 0x121235;
+// Same background/grid/fog treatment as Week 1 — a solid-color backdrop with a GridHelper
+// floor and matching fog, instead of Week 2's old gradient-sky + plain ground plane.
+const BACKGROUND_COLOR = "#1a1a2e";
 const GROUND_SIZE = GRID_SIZE * 8;
+const GRID_HELPER_SIZE = 80;
+const GRID_HELPER_DIVISIONS = 80;
+const FOG_NEAR = 15;
+const FOG_FAR = 50;
 const EROSION_TICK_MS = 100;
 const DROPLETS_PER_TICK = 15;
 
@@ -35,22 +39,6 @@ const CAMERA_PRESETS: Record<CameraPreset, { position: [number, number, number];
 // not a scene light, just a math constant for the faceted "low-poly" look.
 const FACET_SHADE_DIR = new THREE.Vector3(0.4, 1, 0.5).normalize();
 const FACET_SHADE_MIN = 0.55;
-
-/** A vertical gradient (dark zenith → slightly lighter horizon) used as the scene background. */
-function createSkyGradientTexture(): THREE.CanvasTexture {
-  const canvas = document.createElement("canvas");
-  canvas.width = 2;
-  canvas.height = 256;
-  const ctx = canvas.getContext("2d")!;
-  const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
-  gradient.addColorStop(0, SKY_TOP_COLOR);
-  gradient.addColorStop(1, SKY_HORIZON_COLOR);
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  return texture;
-}
 
 /**
  * Converts a map cell into the matching world-space point on the terrain
@@ -328,15 +316,21 @@ const GridScene3D = forwardRef<GridScene3DHandle, GridScene3DProps>(function Gri
     if (!mount) return;
 
     const scene = new THREE.Scene();
-    const skyTexture = createSkyGradientTexture();
-    scene.background = skyTexture;
+    scene.background = new THREE.Color(BACKGROUND_COLOR);
+    // GridHelper has no built-in distance fade, so fog (same color as the background) is what
+    // dissolves it into the backdrop toward the horizon instead of ending in a hard edge.
+    scene.fog = new THREE.Fog(BACKGROUND_COLOR, FOG_NEAR, FOG_FAR);
 
     const groundGeometry = new THREE.PlaneGeometry(GROUND_SIZE, GROUND_SIZE);
-    const groundMaterial = new THREE.MeshBasicMaterial({ color: GROUND_COLOR });
+    const groundMaterial = new THREE.MeshBasicMaterial({ color: BACKGROUND_COLOR });
     const ground = new THREE.Mesh(groundGeometry, groundMaterial);
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -0.05;
     scene.add(ground);
+
+    const gridHelper = new THREE.GridHelper(GRID_HELPER_SIZE, GRID_HELPER_DIVISIONS, 0x8888aa, 0x44445a);
+    gridHelper.position.y = -0.05;
+    scene.add(gridHelper);
 
     const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
     camera.position.set(...CAMERA_PRESETS.perspective.position);
@@ -440,9 +434,10 @@ const GridScene3D = forwardRef<GridScene3DHandle, GridScene3DProps>(function Gri
       if (cameraAnimationRef.current !== null) cancelAnimationFrame(cameraAnimationRef.current);
       resizeObserver.disconnect();
       controls.dispose();
-      skyTexture.dispose();
       groundGeometry.dispose();
       groundMaterial.dispose();
+      gridHelper.geometry.dispose();
+      (gridHelper.material as THREE.Material).dispose();
       geometry.dispose();
       terrainMaterial.dispose();
       wireframeMaterial.dispose();
