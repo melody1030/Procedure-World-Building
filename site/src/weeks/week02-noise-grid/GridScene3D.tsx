@@ -18,12 +18,10 @@ const TERRAIN_OPACITY_HEIGHTMAP = 1;
 const TERRAIN_OPACITY_WIREFRAME = 0.5;
 const MARKER_COLOR = 0xffffff;
 const CAMERA_MOVE_DURATION_MS = 700;
-// Same background/grid/fog treatment as Week 1 — a solid-color backdrop with a GridHelper
-// floor and matching fog, instead of Week 2's old gradient-sky + plain ground plane.
+// Same background/fog treatment as Week 1 — a solid-color backdrop with matching fog,
+// instead of Week 2's old gradient-sky + plain ground plane.
 const BACKGROUND_COLOR = "#1a1a2e";
 const GROUND_SIZE = GRID_SIZE * 8;
-const GRID_HELPER_SIZE = 80;
-const GRID_HELPER_DIVISIONS = 80;
 const FOG_NEAR = 15;
 const FOG_FAR = 50;
 const EROSION_TICK_MS = 100;
@@ -321,18 +319,12 @@ const GridScene3D = forwardRef<GridScene3DHandle, GridScene3DProps>(function Gri
     // dissolves it into the backdrop toward the horizon instead of ending in a hard edge.
     scene.fog = new THREE.Fog(BACKGROUND_COLOR, FOG_NEAR, FOG_FAR);
 
-    // Grid sits at y=0 and the ground plane just below it — coplanar surfaces at the same
-    // depth z-fight (flicker unpredictably as the camera distance changes), so they need a
-    // small vertical gap between them, same as Week 1's scene.
     const groundGeometry = new THREE.PlaneGeometry(GROUND_SIZE, GROUND_SIZE);
     const groundMaterial = new THREE.MeshBasicMaterial({ color: BACKGROUND_COLOR });
     const ground = new THREE.Mesh(groundGeometry, groundMaterial);
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -0.01;
     scene.add(ground);
-
-    const gridHelper = new THREE.GridHelper(GRID_HELPER_SIZE, GRID_HELPER_DIVISIONS, 0x8888aa, 0x44445a);
-    scene.add(gridHelper);
 
     const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
     camera.position.set(...CAMERA_PRESETS.perspective.position);
@@ -438,8 +430,6 @@ const GridScene3D = forwardRef<GridScene3DHandle, GridScene3DProps>(function Gri
       controls.dispose();
       groundGeometry.dispose();
       groundMaterial.dispose();
-      gridHelper.geometry.dispose();
-      (gridHelper.material as THREE.Material).dispose();
       geometry.dispose();
       terrainMaterial.dispose();
       wireframeMaterial.dispose();
