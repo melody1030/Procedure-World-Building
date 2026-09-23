@@ -67,6 +67,17 @@ order.
 
   ![Torus knot with directional light and shadows](site/src/weeks/week01-threejs-basics/screenshots/2026-09-14-torus-knot-directional-shadows.jpg)
 
+- **2026-09-23 — [Week 3 — Voxels & Volumes](site/src/weeks/week03-voxels-volumes/README.md)** —
+  three tabs built around sampling shapes into a voxel grid: Resolution (a
+  fixed shape voxelized at an adjustable grid density), Implicit Surfaces
+  (a procedural noise field turned into a solid/empty test, e.g. terraced
+  terrain), and a CSG "Voxel Techniques Lab" where primitives are combined
+  via SDF boolean formulas (union/difference/intersection) and manipulated
+  with a Move/Rotate/Scale gizmo, with undo/redo and an operation-history
+  tree.
+
+  ![CSG boolean difference result](site/src/weeks/week03-voxels-volumes/screenshots/csg-difference-result.webp)
+
 ## Getting Started
 
 Each week's in-class workshop lives as its own tab in a small React +

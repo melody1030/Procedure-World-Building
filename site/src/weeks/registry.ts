@@ -1,6 +1,7 @@
 import type { ComponentType } from "react";
 import Week01ThreejsBasics from "./week01-threejs-basics";
 import Week02NoiseGrid from "./week02-noise-grid";
+import Week03VoxelsVolumes from "./week03-voxels-volumes";
 
 export interface Week {
   id: string;
@@ -12,4 +13,5 @@ export interface Week {
 export const weeks: Week[] = [
   { id: "week01", title: "Week 1 — Three.js Basics", Component: Week01ThreejsBasics },
   { id: "week02", title: "Week 2 — Noise Grid", Component: Week02NoiseGrid },
+  { id: "week03", title: "Week 3 — Voxels & Volumes", Component: Week03VoxelsVolumes },
 ];
