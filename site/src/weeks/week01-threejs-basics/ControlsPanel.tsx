@@ -1,11 +1,11 @@
 import { useState } from "react";
+import { SidePanel } from "../../components/SidePanel";
+import { Field, FieldNote, headingClass, headingIconClass, RangeInput, Section, Select, Switch } from "../../components/controls";
 import { fieldDescriptions, geometryParamsConfig, lightConfig, materialConfig, presetConfig, shapeConfig } from "./config";
 import ColorField from "./ColorField";
-import Field from "./Field";
 import { CubeIcon, DiamondIcon, DiceIcon, DropletIcon, StarIcon, SunIcon } from "./icons";
 import ParamRow from "./ParamRow";
 import { randomizePatch } from "./randomize";
-import Section from "./Section";
 import type { GeometryParams, LightType, MaterialType, ParamShapeType, PresetKey, ShapeType, Week1BasicsState } from "./types";
 
 interface ControlsPanelProps {
@@ -27,6 +27,7 @@ export default function ControlsPanel({ state, onChange }: ControlsPanelProps) {
   // Shows whichever preset was last chosen, so picking one is reflected in the dropdown
   // instead of silently reverting to the placeholder.
   const [presetSelection, setPresetSelection] = useState("");
+  const [open, setOpen] = useState(true);
 
   const updateGeometryParam = (shape: ParamShapeType, key: string, value: number) => {
     const shapeParams = state.geometryParams[shape] as unknown as Record<string, number>;
@@ -39,10 +40,9 @@ export default function ControlsPanel({ state, onChange }: ControlsPanelProps) {
   };
 
   return (
-    <aside className="controls-panel">
+    <SidePanel side="left" open={open} onToggle={() => setOpen((prev) => !prev)} widthRem={16.2} label="settings panel">
       <Section icon={<StarIcon />} title="Presets">
-        <select
-          className="preset-select"
+        <Select
           value={presetSelection}
           onChange={(e) => {
             const key = e.target.value as PresetKey;
@@ -50,7 +50,7 @@ export default function ControlsPanel({ state, onChange }: ControlsPanelProps) {
             onChange(presetConfig[key].patch);
           }}
         >
-          <option value="" disabled>
+          <option value="" disabled className="text-slate-500">
             Choose a preset…
           </option>
           {Object.entries(presetConfig).map(([key, preset]) => (
@@ -58,18 +58,18 @@ export default function ControlsPanel({ state, onChange }: ControlsPanelProps) {
               {preset.emoji} {preset.label}
             </option>
           ))}
-        </select>
+        </Select>
       </Section>
 
       <Section icon={<CubeIcon />} title="Geometry">
         <Field label="Shape" description={fieldDescriptions.shape}>
-          <select value={state.shape} onChange={(e) => onChange({ shape: e.target.value as ShapeType })}>
+          <Select value={state.shape} onChange={(e) => onChange({ shape: e.target.value as ShapeType })}>
             {Object.entries(shapeConfig).map(([key, cfg]) => (
               <option key={key} value={key}>
                 {cfg.label}
               </option>
             ))}
-          </select>
+          </Select>
         </Field>
 
         <ColorField
@@ -80,9 +80,9 @@ export default function ControlsPanel({ state, onChange }: ControlsPanelProps) {
         />
 
         {isParamShape(state.shape) && (
-          <div className="param-section">
-            <div className="param-section-header">
-              <DiamondIcon />
+          <div className="flex flex-col gap-3.5 border-t border-slate-700/50 pt-3">
+            <div className={headingClass}>
+              <DiamondIcon className={headingIconClass} />
               Parameters
             </div>
             {geometryParamsConfig[state.shape].map((def) => {
@@ -107,7 +107,7 @@ export default function ControlsPanel({ state, onChange }: ControlsPanelProps) {
 
       <Section icon={<DropletIcon />} title="Material">
         <Field label="Type" description={fieldDescriptions.materialType}>
-          <select
+          <Select
             value={state.materialType}
             onChange={(e) => onChange({ materialType: e.target.value as MaterialType })}
           >
@@ -116,18 +116,17 @@ export default function ControlsPanel({ state, onChange }: ControlsPanelProps) {
                 {cfg.label}
               </option>
             ))}
-          </select>
+          </Select>
         </Field>
 
-        <Field label="Wireframe" description={fieldDescriptions.wireframe}>
-          <input
-            type="checkbox"
+        <Field label="Wireframe" description={fieldDescriptions.wireframe} inline>
+          <Switch
             checked={state.wireframe}
             onChange={(e) => onChange({ wireframe: e.target.checked })}
           />
         </Field>
 
-        <p className="field-note">{material.description}</p>
+        <FieldNote>{material.description}</FieldNote>
 
         {showRoughnessMetalness && (
           <>
@@ -136,8 +135,7 @@ export default function ControlsPanel({ state, onChange }: ControlsPanelProps) {
               description={fieldDescriptions.roughness}
               valueLabel={state.roughness.toFixed(2)}
             >
-              <input
-                type="range"
+              <RangeInput
                 min={0}
                 max={1}
                 step={0.05}
@@ -151,8 +149,7 @@ export default function ControlsPanel({ state, onChange }: ControlsPanelProps) {
               description={fieldDescriptions.metalness}
               valueLabel={state.metalness.toFixed(2)}
             >
-              <input
-                type="range"
+              <RangeInput
                 min={0}
                 max={1}
                 step={0.05}
@@ -165,8 +162,7 @@ export default function ControlsPanel({ state, onChange }: ControlsPanelProps) {
 
         {showShininess && (
           <Field label="Shininess" description={fieldDescriptions.shininess} valueLabel={String(state.shininess)}>
-            <input
-              type="range"
+            <RangeInput
               min={0}
               max={200}
               step={5}
@@ -179,7 +175,7 @@ export default function ControlsPanel({ state, onChange }: ControlsPanelProps) {
 
       <Section icon={<SunIcon />} title="Lighting">
         <Field label="Type" description={fieldDescriptions.lightType}>
-          <select
+          <Select
             value={state.lightType}
             onChange={(e) => {
               const lightType = e.target.value as LightType;
@@ -191,26 +187,24 @@ export default function ControlsPanel({ state, onChange }: ControlsPanelProps) {
                 {cfg.label}
               </option>
             ))}
-          </select>
+          </Select>
         </Field>
 
-        <Field label="Shadows" description={fieldDescriptions.shadowsEnabled}>
-          <input
-            type="checkbox"
+        <Field label="Shadows" description={fieldDescriptions.shadowsEnabled} inline>
+          <Switch
             checked={state.shadowsEnabled}
             onChange={(e) => onChange({ shadowsEnabled: e.target.checked })}
           />
         </Field>
 
-        <p className="field-note">{light.description}</p>
+        <FieldNote>{light.description}</FieldNote>
 
         <Field
           label="Intensity"
           description={fieldDescriptions.lightIntensity}
           valueLabel={state.lightIntensity.toFixed(1)}
         >
-          <input
-            type="range"
+          <RangeInput
             min={light.min}
             max={light.max}
             step={light.step}
@@ -220,10 +214,16 @@ export default function ControlsPanel({ state, onChange }: ControlsPanelProps) {
         </Field>
       </Section>
 
-      <button className="randomize-button" onClick={() => onChange(randomizePatch())}>
-        <DiceIcon />
+      {/* Sticky over the scrolling panel: the offset is measured inside the panel's 1.25rem padding, so
+          -0.75rem rests it 0.5rem above the card edge. The translucent cyan sits on solid slate, and the
+          two shadows back the strip above and below it. */}
+      <button
+        className="sticky -bottom-3 flex w-full shrink-0 cursor-pointer items-center justify-center gap-2 rounded-xl border border-cyan-400/60 bg-slate-900 bg-gradient-to-b from-cyan-500/20 to-cyan-500/20 px-3 py-2.5 text-[13px] font-semibold text-cyan-200 shadow-[0_-0.75rem_0.75rem_-0.25rem_rgba(15,23,42,0.95),0_0.75rem_0_0_rgba(15,23,42,0.95)] transition hover:from-cyan-500/30 hover:to-cyan-500/30 active:translate-y-px"
+        onClick={() => onChange(randomizePatch())}
+      >
+        <DiceIcon className="h-4 w-4 shrink-0" />
         Randomize
       </button>
-    </aside>
+    </SidePanel>
   );
 }

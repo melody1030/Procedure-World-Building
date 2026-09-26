@@ -1,16 +1,16 @@
 import * as THREE from "three";
 
 /**
- * Elevation stops from low to high, built from the site's own palette
- * (panel background → accent purple → wireframe lavender → body text)
- * so the terrain reads as part of the same UI rather than a realistic map.
+ * Elevation stops from low to high, built from the site's slate + cyan palette
+ * (deep slate → cyan-800 → cyan-500 → cyan-300 → near-white) so the terrain reads as part of
+ * the same UI rather than a realistic map.
  */
 const STOPS: Array<[number, THREE.Color]> = [
-  [0.0, new THREE.Color(0x121235)],
-  [0.25, new THREE.Color(0x3d3d99)],
-  [0.5, new THREE.Color(0x7a5cf0)],
-  [0.75, new THREE.Color(0xb0a0ff)],
-  [1.0, new THREE.Color(0xffffff)],
+  [0.0, new THREE.Color(0x0f1e33)],
+  [0.25, new THREE.Color(0x155e75)],
+  [0.5, new THREE.Color(0x06b6d4)],
+  [0.75, new THREE.Color(0x67e8f9)],
+  [1.0, new THREE.Color(0xf0fdff)],
 ];
 
 /** Maps a [0, 1] elevation value to a color along the terrain ramp. */

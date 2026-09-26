@@ -4,7 +4,6 @@ import RotateToggle from "./RotateToggle";
 import Scene3D from "./Scene3D";
 import { defaultWeek1BasicsState } from "./config";
 import type { Week1BasicsState } from "./types";
-import "./week01-basics.css";
 
 export default function Week01ThreejsBasics() {
   const [state, setState] = useState<Week1BasicsState>(defaultWeek1BasicsState);
@@ -14,7 +13,7 @@ export default function Week01ThreejsBasics() {
   };
 
   return (
-    <div className="week01-basics">
+    <div className="relative min-h-[480px] flex-1 overflow-hidden rounded-2xl">
       <Scene3D state={state} />
       <ControlsPanel state={state} onChange={onChange} />
       <RotateToggle autoRotate={state.autoRotate} onToggle={() => onChange({ autoRotate: !state.autoRotate })} />

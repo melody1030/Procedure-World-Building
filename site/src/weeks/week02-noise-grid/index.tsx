@@ -7,7 +7,6 @@ import SimulationPlayer from "./SimulationPlayer";
 import { createRng, erodeDroplets, generateHeightField } from "./erosion";
 import { defaultWeek1State } from "./config";
 import type { MapCell, Week1State } from "./types";
-import "./week02.css";
 
 // Around half a droplet per grid node is roughly where this simulation's erosion settles into
 // a detailed, channel-carved equilibrium (matches the ratio used in the reference Lague-style
@@ -73,7 +72,7 @@ export default function Week02NoiseGrid() {
   };
 
   return (
-    <div className="week02">
+    <div className="relative min-h-[480px] flex-1 overflow-hidden rounded-2xl">
       <GridScene3D
         ref={gridRef}
         state={state}

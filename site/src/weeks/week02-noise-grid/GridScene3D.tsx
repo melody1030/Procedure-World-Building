@@ -19,7 +19,7 @@ const MARKER_COLOR = 0xffffff;
 const CAMERA_MOVE_DURATION_MS = 700;
 // Same background/fog treatment as Week 1 — a solid-color backdrop with matching fog,
 // instead of Week 2's old gradient-sky + plain ground plane.
-const BACKGROUND_COLOR = "#1a1a2e";
+const BACKGROUND_COLOR = "#0a0f17";
 const GROUND_SIZE = GRID_SIZE * 8;
 const FOG_NEAR = 15;
 const FOG_FAR = 50;
@@ -488,7 +488,7 @@ const GridScene3D = forwardRef<GridScene3DHandle, GridScene3DProps>(function Gri
     }
   }, [state, heightField, selectedCell]);
 
-  return <div ref={mountRef} className="grid-scene-3d" />;
+  return <div ref={mountRef} className="absolute inset-0 overflow-hidden rounded-2xl bg-stage [&>canvas]:block [&>canvas]:!h-full [&>canvas]:!w-full" />;
 });
 
 export default GridScene3D;

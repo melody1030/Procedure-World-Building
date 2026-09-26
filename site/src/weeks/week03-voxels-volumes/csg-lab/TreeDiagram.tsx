@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { IconChevronDown, IconEye, IconEyeOff } from "../icons";
+import { IconChevronDown, IconEye, IconEyeOff, IconTrash } from "../icons";
 import { CSG_LAB_OPERATIONS, PRIMITIVE_META } from "./types";
 import type { CSGTreeNode } from "./types";
 import type { CSGLabController } from "./state";
@@ -24,11 +24,14 @@ function TreeNode({
   state,
   collapsed,
   onToggleCollapse,
+  isRoot = false,
 }: {
   node: CSGTreeNode;
   state: CSGLabController;
   collapsed: Set<string>;
   onToggleCollapse: (id: string) => void;
+  /** Only top-level shapes can be deleted, so only their rows get the bin. */
+  isRoot?: boolean;
 }) {
   const isInspected = node.id === state.inspectedNodeId;
   // Nested (non-root) ids never appear in selectedRootIds by construction, so this check
@@ -59,7 +62,7 @@ function TreeNode({
             <IconChevronDown />
           </button>
         ) : (
-          <span className="h-7 w-6 shrink-0" />
+          <span className="h-7 w-1 shrink-0" />
         )}
         <button onClick={() => state.inspectNode(node.id)} className="flex flex-1 items-center gap-2 py-1.5 text-left">
           <span className={color}>{icon}</span>
@@ -72,6 +75,16 @@ function TreeNode({
         >
           {node.hidden ? <IconEyeOff /> : <IconEye />}
         </button>
+        {isRoot && (
+          <button
+            onClick={() => state.removeRoot(node.id)}
+            title="Delete this shape"
+            aria-label="Delete this shape"
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-slate-400 transition-colors hover:text-red-400"
+          >
+            <IconTrash />
+          </button>
+        )}
       </div>
       {isOperation && !isCollapsed && (
         <div className="ml-3 flex flex-col gap-1 border-l border-slate-700/50 pl-3">
@@ -100,7 +113,7 @@ export function TreeDiagram({ state }: { state: CSGLabController }) {
   return (
     <div className="flex flex-col gap-3">
       {state.roots.map((root) => (
-        <TreeNode key={root.id} node={root} state={state} collapsed={collapsed} onToggleCollapse={toggleCollapse} />
+        <TreeNode key={root.id} node={root} state={state} collapsed={collapsed} onToggleCollapse={toggleCollapse} isRoot />
       ))}
     </div>
   );

@@ -2,6 +2,7 @@ import { useCallback, useReducer } from "react";
 import {
   addPrimitiveRoot,
   combineRoots,
+  findNode,
   isRoot,
   removeRoot,
   toggleNodeHidden,
@@ -17,7 +18,7 @@ type Action =
   | { type: "ARM_PREVIEW"; operation: CSGOp }
   | { type: "CANCEL_PREVIEW" }
   | { type: "CONFIRM_PREVIEW" }
-  | { type: "REMOVE_SELECTED_ROOT" }
+  | { type: "REMOVE_ROOT"; id: string }
   | { type: "UPDATE_PRIMITIVE_PARAMS"; id: string; patch: Record<string, number> }
   | { type: "TRANSFORM_ROOT"; id: string; patch: TransformPatch }
   | { type: "TOGGLE_HIDDEN"; id: string }
@@ -77,12 +78,13 @@ function reducer(state: CSGLabState, action: Action): CSGLabState {
         previewOperation: null,
       };
     }
-    case "REMOVE_SELECTED_ROOT": {
-      if (state.selectedRootIds.length !== 1) return state;
-      const [id] = state.selectedRootIds;
-      const roots = removeRoot(state.roots, id);
-      const inspectedNodeId = state.inspectedNodeId === id ? null : state.inspectedNodeId;
-      return { ...state, roots, selectedRootIds: [], inspectedNodeId };
+    case "REMOVE_ROOT": {
+      const roots = removeRoot(state.roots, action.id);
+      if (roots.length === state.roots.length) return state;
+      const selectedRootIds = state.selectedRootIds.filter((id) => id !== action.id);
+      const inspectedNodeId = findNode(roots, state.inspectedNodeId) ? state.inspectedNodeId : null;
+      const previewOperation = selectedRootIds.length === 2 ? state.previewOperation : null;
+      return { ...state, roots, selectedRootIds, inspectedNodeId, previewOperation };
     }
     case "UPDATE_PRIMITIVE_PARAMS": {
       if (!isRoot(state.roots, action.id)) return state;
@@ -113,7 +115,7 @@ function reducer(state: CSGLabState, action: Action): CSGLabState {
 const UNDOABLE_ACTION_TYPES = new Set<Action["type"]>([
   "ADD_PRIMITIVE",
   "CONFIRM_PREVIEW",
-  "REMOVE_SELECTED_ROOT",
+  "REMOVE_ROOT",
   "UPDATE_PRIMITIVE_PARAMS",
   "TRANSFORM_ROOT",
   "TOGGLE_HIDDEN",
@@ -156,7 +158,7 @@ export interface CSGLabController extends CSGLabState {
   armPreview: (operation: CSGOp) => void;
   cancelPreview: () => void;
   confirmPreview: () => void;
-  removeSelectedRoot: () => void;
+  removeRoot: (id: string) => void;
   updatePrimitiveParams: (id: string, patch: Record<string, number>) => void;
   transformRoot: (id: string, patch: TransformPatch) => void;
   toggleHidden: (id: string) => void;
@@ -178,7 +180,7 @@ export function useCSGLabState(): CSGLabController {
   const armPreview = useCallback((operation: CSGOp) => dispatch({ type: "ARM_PREVIEW", operation }), []);
   const cancelPreview = useCallback(() => dispatch({ type: "CANCEL_PREVIEW" }), []);
   const confirmPreview = useCallback(() => dispatch({ type: "CONFIRM_PREVIEW" }), []);
-  const removeSelectedRoot = useCallback(() => dispatch({ type: "REMOVE_SELECTED_ROOT" }), []);
+  const removeRoot = useCallback((id: string) => dispatch({ type: "REMOVE_ROOT", id }), []);
   const updatePrimitiveParams = useCallback(
     (id: string, patch: Record<string, number>) => dispatch({ type: "UPDATE_PRIMITIVE_PARAMS", id, patch }),
     [],
@@ -198,7 +200,7 @@ export function useCSGLabState(): CSGLabController {
     armPreview,
     cancelPreview,
     confirmPreview,
-    removeSelectedRoot,
+    removeRoot,
     updatePrimitiveParams,
     transformRoot,
     toggleHidden,

@@ -1,5 +1,6 @@
+import { SidePanel } from "../../../components/SidePanel";
 import { useEffect } from "react";
-import { IconChevronRight, IconMove, IconRedo, IconRefresh, IconRotate, IconScale, IconSliders, IconUndo } from "../icons";
+import { IconMove, IconRedo, IconRefresh, IconRotate, IconScale, IconSliders, IconUndo } from "../icons";
 import { TreeDiagram } from "./TreeDiagram";
 import { CSG_LAB_OPERATIONS, PRIMITIVE_META } from "./types";
 import type { TransformMode } from "./types";
@@ -13,12 +14,12 @@ const TRANSFORM_MODES: { id: TransformMode; label: string; icon: JSX.Element }[]
 ];
 
 function SectionHeading({ children }: { children: string }) {
-  return <h3 className="text-sm font-semibold text-slate-200">{children}</h3>;
+  return <h3 className="font-display text-sm font-bold text-slate-200">{children}</h3>;
 }
 
 export function CSGLabPanel({ state }: { state: CSGLabController }) {
   const canCombine = state.selectedRootIds.length === 2;
-  const canRemove = state.selectedRootIds.length === 1;
+  const hasSingleSelection = state.selectedRootIds.length === 1;
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -32,20 +33,7 @@ export function CSGLabPanel({ state }: { state: CSGLabController }) {
   }, [state.undo, state.redo]);
 
   return (
-    <>
-      <button
-        onClick={state.togglePanel}
-        className="pointer-events-auto absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-slate-700/50 bg-slate-900/70 text-slate-300 shadow-lg shadow-black/30 backdrop-blur-md transition-colors hover:text-cyan-300"
-        aria-label={state.panelOpen ? "Close settings panel" : "Open settings panel"}
-      >
-        {state.panelOpen ? <IconChevronRight /> : <IconSliders />}
-      </button>
-      <div
-        className={
-          "pointer-events-auto absolute right-0 top-0 flex h-full w-80 max-w-[85vw] flex-col gap-6 overflow-y-auto border-l border-slate-700/50 bg-slate-900/70 p-6 pt-16 shadow-2xl shadow-black/40 backdrop-blur-xl transition-transform duration-300 " +
-          (state.panelOpen ? "translate-x-0" : "translate-x-full")
-        }
-      >
+    <SidePanel side="right" open={state.panelOpen} onToggle={state.togglePanel} widthRem={16.2} closedIcon={<IconSliders />} label="settings panel">
         <section className="flex flex-col gap-3">
           <SectionHeading>1. Voxel Volume Inputs</SectionHeading>
           <div className="grid grid-cols-3 gap-2">
@@ -92,14 +80,6 @@ export function CSGLabPanel({ state }: { state: CSGLabController }) {
               );
             })}
           </div>
-          {canRemove && (
-            <button
-              onClick={state.removeSelectedRoot}
-              className="rounded-xl border border-red-400/40 bg-red-500/10 px-3 py-2 text-left text-xs font-medium text-red-300 transition-colors hover:bg-red-500/20"
-            >
-              Remove selected shape
-            </button>
-          )}
           {canCombine && state.previewOperation && (
             <div className="flex gap-2">
               <button
@@ -116,14 +96,14 @@ export function CSGLabPanel({ state }: { state: CSGLabController }) {
               </button>
             </div>
           )}
-          {!canCombine && !canRemove && (
-            <p className="text-xs text-slate-400">Select two shapes below to combine them, or one to remove it.</p>
+          {!canCombine && (
+            <p className="text-xs text-slate-400">Select two shapes below to combine them.</p>
           )}
         </section>
 
         <section className="flex flex-col gap-3">
           <SectionHeading>3. Object Manipulation</SectionHeading>
-          {canRemove ? (
+          {hasSingleSelection ? (
             <div className="grid grid-cols-3 gap-2">
               {TRANSFORM_MODES.map((mode) => (
                 <button
@@ -148,7 +128,7 @@ export function CSGLabPanel({ state }: { state: CSGLabController }) {
 
         <section className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
-            <SectionHeading>4. CSG Tree / Operation History</SectionHeading>
+            <SectionHeading>4. CSG Tree</SectionHeading>
             <div className="flex items-center gap-1">
               <button
                 onClick={state.undo}
@@ -190,7 +170,6 @@ export function CSGLabPanel({ state }: { state: CSGLabController }) {
           </div>
           <TreeDiagram state={state} />
         </section>
-      </div>
-    </>
+    </SidePanel>
   );
 }

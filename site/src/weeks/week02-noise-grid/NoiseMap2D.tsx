@@ -1,10 +1,12 @@
 import { useEffect, useRef } from "react";
 import { sampleHeightField } from "./erosion";
+import { glassCardClass, headingClass, headingIconClass } from "../../components/controls";
 import { MapIcon } from "./icons";
 import type { MapCell } from "./types";
 
 const MAP_SIZE = 256;
 const REDRAW_INTERVAL_MS = 120;
+const canvasClass = "absolute inset-0 block h-full w-full [image-rendering:pixelated]";
 
 interface NoiseMap2DProps {
   heightField: Float32Array;
@@ -122,22 +124,27 @@ export default function NoiseMap2D({
   };
 
   return (
-    <div className="noise-map-2d">
-      <div className="noise-map-2d-header">
-        <h3>
-          <MapIcon className="noise-map-2d-icon" />
+    <div className={"absolute bottom-4 right-4 z-10 flex flex-col gap-3 p-3 " + glassCardClass}>
+      <div className="flex items-center justify-between gap-3">
+        <h3 className={"m-0 " + headingClass}>
+          <MapIcon className={headingIconClass} />
           2D Noise Map
         </h3>
         {selectedCell && (
-          <button className="noise-map-2d-clear" onClick={onClearSelection} title="Remove the pin and crosshair">
+          <button
+            className="cursor-pointer whitespace-nowrap rounded-lg border border-slate-700/50 bg-slate-800/50 px-2 py-0.5 text-[11px] font-medium text-slate-400 transition-colors hover:bg-slate-700/60 hover:text-slate-200"
+            onClick={onClearSelection}
+            title="Remove the pin and crosshair"
+          >
             Clear pin
           </button>
         )}
       </div>
-      <div className="noise-map-2d-canvases">
-        <canvas ref={baseRef} width={MAP_SIZE} height={MAP_SIZE} />
+      <div className="relative h-[180px] w-[180px] overflow-hidden rounded-xl border border-slate-700/50">
+        <canvas ref={baseRef} width={MAP_SIZE} height={MAP_SIZE} className={canvasClass + " pointer-events-none"} />
         <canvas
           ref={overlayRef}
+          className={canvasClass + " cursor-crosshair"}
           width={MAP_SIZE}
           height={MAP_SIZE}
           onMouseMove={(e) => onHoverCell(cellFromEvent(e))}

@@ -13,7 +13,7 @@ export const defaultGeometryParams: GeometryParams = {
 export const defaultWeek1BasicsState: Week1BasicsState = {
   shape: "icosahedron",
   geometryParams: defaultGeometryParams,
-  color: "#6c8cff",
+  color: "#7fb5d6",
   materialType: "standard",
   wireframe: false,
   autoRotate: true,
@@ -160,7 +160,7 @@ export const presetConfig: Record<PresetKey, PresetConfig> = {
     label: "Default",
     patch: {
       materialType: "standard",
-      color: "#6c8cff",
+      color: "#7fb5d6",
       wireframe: false,
       roughness: 0.4,
       metalness: 0.1,
@@ -253,7 +253,7 @@ export const presetConfig: Record<PresetKey, PresetConfig> = {
       // Same base color and light as Default, roughness maxed out — isolates "what does
       // roughness alone change" instead of also swapping the hue, which muddied the comparison.
       materialType: "standard",
-      color: "#6c8cff",
+      color: "#7fb5d6",
       wireframe: false,
       roughness: 1,
       metalness: 0,

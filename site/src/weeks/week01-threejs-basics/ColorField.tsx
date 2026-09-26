@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Field } from "../../components/controls";
 
 interface ColorFieldProps {
   label: string;
@@ -24,22 +25,18 @@ export default function ColorField({ label, description, value, onChange }: Colo
   };
 
   return (
-    <label className="field">
-      <span className="field-label" title={description}>
-        {label}
-        <span className="field-tooltip">{description}</span>
-      </span>
-      <div className="color-field">
+    <Field label={label} description={description}>
+      <div className="flex items-center gap-2">
         <input
           type="color"
-          className="color-swatch"
+          className="h-[38px] w-[38px] shrink-0 cursor-pointer rounded-xl border border-slate-700/50 bg-slate-800/60 p-[3px] transition-colors hover:border-slate-500 [&::-moz-color-swatch]:rounded-lg [&::-moz-color-swatch]:border-none [&::-webkit-color-swatch-wrapper]:p-0 [&::-webkit-color-swatch]:rounded-lg [&::-webkit-color-swatch]:border-none"
           value={HEX_COLOR.test(text) ? text : value}
           onChange={(e) => commit(e.target.value)}
           aria-label={`${label} swatch`}
         />
         <input
           type="text"
-          className="color-hex"
+          className="min-w-0 flex-1 rounded-xl border border-slate-700/50 bg-slate-800/60 px-3 py-2 font-mono text-[13px] text-cyan-300 transition-colors hover:border-slate-500 focus:border-cyan-400/50 focus:outline-none"
           value={text}
           spellCheck={false}
           onChange={(e) => commit(e.target.value)}
@@ -47,6 +44,6 @@ export default function ColorField({ label, description, value, onChange }: Colo
           aria-label={`${label} hex value`}
         />
       </div>
-    </label>
+    </Field>
   );
 }

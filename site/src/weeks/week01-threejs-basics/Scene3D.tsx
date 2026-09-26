@@ -6,7 +6,7 @@ import { createGeometry, createLight, createMaterial, groundedY, updateMaterial 
 import type { ShadowCastingLight } from "./sceneFactories";
 import type { Week1BasicsState } from "./types";
 
-const BACKGROUND_COLOR = "#1a1a2e";
+const BACKGROUND_COLOR = "#0a0f17";
 const GRID_SIZE = 40;
 const GRID_DIVISIONS = 40;
 const MESH_ROTATION_SPEED = 0.25;
@@ -85,7 +85,7 @@ export default function Scene3D({ state }: Scene3DProps) {
 
     // A dim, direction-less fill so the unlit side of the mesh reads as a soft
     // shadow instead of dropping straight to black — a gentler lit/dark blend.
-    const fillLight = new THREE.HemisphereLight(0xaeb4ff, 0x1a1a2e, 0.9);
+    const fillLight = new THREE.HemisphereLight(0xaac4dd, 0x0a0f17, 0.9);
     scene.add(fillLight);
 
     const geometry = createGeometry(state.shape, state.geometryParams);
@@ -95,7 +95,7 @@ export default function Scene3D({ state }: Scene3DProps) {
     mesh.castShadow = state.shadowsEnabled;
     scene.add(mesh);
 
-    const grid = new THREE.GridHelper(GRID_SIZE, GRID_DIVISIONS, 0x8888aa, 0x44445a);
+    const grid = new THREE.GridHelper(GRID_SIZE, GRID_DIVISIONS, 0x64748b, 0x334155);
     scene.add(grid);
 
     // A ShadowMaterial is transparent everywhere except where a shadow falls
@@ -214,5 +214,5 @@ export default function Scene3D({ state }: Scene3DProps) {
     refs.mesh.castShadow = state.shadowsEnabled;
   }, [state.shadowsEnabled, state.lightType]);
 
-  return <div className="scene3d" ref={mountRef} />;
+  return <div className="absolute inset-0 overflow-hidden rounded-2xl bg-stage [&>canvas]:block [&>canvas]:!h-full [&>canvas]:!w-full" ref={mountRef} />;
 }

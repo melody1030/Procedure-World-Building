@@ -5,10 +5,10 @@ import { SimplexNoise } from "three/examples/jsm/math/SimplexNoise.js";
 import { WORLD_SIZE } from "./constants";
 import { useDebouncedEffect } from "./useDebouncedEffect";
 import { SliderField } from "./SliderField";
+import { SidePanel } from "../../components/SidePanel";
 import {
   IconChevronDown,
-  IconChevronLeft,
-  IconChevronRight,
+  IconMenu,
   IconMinusCircle,
   IconOrbit,
   IconPlusCircle,
@@ -18,12 +18,16 @@ import {
 import { useCSGLabState } from "./csg-lab/state";
 import { CSGLabViewport } from "./csg-lab/CSGLabViewport";
 import { CSGLabPanel } from "./csg-lab/CSGLabPanel";
+import { MeshGenViewport } from "./mesh-gen/MeshGenViewport";
+import { MeshGenPanel } from "./mesh-gen/MeshGenPanel";
+import { DEFAULT_MESH_PARAMS } from "./mesh-gen/types";
+import type { MeshGenParams, MeshStats } from "./mesh-gen/types";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-type ViewId = "resolution" | "density" | "csg";
+type ViewId = "resolution" | "density" | "csg" | "mesh";
 
 type ResolutionShapeId = "creature" | "sphere" | "torus" | "octahedron" | "cube" | "heart" | "gyroid" | "twisted";
 
@@ -84,7 +88,7 @@ const RESOLUTION_SHAPES: ResolutionShapeMeta[] = [
 ];
 const DEFAULT_DENSITY_PARAMS: DensityParams = {
   shapeId: "terraced",
-  frequency: 1.4,
+  frequency: 1,
   amplitude: 1.2,
   octaves: 5,
   yOffset: 0,
@@ -1017,27 +1021,14 @@ function DensityPanel({
   const selectedShape = DENSITY_SHAPES.find((shape) => shape.id === params.shapeId);
 
   return (
-    <>
-      <button
-        onClick={onToggleOpen}
-        className="pointer-events-auto absolute right-4 top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-slate-700/50 bg-slate-900/70 text-slate-300 shadow-lg shadow-black/30 backdrop-blur-md transition-colors hover:text-cyan-300"
-        aria-label={open ? "Close settings panel" : "Open settings panel"}
-      >
-        {open ? <IconChevronRight /> : <IconSliders />}
-      </button>
-      <div
-        className={
-          "pointer-events-auto absolute right-0 top-0 flex h-full w-80 max-w-[85vw] flex-col gap-6 overflow-y-auto border-l border-slate-700/50 bg-slate-900/70 p-6 pt-16 shadow-2xl shadow-black/40 backdrop-blur-xl transition-transform duration-300 " +
-          (open ? "translate-x-0" : "translate-x-full")
-        }
-      >
+    <SidePanel side="right" open={open} onToggle={onToggleOpen} widthRem={16.2} closedIcon={<IconSliders />} label="settings panel">
         <section className="flex flex-col gap-4">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Parameters</h3>
+          <h3 className="font-display text-sm font-bold uppercase tracking-wider text-slate-400">Parameters</h3>
           <SliderField
             label="Frequency"
             value={params.frequency}
             min={0.1}
-            max={3}
+            max={1}
             step={0.05}
             onChange={(value) => onChange({ frequency: value })}
           />
@@ -1067,7 +1058,7 @@ function DensityPanel({
           />
         </section>
         <section className="flex flex-col gap-2">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Shape</h3>
+          <h3 className="font-display text-sm font-bold uppercase tracking-wider text-slate-400">Shape</h3>
           <select
             value={params.shapeId}
             onChange={(event) => onChange({ shapeId: event.target.value as DensityShapeId })}
@@ -1086,80 +1077,47 @@ function DensityPanel({
             </div>
           )}
         </section>
-      </div>
-    </>
+    </SidePanel>
   );
 }
+
+const SIDEBAR_ITEMS: { id: ViewId; label: string }[] = [
+  { id: "resolution", label: "01 — Voxels (Resolution)" },
+  { id: "density", label: "02 — Volumes (Implicit Surfaces)" },
+  { id: "csg", label: "03 — CSG (Boolean Ops)" },
+  { id: "mesh", label: "04 — Mesh Generation" },
+];
 
 function Sidebar({
   view,
   onChangeView,
-  collapsed,
-  onToggleCollapsed,
+  open,
+  onToggleOpen,
 }: {
   view: ViewId;
   onChangeView: (view: ViewId) => void;
-  collapsed: boolean;
-  onToggleCollapsed: () => void;
+  open: boolean;
+  onToggleOpen: () => void;
 }) {
   return (
-    <aside
-      className={
-        "pointer-events-auto absolute left-4 top-4 flex flex-col gap-4 overflow-hidden rounded-2xl border border-slate-700/50 bg-slate-900/60 p-4 text-slate-200 shadow-lg shadow-black/30 backdrop-blur-md transition-all duration-300 " +
-        (collapsed ? "w-14" : "w-64")
-      }
-    >
-      <div className="flex items-center justify-between gap-2">
-        {!collapsed && (
-          <div className="min-w-0">
-            <div className="truncate text-xs font-semibold uppercase tracking-wider text-cyan-400">Design 6197 / 4197</div>
-            <div className="text-[11px] text-slate-400">Fall 2026</div>
-          </div>
-        )}
-        <button
-          onClick={onToggleCollapsed}
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-800/60 hover:text-cyan-300"
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          {collapsed ? <IconChevronRight /> : <IconChevronLeft />}
-        </button>
-      </div>
+    <SidePanel side="left" open={open} onToggle={onToggleOpen} widthRem={16.2} closedIcon={<IconMenu />} label="navigation">
       <nav className="flex flex-col gap-1">
-        <button
-          onClick={() => onChangeView("resolution")}
-          className={
-            "rounded-lg px-3 py-2 text-left text-sm transition-colors " +
-            (view === "resolution"
-              ? "border border-cyan-400/30 bg-cyan-500/15 text-cyan-300"
-              : "text-slate-300 hover:bg-slate-800/60 hover:text-cyan-300")
-          }
-        >
-          {collapsed ? "01" : "01 — Voxels (Resolution)"}
-        </button>
-        <button
-          onClick={() => onChangeView("density")}
-          className={
-            "rounded-lg px-3 py-2 text-left text-sm transition-colors " +
-            (view === "density"
-              ? "border border-cyan-400/30 bg-cyan-500/15 text-cyan-300"
-              : "text-slate-300 hover:bg-slate-800/60 hover:text-cyan-300")
-          }
-        >
-          {collapsed ? "02" : "02 — Volumes (Implicit Surfaces)"}
-        </button>
-        <button
-          onClick={() => onChangeView("csg")}
-          className={
-            "rounded-lg px-3 py-2 text-left text-sm transition-colors " +
-            (view === "csg"
-              ? "border border-cyan-400/30 bg-cyan-500/15 text-cyan-300"
-              : "text-slate-300 hover:bg-slate-800/60 hover:text-cyan-300")
-          }
-        >
-          {collapsed ? "03" : "03 — CSG (Boolean Ops)"}
-        </button>
+        {SIDEBAR_ITEMS.map((item) => (
+          <button
+            key={item.id}
+            onClick={() => onChangeView(item.id)}
+            className={
+              "rounded-lg border font-display font-bold px-2.5 py-2 text-left text-sm transition-colors " +
+              (view === item.id
+                ? "border-cyan-400/30 bg-cyan-500/15 text-cyan-300"
+                : "border-transparent text-slate-300 hover:bg-slate-800/60 hover:text-cyan-300")
+            }
+          >
+            {item.label}
+          </button>
+        ))}
       </nav>
-    </aside>
+    </SidePanel>
   );
 }
 
@@ -1169,12 +1127,15 @@ function Sidebar({
 
 export default function Week03VoxelsVolumes() {
   const [view, setView] = useState<ViewId>("resolution");
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [resolutionParams, setResolutionParams] = useState<ResolutionParams>(DEFAULT_RESOLUTION_PARAMS);
   const [resolutionEditMode, setResolutionEditMode] = useState<ResolutionEditMode>("orbit");
   const [resolutionResetToken, setResolutionResetToken] = useState(0);
   const [densityParams, setDensityParams] = useState<DensityParams>(DEFAULT_DENSITY_PARAMS);
   const [densityPanelOpen, setDensityPanelOpen] = useState(true);
+  const [meshParams, setMeshParams] = useState<MeshGenParams>(DEFAULT_MESH_PARAMS);
+  const [meshStats, setMeshStats] = useState<MeshStats | null>(null);
+  const [meshPanelOpen, setMeshPanelOpen] = useState(true);
   const csgLab = useCSGLabState();
 
   const handleResolutionChange = useCallback((patch: Partial<ResolutionParams>) => {
@@ -1185,6 +1146,17 @@ export default function Week03VoxelsVolumes() {
     setDensityParams((prev) => ({ ...prev, ...patch }));
   }, []);
 
+  const handleMeshChange = useCallback((patch: Partial<MeshGenParams>) => {
+    setMeshParams((prev) => {
+      const next = { ...prev, ...patch };
+      if (patch.method && patch.method !== prev.method) {
+        next.step = 0;
+        next.progress = 0;
+      }
+      return next;
+    });
+  }, []);
+
   return (
     <div className="relative min-h-[480px] flex-1 overflow-hidden rounded-2xl bg-slate-950">
       <div className="absolute inset-0">
@@ -1193,13 +1165,14 @@ export default function Week03VoxelsVolumes() {
         )}
         {view === "density" && <DensityView params={densityParams} />}
         {view === "csg" && <CSGLabViewport state={csgLab} />}
+        {view === "mesh" && <MeshGenViewport params={meshParams} onStats={setMeshStats} />}
       </div>
       <div className="pointer-events-none absolute inset-0">
         <Sidebar
           view={view}
           onChangeView={setView}
-          collapsed={sidebarCollapsed}
-          onToggleCollapsed={() => setSidebarCollapsed((prev) => !prev)}
+          open={sidebarOpen}
+          onToggleOpen={() => setSidebarOpen((prev) => !prev)}
         />
         {view === "resolution" && (
           <ResolutionPanel
@@ -1219,6 +1192,15 @@ export default function Week03VoxelsVolumes() {
           />
         )}
         {view === "csg" && <CSGLabPanel state={csgLab} />}
+        {view === "mesh" && (
+          <MeshGenPanel
+            params={meshParams}
+            onChange={handleMeshChange}
+            stats={meshStats}
+            open={meshPanelOpen}
+            onToggleOpen={() => setMeshPanelOpen((prev) => !prev)}
+          />
+        )}
       </div>
     </div>
   );
