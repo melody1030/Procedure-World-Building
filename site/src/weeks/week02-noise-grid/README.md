@@ -1,5 +1,7 @@
 # Week 2 — Noise Grid & Hydraulic Erosion
 
+[← Back to the main README](../../../../README.md)
+
 Started as a 2D/3D procedural terrain viewer built on a noise stack, then
 grew into a full submission for **Assignment 2** (add a simulation that
 starts/stops, a height field driven by the noise stack, and calibrated
@@ -48,6 +50,25 @@ simulation on top.
   button in the center, and a **reset** button (back to raw, un-eroded
   noise) on the right.
 - Live droplet count is shown under the transport row.
+
+## Key Concepts
+
+- **Noise as a height field.** A noise function turns a 2D coordinate into a value; sampling it
+  on a grid gives a height for every vertex. White noise is random per point, Perlin is smooth,
+  and Cellular is based on distance to scattered points.
+- **Octaves and persistence.** Layering the same noise at higher frequencies and lower
+  amplitudes adds small detail on top of large shapes.
+- **A seed makes randomness repeatable.** The same seed always produces the same terrain, and
+  the same droplet sequence during erosion.
+- **Shaping curves** (power, terrace, ridge) reshape the raw values after sampling.
+- **Resolution is a trade-off** between detail and the cost of building the mesh.
+- **Hydraulic erosion** simulates water droplets that pick up sediment on steep, fast sections
+  and drop it where they slow down, carving channels over time.
+- **Determinism enables scrubbing.** Because the simulation is seeded, jumping to any point on
+  the timeline is just replaying the first *N* droplets.
+
+Class feedback on this week and ideas for later:
+[presentation feedback notes](../../../../docs/analysis/week02-noise-grid-feedback.md).
 
 ## Development Log
 
@@ -101,5 +122,9 @@ bordered box) and a boxed numeric readout alongside every slider.
 | `SimulationPlayer.tsx` | Timeline scrubber + speed/play/reset transport controls |
 | `ControlsPanel.tsx` | Noise/View tabbed control panel |
 | `colorRamp.ts` | Height-based color ramp for the 3D terrain |
+| `icons.tsx` | Inline SVG icons for the panel headings and 2D map |
 | `config.ts` | Default state and per-control metadata |
 | `types.ts` | Shared state and cell/view/camera types |
+
+Shared across weeks: the side panel and form controls in
+[`site/src/components/`](../../components).

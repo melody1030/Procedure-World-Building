@@ -1,6 +1,26 @@
-# Week 3 — Voxels & Volumes: Process Log
+# Week 3 — Voxels & Volumes
 
-Tab structure: **01 — Voxels (Resolution)**, **02 — Volumes (Implicit Surfaces)**, **03 — CSG (Boolean Ops)**.
+[← Back to the main README](../../../../README.md)
+
+Four views about representing shapes as volumes: sampling a shape into a voxel grid, defining
+a solid with a formula, combining solids with boolean operations, and turning a volume back
+into a surface mesh.
+
+Tab structure: **01 — Voxels (Resolution)**, **02 — Volumes (Implicit Surfaces)**, **03 — CSG (Boolean Ops)**, **04 — Mesh Generation**.
+
+## Key Concepts
+
+- **Voxels** store a shape as filled or empty cells in a 3D grid. Grid resolution trades a
+  blocky, readable silhouette against detail and cost.
+- **Implicit surfaces** define a solid with an inequality: a point is inside when a function
+  of its position is below zero. Noise can drive that function to make terrain.
+- **Signed distance fields (SDFs)** give the distance to a surface, negative inside. Boolean
+  operations become simple formulas: union `min(a,b)`, difference `max(a,-b)`,
+  intersection `max(a,b)`.
+- **Mesh extraction** turns a volume back into polygons. Methods differ in their input (binary,
+  density, or Hermite data), how smooth or sharp the result is, face count, and cost.
+
+The sections below are the process log for each tab.
 
 ---
 
@@ -122,3 +142,120 @@ every mode:
 primitives, all three boolean operations, Undo/Redo, and the Move/Rotate/Scale gizmo tracking
 both a bare primitive and a combined shape correctly (including a live drag → commit → undo
 round-trip). Views 01 and 02 re-checked for regressions after the final gizmo fix.
+
+---
+
+## 04 — Mesh Generation
+
+Views 01 to 03 all render *voxels*. This tab asks the next question: how do you turn a volume
+into an actual mesh? It starts from a comparison of surface-extraction methods (input type,
+look, face count, sharp features, topology, cost) and turns each row into something you can
+poke at. Marching tetrahedra was skipped, and instead of one tab per method there is a single
+tab with a method dropdown.
+
+| Method | Input | Look | Faces | Sharp features | Topology | Relative cost |
+|---|---|---|---|---|---|---|
+| Culled Faces | binary | blocky | medium | yes (axis-aligned only) | watertight, often non-manifold | lowest |
+| Greedy | binary | blocky | lowest | yes (axis-aligned only) | T-junctions | low–medium |
+| Marching Cubes | density | smooth, bevelled | highest (tris) | no | manifold if disambiguated | medium |
+| Surface Nets | density | smooth | low (quads) | no | mostly manifold | low–medium |
+| Dual Contouring | Hermite | smooth + sharp | low (quads) | yes | risk of non-manifold / self-intersection | high |
+
+### Process
+
+**1. Explore mode with per-method controls.** The first version had a button per method, a
+"how it works" card, and a few controls that make each algorithm's key idea tweakable. It
+used a carved cube as the test volume, because it has flat faces, sharp edges and a curved
+cut in one object. Along the way I removed things that did not help with comparing methods:
+the resolution slider (that belongs to tab 01), the volume selector, the wireframe toggle, and
+the display toggles. The volume is now fixed at n = 20, and the source voxels are shown as a
+faint overlay so you can see what each method starts from.
+
+![Explore mode, Dual Contouring on the carved cube](screenshots/mesh-explore-dual-contouring.webp)
+
+**2. Step-by-step mode, and a new default volume.** Comparing finished meshes does not show
+*how* a method works, so I added a Step-by-step mode that walks through each algorithm one
+stage at a time. At the same time the default volume became a cube and a ball unioned
+together: the cube gives sharp edges, the ball gives a curved surface, and the place where they
+meet is a concave crease that every method has to deal with. Each stage draws what the
+algorithm is looking at: inside/outside samples, amber surface cells, pink edge crossings with
+orange normals, and green cell vertices. On the last stage the mesh is built face by face
+(drag *Built (%)* or press Play), with every face outlined so merged rectangles are visible.
+
+| Step 1: sample the volume | Step 2: find exposed faces (Greedy) |
+|---|---|
+| ![Step 1, sampling the cube and ball](screenshots/mesh-step-1-sample.webp) | ![Step 2, exposed faces before merging](screenshots/mesh-step-2-exposed-faces.webp) |
+
+A short recording of Greedy's last step, where the exposed faces are merged into rectangles
+as the mesh builds: [mesh-greedy-merge-walkthrough.mov](screenshots/mesh-greedy-merge-walkthrough.mov).
+
+| Method | Steps |
+|---|---|
+| Culled Faces | sample, emit exposed faces |
+| Greedy | sample, exposed faces, merge into rectangles |
+| Marching Cubes | sample, surface cells, look up triangles per cell |
+| Surface Nets | sample, surface cells, edge crossings, one vertex per cell, connect quads |
+| Dual Contouring | sample, surface cells, crossings and normals (Hermite data), solve the QEF, connect quads |
+
+**3. Simplifying the UI.** Once the features were in, most of the work was making the panel
+easier to read:
+
+- The method buttons became a dropdown, with "How it works" directly under it.
+- The two modes now show different things. Explore shows Method, How it works and Controls.
+  Step-by-step shows only the step section (its heading names the current method).
+- All descriptions were rewritten in plainer language, without em dashes.
+- The left navigation and the right settings panels now share one `SidePanel` component: the
+  same card style, the same slide animation, and the same round toggle button, and the arrow
+  sits outside the panel so it never covers the controls. The navigation also lost its
+  "Design 6197 / 4197" header and its wrapped labels.
+
+![Final layout, Marching Cubes in Explore mode](screenshots/mesh-final-ui.webp)
+
+### How the methods are implemented (`mesh-gen/`)
+
+- **One shared volume.** `fields.ts` defines a signed-distance-style field (a cube unioned with
+  a ball). `buildVolume` samples one value per voxel centre. Binary methods only look at the
+  sign, density methods interpolate the value, and Dual Contouring also bisects the true field
+  for the edge crossing and takes its gradient as the normal (the Hermite data).
+- **Culled vs. greedy** share one sweep (`meshBlocky`): find the exposed faces in each slice,
+  then either emit each one or grow it into the largest rectangle. The surface is the same,
+  with far fewer quads.
+- **Marching cubes** reuses the 256-case `edgeTable` and `triTable` exported by three.js's
+  `MarchingCubes.js`. Vertices are welded per grid edge so the vertex count is comparable with
+  the quad-based methods.
+- **Surface nets and dual contouring** share their connectivity: one vertex per sign-changing
+  cell and one quad per sign-changing grid edge. They differ only in where the vertex goes,
+  either the mean of the edge crossings or the minimizer of a regularized quadratic error
+  function (QEF). That single difference is what keeps the cube's edges crisp in Dual
+  Contouring and rounds them in Surface Nets.
+- **Step data** (surface cells, crossings, normals, vertices) is captured while each mesher
+  runs, so the step-by-step view shows the algorithm's real intermediate results and not a
+  re-drawn approximation.
+
+### Controls
+
+Each method has controls that expose its key idea, plus a shared *Threshold* slider that moves
+the surface in or out. The panel also lists live vertex, face and triangle counts and build time.
+
+| Method | Control | What it shows |
+|---|---|---|
+| Culled Faces | Cull hidden faces | off adds all 6 faces per voxel, including buried ones |
+| Greedy | Max quad size | 1 means no merging (same as Culled), 20 means fully greedy |
+| Marching Cubes | Interpolate along edges | off puts vertices at edge midpoints, so the surface snaps to coarse positions |
+| Surface Nets | Average edge crossings | off puts each vertex at its cell centre, so the surface follows the grid |
+| Dual Contouring | Sharpness, Clamp to cell | sharpness 0 behaves like Surface Nets; unclamped vertices can spike or self-intersect |
+
+## Files
+
+| File | Purpose |
+| --- | --- |
+| `index.tsx` | The Week 3 page: sidebar navigation, plus the Resolution and Implicit Surfaces views and panels |
+| `SliderField.tsx` | Labelled slider used by the Week 3 panels |
+| `constants.ts` | Shared world-space scale so every view is similarly sized |
+| `icons.tsx` | Inline SVG icons shared by every view |
+| `useDebouncedEffect.ts` | Runs an effect only after inputs stop changing (avoids rebuilding on every slider tick) |
+| `csg-lab/` | Tab 03: SDF primitives and boolean engine, voxel sampler, CSG tree, undo/redo state, transform gizmo, panel and viewport |
+| `mesh-gen/` | Tab 04: the test volume (`fields.ts`), the five meshers (`meshers.ts`), panel, step-by-step view and viewport |
+| `screenshots/` | Images and the recording referenced above |
+
+Shared across weeks: the side panel in [`site/src/components/`](../../components).

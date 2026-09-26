@@ -1,5 +1,7 @@
 # Week 1 — Three.js Basics
 
+[← Back to the main README](../../../../README.md)
+
 An interactive playground for the fundamental building blocks of a Three.js
 scene: geometry, material, and light. The goal was to build intuition for
 how those three pieces interact before moving on to procedural generation
@@ -25,6 +27,21 @@ drag/scroll. A floating control panel lets you swap:
 - **Light intensity** and a **shadows** toggle (casts onto the ground
   plane via a `ShadowMaterial`, invisible until a shadow actually falls
   on it)
+
+## Key Concepts
+
+- **A scene needs three things:** geometry (the shape), material (how its surface responds to
+  light), and light. Changing any one of them changes how the other two read.
+- **Materials shade differently.** PBR materials (Standard, Physical) use roughness and
+  metalness; Phong uses a single shininess value; Toon quantizes light into bands; Basic ignores
+  lights entirely.
+- **Metals need something to reflect.** A metallic surface has no diffuse colour of its own, so
+  it renders black unless the scene has an environment map.
+- **Light types differ in how they fall off.** Directional light is parallel (like sunlight);
+  point and spot lights radiate from a position and weaken with distance, so they need much
+  higher intensity values.
+- **Shadows are opt-in** on both sides: the light must cast them and a surface must receive
+  them.
 
 ## Notable implementation details
 
@@ -87,6 +104,13 @@ reshapes the torus in real time.
 | `Scene3D.tsx` | Three.js scene setup and the render loop |
 | `sceneFactories.ts` | Builds/updates geometry, material, and light objects from state |
 | `ControlsPanel.tsx` | The floating control panel UI |
+| `ColorField.tsx` | Colour swatch plus an editable hex value |
+| `ParamRow.tsx` | Slider with a typable numeric box, for each shape's construction parameters |
+| `randomize.ts` | Builds the random state used by the Randomize button |
 | `RotateToggle.tsx` | Small auto-rotate on/off button |
-| `config.ts` | Default state, per-shape/material/light labels and descriptions |
+| `icons.tsx` | Inline SVG icons for the panel headings |
+| `config.ts` | Default state, presets, per-shape/material/light labels and descriptions |
 | `types.ts` | `Week1BasicsState` and the shape/material/light union types |
+
+Shared across weeks: the side panel and form controls in
+[`site/src/components/`](../../components).

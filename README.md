@@ -2,6 +2,18 @@
 
 _A working repository for the Procedure World Building project (2026 Fall)._
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Repository Structure](#repository-structure)
+- [Documentation](#documentation)
+- [Weekly Progress](#weekly-progress)
+  - [Week 1 — Three.js Basics](site/src/weeks/week01-threejs-basics/README.md): geometry, materials, lighting
+  - [Week 2 — Noise Grid & Hydraulic Erosion](site/src/weeks/week02-noise-grid/README.md): noise stacks, shaping, droplet erosion
+    ([presentation feedback](docs/analysis/week02-noise-grid-feedback.md))
+  - [Week 3 — Voxels & Volumes](site/src/weeks/week03-voxels-volumes/README.md): voxel resolution, implicit surfaces, CSG, mesh generation
+- [Getting Started](#getting-started)
+
 ## Overview
 
 This repository tracks my coursework for **Procedural World Building** at
@@ -28,13 +40,33 @@ builder) and reference materials live in the instructor's repository:
 This repo is where I track my own planning, tutorial notes, and analysis
 as I work through the material.
 
+## Repository Structure
+
+```
+Procedure-World-Building/
+├── README.md                  ← you are here: entry point and table of contents
+├── docs/
+│   └── analysis/              ← feedback and reflection notes from class presentations
+└── site/                      ← the React + TypeScript + Three.js workshop site
+    ├── STYLE_GUIDE.md         ← shared visual style for every week
+    └── src/
+        ├── components/        ← UI shared by all weeks (side panel, controls)
+        └── weeks/
+            ├── week01-threejs-basics/
+            ├── week02-noise-grid/
+            └── week03-voxels-volumes/
+                ├── README.md      ← the study notes for that week
+                ├── screenshots/   ← images referenced by that README
+                └── *.ts / *.tsx   ← the week's code
+```
+
+Every week follows the same pattern: its code, a `README.md` study notebook, and a
+`screenshots/` folder live together in one folder under `site/src/weeks/`.
+
 ## Documentation
 
-Project documentation lives in [`docs/`](docs), organized by purpose:
-
-- [`docs/planning`](docs/planning) — project plans, proposals, and roadmaps
-- [`docs/tutorials`](docs/tutorials) — how-to guides and walkthroughs
-- [`docs/analysis`](docs/analysis) — findings, write-ups, and analysis notes
+- [`docs/analysis/week02-noise-grid-feedback.md`](docs/analysis/week02-noise-grid-feedback.md) — teacher feedback from the Week 2 presentation, and ideas for future work
+- [`site/STYLE_GUIDE.md`](site/STYLE_GUIDE.md) — the shared visual style for every page of the site (colours, fonts, panels, controls)
 
 ## Weekly Progress
 
@@ -67,15 +99,18 @@ folder numbers track the syllabus, not build order.
   ![Perlin noise heightmap terrain](site/src/weeks/week02-noise-grid/screenshots/2026-09-10-perlin-heightmap.jpg)
 
 - **2026-09-23 — [Week 3 — Voxels & Volumes](site/src/weeks/week03-voxels-volumes/README.md)** —
-  three tabs built around sampling shapes into a voxel grid: Resolution (a
+  four tabs built around sampling shapes into a voxel grid: Resolution (a
   fixed shape voxelized at an adjustable grid density), Implicit Surfaces
   (a procedural noise field turned into a solid/empty test, e.g. terraced
-  terrain), and a CSG "Voxel Techniques Lab" where primitives are combined
+  terrain), a CSG "Voxel Techniques Lab" where primitives are combined
   via SDF boolean formulas (union/difference/intersection) and manipulated
-  with a Move/Rotate/Scale gizmo, with undo/redo and an operation-history
-  tree.
+  with a Move/Rotate/Scale gizmo, and Mesh Generation, which compares five
+  surface-extraction methods (culled faces, greedy, marching cubes, surface
+  nets, dual contouring) with per-method controls and a step-by-step mode.
 
   ![CSG boolean difference result](site/src/weeks/week03-voxels-volumes/screenshots/csg-difference-result.webp)
+
+  ![Mesh generation, Marching Cubes on a cube and ball](site/src/weeks/week03-voxels-volumes/screenshots/mesh-final-ui.webp)
 
 ## Getting Started
 
@@ -91,7 +126,3 @@ npm run dev
 Then open the printed `localhost` URL. New weeks are added by dropping a
 folder under `site/src/weeks/` and registering it in
 [`site/src/weeks/registry.ts`](site/src/weeks/registry.ts).
-
-## Contributing
-
-<!-- TODO: how others can contribute, if applicable -->
