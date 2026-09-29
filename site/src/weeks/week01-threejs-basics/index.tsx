@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useWeekConfig, withDefaults } from "../../firebase/weekConfig";
 import ControlsPanel from "./ControlsPanel";
 import RotateToggle from "./RotateToggle";
 import Scene3D from "./Scene3D";
@@ -11,6 +12,12 @@ export default function Week01ThreejsBasics() {
   const onChange = (patch: Partial<Week1BasicsState>) => {
     setState((prev) => ({ ...prev, ...patch }));
   };
+
+  useWeekConfig(
+    "week01",
+    () => state,
+    (data) => setState(withDefaults(defaultWeek1BasicsState, data)),
+  );
 
   return (
     <div className="relative min-h-[480px] flex-1 overflow-hidden rounded-2xl">

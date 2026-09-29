@@ -2,3 +2,7 @@ node_modules
 dist
 *.local
 *.tsbuildinfo
+
+# Firebase
+.firebase/
+firebase-debug.log

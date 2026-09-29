@@ -16,6 +16,8 @@ import {
   IconSliders,
 } from "./icons";
 import { useCSGLabState } from "./csg-lab/state";
+import type { CSGTreeNode } from "./csg-lab/types";
+import { useWeekConfig, withDefaults } from "../../firebase/weekConfig";
 import { CSGLabViewport } from "./csg-lab/CSGLabViewport";
 import { CSGLabPanel } from "./csg-lab/CSGLabPanel";
 import { MeshGenViewport } from "./mesh-gen/MeshGenViewport";
@@ -1137,6 +1139,32 @@ export default function Week03VoxelsVolumes() {
   const [meshStats, setMeshStats] = useState<MeshStats | null>(null);
   const [meshPanelOpen, setMeshPanelOpen] = useState(true);
   const csgLab = useCSGLabState();
+
+  // One configuration covers every tab, plus which tab was open when it was saved.
+  useWeekConfig(
+    "week03",
+    () => ({
+      view,
+      resolution: resolutionParams,
+      density: densityParams,
+      mesh: meshParams,
+      csg: { roots: csgLab.roots, nextSlot: csgLab.nextSlot },
+    }),
+    (raw) => {
+      const data = (raw ?? {}) as {
+        view?: ViewId;
+        resolution?: unknown;
+        density?: unknown;
+        mesh?: unknown;
+        csg?: { roots?: CSGTreeNode[]; nextSlot?: number };
+      };
+      if (data.view && SIDEBAR_ITEMS.some((item) => item.id === data.view)) setView(data.view);
+      setResolutionParams(withDefaults(DEFAULT_RESOLUTION_PARAMS, data.resolution));
+      setDensityParams(withDefaults(DEFAULT_DENSITY_PARAMS, data.density));
+      setMeshParams(withDefaults(DEFAULT_MESH_PARAMS, data.mesh));
+      if (Array.isArray(data.csg?.roots)) csgLab.loadTree(data.csg.roots, data.csg.nextSlot ?? data.csg.roots.length);
+    },
+  );
 
   const handleResolutionChange = useCallback((patch: Partial<ResolutionParams>) => {
     setResolutionParams((prev) => ({ ...prev, ...patch }));

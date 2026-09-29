@@ -1,0 +1,33 @@
+rules_version = '2';
+
+// Every document lives under users/{uid}, and only that signed-in user can touch it.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    // Profile written at sign-in: display name, email, photo, last sign-in time.
+    match /users/{uid} {
+      allow read, write: if isOwner(uid);
+
+      // Saved configurations (see site/src/firebase/configs.ts).
+      match /configs/{configId} {
+        allow read, delete: if isOwner(uid);
+        allow create: if isOwner(uid) && validConfig(request.resource.data);
+        // Configurations are immutable: save a new one instead of editing.
+        allow update: if false;
+      }
+    }
+
+    function validConfig(data) {
+      return data.keys().hasOnly(['name', 'weekId', 'dataJson', 'thumbnail', 'createdAt'])
+        && data.name is string && data.name.size() > 0 && data.name.size() <= 80
+        && data.weekId in ['week01', 'week02', 'week03']
+        && data.dataJson is string && data.dataJson.size() < 500000
+        && data.thumbnail is string && data.thumbnail.size() < 200000
+        && data.createdAt == request.time;
+    }
+  }
+}

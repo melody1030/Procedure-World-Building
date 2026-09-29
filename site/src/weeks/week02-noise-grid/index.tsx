@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { useWeekConfig, withDefaults } from "../../firebase/weekConfig";
 import ControlsPanel from "./ControlsPanel";
 import NoiseMap2D from "./NoiseMap2D";
 import GridScene3D from "./GridScene3D";
@@ -45,6 +46,16 @@ export default function Week02NoiseGrid() {
   const onChange = (patch: Partial<Week1State>) => {
     setState((prev) => ({ ...prev, ...patch }));
   };
+
+  // The erosion playback isn't saved: loading regenerates raw noise from the saved settings.
+  useWeekConfig(
+    "week02",
+    () => state,
+    (data) => {
+      setIsSimulating(false);
+      setState(withDefaults(defaultWeek1State, data));
+    },
+  );
 
   const handleSelectCell = (cell: MapCell) => {
     setSelectedCell(cell);

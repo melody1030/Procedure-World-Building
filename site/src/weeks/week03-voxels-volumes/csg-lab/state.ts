@@ -10,7 +10,7 @@ import {
   updateRootTransform,
 } from "./treeLogic";
 import type { TransformPatch } from "./treeLogic";
-import type { CSGLabState, CSGOp, PrimitiveType, TransformMode } from "./types";
+import type { CSGLabState, CSGOp, CSGTreeNode, PrimitiveType, TransformMode } from "./types";
 
 type Action =
   | { type: "ADD_PRIMITIVE"; primitiveType: PrimitiveType }
@@ -24,7 +24,8 @@ type Action =
   | { type: "TOGGLE_HIDDEN"; id: string }
   | { type: "SET_TRANSFORM_MODE"; mode: TransformMode }
   | { type: "TOGGLE_PANEL" }
-  | { type: "RESET" };
+  | { type: "RESET" }
+  | { type: "LOAD"; roots: CSGTreeNode[]; nextSlot: number };
 
 const initialState: CSGLabState = {
   roots: [],
@@ -102,6 +103,9 @@ function reducer(state: CSGLabState, action: Action): CSGLabState {
       return { ...state, panelOpen: !state.panelOpen };
     case "RESET":
       return { ...initialState, panelOpen: state.panelOpen };
+    case "LOAD":
+      // A saved configuration replaces the whole tree; selection and previews start fresh.
+      return { ...initialState, panelOpen: state.panelOpen, roots: action.roots, nextSlot: action.nextSlot };
     default:
       return state;
   }
@@ -120,6 +124,7 @@ const UNDOABLE_ACTION_TYPES = new Set<Action["type"]>([
   "TRANSFORM_ROOT",
   "TOGGLE_HIDDEN",
   "RESET",
+  "LOAD",
 ]);
 
 const MAX_HISTORY = 50;
@@ -165,6 +170,8 @@ export interface CSGLabController extends CSGLabState {
   setTransformMode: (mode: TransformMode) => void;
   togglePanel: () => void;
   resetAll: () => void;
+  /** Replaces the tree with a saved one (undoable, like any other structural edit). */
+  loadTree: (roots: CSGTreeNode[], nextSlot: number) => void;
   undo: () => void;
   redo: () => void;
   canUndo: boolean;
@@ -190,6 +197,7 @@ export function useCSGLabState(): CSGLabController {
   const setTransformMode = useCallback((mode: TransformMode) => dispatch({ type: "SET_TRANSFORM_MODE", mode }), []);
   const togglePanel = useCallback(() => dispatch({ type: "TOGGLE_PANEL" }), []);
   const resetAll = useCallback(() => dispatch({ type: "RESET" }), []);
+  const loadTree = useCallback((roots: CSGTreeNode[], nextSlot: number) => dispatch({ type: "LOAD", roots, nextSlot }), []);
   const undo = useCallback(() => dispatch({ type: "UNDO" }), []);
   const redo = useCallback(() => dispatch({ type: "REDO" }), []);
 
@@ -207,6 +215,7 @@ export function useCSGLabState(): CSGLabController {
     setTransformMode,
     togglePanel,
     resetAll,
+    loadTree,
     undo,
     redo,
     canUndo: history.past.length > 0,

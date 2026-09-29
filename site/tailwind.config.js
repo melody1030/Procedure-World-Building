@@ -11,6 +11,8 @@ export default {
         sans: ["Roboto", "-apple-system", '"Segoe UI"', "system-ui", "sans-serif"],
         // Share Tech only ships a regular weight; pair with font-bold for the synthesized bold.
         display: ['"Share Tech"', "-apple-system", '"Segoe UI"', "system-ui", "sans-serif"],
+        // Homepage headline and copy. Separate from `mono`, which the week panels use for values.
+        technical: ['"JetBrains Mono"', "ui-monospace", '"SF Mono"', "Menlo", "monospace"],
       },
       // Tailwind's default corner radii, all 10% smaller. `full` and `none` are untouched.
       borderRadius: {
