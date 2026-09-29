@@ -2,9 +2,12 @@
 
 _A working repository for the Procedure World Building project (2026 Fall)._
 
+**Live site:** [procedural-worlds-d79be.web.app](https://procedural-worlds-d79be.web.app), hosted on Firebase ([how it was set up](docs/tutorial/firebase-tutorial.md)).
+
 ## Table of Contents
 
 - [Overview](#overview)
+- [Project Concept: Blueprint City](docs/concept.md)
 - [Repository Structure](#repository-structure)
 - [Documentation](#documentation)
 - [Weekly Progress](#weekly-progress)
@@ -12,6 +15,7 @@ _A working repository for the Procedure World Building project (2026 Fall)._
   - [Week 2 — Noise Grid & Hydraulic Erosion](site/src/weeks/week02-noise-grid/README.md): noise stacks, shaping, droplet erosion
     ([presentation feedback](docs/analysis/week02-noise-grid-feedback.md))
   - [Week 3 — Voxels & Volumes](site/src/weeks/week03-voxels-volumes/README.md): voxel resolution, implicit surfaces, CSG, mesh generation
+- [Firebase: Accounts & Saved Configurations](#firebase-accounts--saved-configurations)
 - [Getting Started](#getting-started)
 
 ## Overview
@@ -46,7 +50,9 @@ as I work through the material.
 Procedure-World-Building/
 ├── README.md                  ← you are here: entry point and table of contents
 ├── docs/
-│   └── analysis/              ← feedback and reflection notes from class presentations
+│   ├── concept.md             ← the project concept (Blueprint City)
+│   ├── analysis/              ← feedback and reflection notes from class presentations
+│   └── tutorial/              ← setup guides and class notes (React, Three.js, Git, Firebase, noise)
 └── site/                      ← the React + TypeScript + Three.js workshop site
     ├── STYLE_GUIDE.md         ← shared visual style for every week
     └── src/
@@ -65,8 +71,17 @@ Every week follows the same pattern: its code, a `README.md` study notebook, and
 
 ## Documentation
 
+- [`docs/concept.md`](docs/concept.md) — the project concept: a procedural voxel diorama that grows from a cliffside settlement into a neon cyberpunk megacity
 - [`docs/analysis/week02-noise-grid-feedback.md`](docs/analysis/week02-noise-grid-feedback.md) — teacher feedback from the Week 2 presentation, and ideas for future work
 - [`site/STYLE_GUIDE.md`](site/STYLE_GUIDE.md) — the shared visual style for every page of the site (colours, fonts, panels, controls)
+
+**Tutorials and class notes** ([`docs/tutorial/`](docs/tutorial)):
+
+- [Installing React (with terminal basics)](docs/tutorial/react-install-tutorial.md)
+- [Installing Three.js](docs/tutorial/threejs-install-tutorial.md)
+- [Git & GitHub](docs/tutorial/git-github-tutorial.md)
+- [Firebase: Hosting and Firestore](docs/tutorial/firebase-tutorial.md)
+- [Noise & Maps — class notes](docs/tutorial/noise-and-maps-notes.md)
 
 ## Weekly Progress
 
@@ -111,6 +126,24 @@ folder numbers track the syllabus, not build order.
   ![CSG boolean difference result](site/src/weeks/week03-voxels-volumes/screenshots/csg-difference-result.webp)
 
   ![Mesh generation, Marching Cubes on a cube and ball](site/src/weeks/week03-voxels-volumes/screenshots/mesh-final-ui.webp)
+
+## Firebase: Accounts & Saved Configurations
+
+The live site uses Firebase for sign-in and per-user saved settings. Full walkthrough, including
+the problems I hit along the way: **[Firebase tutorial](docs/tutorial/firebase-tutorial.md)**.
+
+- **Authentication:** "Sign in with Google" in the top bar.
+- **Firestore:** once signed in, **Configurations** saves the current week's settings to your
+  account (`users/{uid}/configs`) and loads them back later, on any device. Week 3 saves all four
+  tabs, including the CSG shape tree. Security rules ([`site/firestore.rules`](site/firestore.rules))
+  let each user reach only their own data.
+- **Hosting:** the site is deployed to [procedural-worlds-d79be.web.app](https://procedural-worlds-d79be.web.app).
+- **Storage:** not used. The project stays on the free Spark plan, where new projects can't create
+  a Storage bucket, so each save's thumbnail is a small JPEG kept in its Firestore document. The
+  tutorial explains the Storage version (Part D).
+
+Code: [`site/src/firebase/`](site/src/firebase) (connection, sign-in, save/load) and
+[`site/src/components/AccountMenu.tsx`](site/src/components/AccountMenu.tsx) (the top-bar menu).
 
 ## Getting Started
 
