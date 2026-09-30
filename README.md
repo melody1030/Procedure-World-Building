@@ -141,8 +141,8 @@ folder numbers track the syllabus, not build order.
   rounded forms. It replaces an earlier voxel-city version that was too
   busy to show the techniques. Lecture notes:
   [Shaders — class notes](docs/notes/shaders-notes.md).
+  ![Shader Studio](<site/src/weeks/week04-shaders/screenshots/截圖 2026-09-30 08.35.24.png>)
 
-  ![Shader Studio showing the position gradient](site/src/weeks/week04-shaders/screenshots/shader-studio.jpg)
 
 ## Firebase: Accounts & Saved Configurations
 

@@ -7,7 +7,8 @@ and read how it works.
 
 The lecture notes behind this tab are in [Shaders — Class Notes](../../../../docs/notes/shaders-notes.md).
 
-![Shader Studio showing the position gradient](screenshots/shader-studio.jpg)
+![Shader Studio](<screenshots/截圖 2026-09-30 08.35.24.png>)
+
 
 ## Why a studio instead of a city
 
@@ -17,6 +18,8 @@ every strategy, so moving a slider barely changed the picture. And a voxel face 
 six directions, so cel bands, fresnel falloff and matcaps (which all depend on smooth normals)
 hardly showed. It was removed and replaced by this studio: one calm scene, one material, and
 nothing on screen that is not a technique you chose.
+
+![The earlier voxel city version](<screenshots/截圖 2026-09-29 22.56.25.png>)
 
 ## One technique at a time
 
