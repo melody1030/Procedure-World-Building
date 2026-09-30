@@ -23,6 +23,9 @@ The visual starting point is *Town to City*: a cozy city builder with a voxel lo
 
 What I change is the **tone** and **who does the building**. In *Town to City* a player places every building in a warm, sunlit world. In Blueprint City, **rules grow the city** by themselves, and the world is a dark, neon-lit future.
 
+Here are some reference images:
+![[Town-to-city1.png|334]]
+![[Town-to-city2.png|625]]![[Town-to-city3.png|632]]
 ## 3. From the References to My Version
 
 | *Town to City* | Blueprint City |

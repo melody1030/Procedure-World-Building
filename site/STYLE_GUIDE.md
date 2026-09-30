@@ -1,6 +1,6 @@
 # Style Guide
 
-The visual rules for every page of the Procedural World Building site (Weeks 1, 2 and 3). The
+The visual rules for every page of the Procedural World Building site (Weeks 1 to 4). The
 look is **dark slate with cyan accents**: quiet translucent panels floating over a 3D scene, one
 accent colour, and a small set of reusable shapes. When you add or change anything, follow this
 guide so the weeks keep feeling like one product.
@@ -27,7 +27,7 @@ The values below are the ones in the code today. If you change a value, change i
 | Tailwind directives plus the base layer (page defaults, slider thumb) | `src/styles.css` |
 | Top bar and week tabs | `src/App.tsx` |
 | Floating side panel, its toggle button and the `E` shortcut | `src/components/SidePanel.tsx` |
-| Shared panel controls for Weeks 1 and 2 (`Section`, `Field`, `FieldNote`, `RangeInput`, `Switch`, `Select`, `PanelButton`, heading and glass-card classes) | `src/components/controls.tsx` |
+| Shared panel controls for Weeks 1, 2 and 4 (`Section`, `Field`, `FieldNote`, `RangeInput`, `Switch`, `Select`, `ColorField`, `PanelButton`, heading and glass-card classes) | `src/components/controls.tsx` |
 | Everything else | Tailwind classes inside each week's `.tsx` files |
 | Fonts | `@fontsource/roboto`, `@fontsource/share-tech`, imported in `src/main.tsx` |
 
@@ -94,6 +94,20 @@ Do not introduce a second accent colour for UI. Amber, pink, orange and lime exi
 | Edge crossings | pink `#f472b6` |
 | Surface normals | orange `#fb923c` |
 | Cell vertices | lime `#a3e635` |
+| Week 4 unlit surface (no base colour) | grey `#8c8c8c` |
+| Week 4 Flat default | `#7fb5d6` |
+| Week 4 position-gradient ramp (low to high) | `#1d3a52`, `#a5d4ee` |
+| Week 4 Slope (flat, steep) | `#5fa391`, `#8b8394` |
+| Week 4 fresnel rim default | cyan `#22d3ee` |
+| Week 4 fog default | `#0a0f17` (the stage colour) |
+| Week 4 cel outlines | `#05080d` |
+| Week 4 Ripple water (shallow to deep), glint and foam | `#54b8cc`, `#1a528c`, `#99cce6`, `#f7fcff` |
+| Week 4 curve plot in the panel | cyan `#22d3ee` |
+
+Week 4's shaders write these as raw sRGB values and output them without colour-space conversion,
+so they show exactly as listed. While fog is in the shader, the stage background swaps to the fog
+colour. Matcap pictures (clay, chrome, neon rim, holographic) are drawn on a canvas at runtime and
+are scene colours, not UI.
 
 CSG primitives keep a hue per shape in their icons (cube blue, sphere sky, cylinder violet,
 cone emerald, torus amber) so they can be told apart in the tree.

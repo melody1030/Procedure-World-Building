@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { SidePanel } from "../../components/SidePanel";
-import { Field, FieldNote, headingClass, headingIconClass, RangeInput, Section, Select, Switch } from "../../components/controls";
+import { ColorField, Field, FieldNote, headingClass, headingIconClass, RangeInput, Section, Select, Switch } from "../../components/controls";
 import { fieldDescriptions, geometryParamsConfig, lightConfig, materialConfig, presetConfig, shapeConfig } from "./config";
-import ColorField from "./ColorField";
 import { CubeIcon, DiamondIcon, DiceIcon, DropletIcon, StarIcon, SunIcon } from "./icons";
 import ParamRow from "./ParamRow";
 import { randomizePatch } from "./randomize";

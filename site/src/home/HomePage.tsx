@@ -36,6 +36,16 @@ function VoxelIcon() {
   );
 }
 
+function ShaderSphereIcon() {
+  return (
+    <svg {...iconProps} className="h-11 w-11">
+      <circle cx="12" cy="12" r="9.5" />
+      <path d="M3.4 15.2c5.4 2 11.8 2 17.2 0M2.6 10.4c6.1 1.7 12.7 1.7 18.8 0" />
+      <path d="M8 5.6c2.3-1.2 5.2-1.1 7.4.3" strokeOpacity={0.55} />
+    </svg>
+  );
+}
+
 function ArrowIcon({ className = "h-4 w-4" }: { className?: string }) {
   return (
     <svg {...iconProps} strokeWidth={1.8} className={className}>
@@ -74,6 +84,7 @@ const EXPERIMENTS: { number: string; title: string; description: string; path: s
   { number: "01", title: "Geometry", description: "Three.js basics, shapes, materials, lighting.", path: "/week01", icon: <CubeIcon /> },
   { number: "02", title: "Terrain", description: "Noise grids, shaping, hydraulic erosion.", path: "/week02", icon: <MountainIcon /> },
   { number: "03", title: "Volumes", description: "Voxels, CSG, implicit surfaces, mesh generation.", path: "/week03", icon: <VoxelIcon /> },
+  { number: "04", title: "Shader Studio", description: "Stack, isolate and read shader techniques.", path: "/week04", icon: <ShaderSphereIcon /> },
 ];
 
 /** Landing page: the project's entry point into the week-by-week experiments. */
@@ -99,7 +110,7 @@ export default function HomePage() {
               <span className="text-cyan-400 [text-shadow:0_0_28px_rgba(34,211,238,0.35)]">from rules.</span>
             </h1>
             <p className="mt-6 max-w-md text-[15px] leading-relaxed text-slate-400">
-              Explore geometry, noise, erosion, voxels, volumes, and mesh generation through interactive procedural experiments.
+              Explore geometry, noise, erosion, voxels, volumes, mesh generation, and shaders through interactive procedural experiments.
             </p>
             <div className="mt-9 flex flex-wrap gap-3">
               <a
@@ -128,7 +139,7 @@ export default function HomePage() {
         </div>
 
         {/* Hovering the cards shows a cursor spotlight: everything outside it turns grayscale. */}
-        <ChromaGrid className="mx-auto grid max-w-[1600px] grid-cols-1 gap-5 px-6 pb-16 pt-4 sm:px-10 lg:grid-cols-3 lg:px-20">
+        <ChromaGrid className="mx-auto grid max-w-[1600px] grid-cols-1 gap-5 px-6 pb-16 pt-4 sm:px-10 md:grid-cols-2 lg:px-20 2xl:grid-cols-4">
           {EXPERIMENTS.map((experiment) => (
             <a
               key={experiment.path}

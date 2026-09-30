@@ -104,7 +104,7 @@ reshapes the torus in real time.
 | `Scene3D.tsx` | Three.js scene setup and the render loop |
 | `sceneFactories.ts` | Builds/updates geometry, material, and light objects from state |
 | `ControlsPanel.tsx` | The floating control panel UI |
-| `ColorField.tsx` | Colour swatch plus an editable hex value |
+| `ColorField` (in `components/controls.tsx`) | Color swatch plus an editable hex value, shared with Week 4 |
 | `ParamRow.tsx` | Slider with a typable numeric box, for each shape's construction parameters |
 | `randomize.ts` | Builds the random state used by the Randomize button |
 | `RotateToggle.tsx` | Small auto-rotate on/off button |

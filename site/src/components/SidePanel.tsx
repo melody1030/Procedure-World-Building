@@ -70,7 +70,7 @@ function registerPanel(handle: PanelHandle): () => void {
 }
 
 /**
- * Shared floating side panel used by the Week 1, 2 and 3 views. Pressing E toggles every mounted panel together, on either edge. Left and right use the
+ * Shared floating side panel used by every week's views. Pressing E toggles every mounted panel together, on either edge. Left and right use the
  * same card style, the same slide-in/out animation and the same round toggle button, so the
  * navigation sidebar and the settings panels behave identically.
  */

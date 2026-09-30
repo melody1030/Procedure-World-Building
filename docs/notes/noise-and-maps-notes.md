@@ -1,5 +1,7 @@
 # Noise & Maps — Class Notes
 
+[← Back to the main README](../../README.md)
+
 ## 1. What Is Procedural Noise?
 
 Procedural noise is a **function that turns coordinates into a value**, deterministically:

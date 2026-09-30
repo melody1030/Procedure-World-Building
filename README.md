@@ -15,6 +15,7 @@ _A working repository for the Procedure World Building project (2026 Fall)._
   - [Week 2 — Noise Grid & Hydraulic Erosion](site/src/weeks/week02-noise-grid/README.md): noise stacks, shaping, droplet erosion
     ([presentation feedback](docs/analysis/week02-noise-grid-feedback.md))
   - [Week 3 — Voxels & Volumes](site/src/weeks/week03-voxels-volumes/README.md): voxel resolution, implicit surfaces, CSG, mesh generation
+  - [Week 4 — Shader Studio](site/src/weeks/week04-shaders/README.md): pick a shader technique from a dropdown, tune it and see the value it computes
 - [Firebase: Accounts & Saved Configurations](#firebase-accounts--saved-configurations)
 - [Getting Started](#getting-started)
 
@@ -52,7 +53,8 @@ Procedure-World-Building/
 ├── docs/
 │   ├── concept.md             ← the project concept (Blueprint City)
 │   ├── analysis/              ← feedback and reflection notes from class presentations
-│   └── tutorial/              ← setup guides and class notes (React, Three.js, Git, Firebase, noise)
+│   ├── notes/                 ← class notes from lectures (noise, shaders)
+│   └── tutorial/              ← setup guides (React, Three.js, Git, Firebase)
 └── site/                      ← the React + TypeScript + Three.js workshop site
     ├── STYLE_GUIDE.md         ← shared visual style for every week
     └── src/
@@ -60,7 +62,8 @@ Procedure-World-Building/
         └── weeks/
             ├── week01-threejs-basics/
             ├── week02-noise-grid/
-            └── week03-voxels-volumes/
+            ├── week03-voxels-volumes/
+            └── week04-shaders/
                 ├── README.md      ← the study notes for that week
                 ├── screenshots/   ← images referenced by that README
                 └── *.ts / *.tsx   ← the week's code
@@ -75,13 +78,17 @@ Every week follows the same pattern: its code, a `README.md` study notebook, and
 - [`docs/analysis/week02-noise-grid-feedback.md`](docs/analysis/week02-noise-grid-feedback.md) — teacher feedback from the Week 2 presentation, and ideas for future work
 - [`site/STYLE_GUIDE.md`](site/STYLE_GUIDE.md) — the shared visual style for every page of the site (colours, fonts, panels, controls)
 
-**Tutorials and class notes** ([`docs/tutorial/`](docs/tutorial)):
+**Class notes** ([`docs/notes/`](docs/notes)):
+
+- [Noise & Maps](docs/notes/noise-and-maps-notes.md)
+- [Shaders](docs/notes/shaders-notes.md): the graphics pipeline, shader languages, and techniques (gradients, fog, fresnel, matcap, cel, contact, vertex displacement)
+
+**Tutorials** ([`docs/tutorial/`](docs/tutorial)):
 
 - [Installing React (with terminal basics)](docs/tutorial/react-install-tutorial.md)
 - [Installing Three.js](docs/tutorial/threejs-install-tutorial.md)
 - [Git & GitHub](docs/tutorial/git-github-tutorial.md)
 - [Firebase: Hosting and Firestore](docs/tutorial/firebase-tutorial.md)
-- [Noise & Maps — class notes](docs/tutorial/noise-and-maps-notes.md)
 
 ## Weekly Progress
 
@@ -126,6 +133,16 @@ folder numbers track the syllabus, not build order.
   ![CSG boolean difference result](site/src/weeks/week03-voxels-volumes/screenshots/csg-difference-result.webp)
 
   ![Mesh generation, Marching Cubes on a cube and ball](site/src/weeks/week03-voxels-volumes/screenshots/mesh-final-ui.webp)
+
+- **2026-09-29 — [Week 4 — Shader Studio](site/src/weeks/week04-shaders/README.md)** —
+  the Assignment 2 shader study. A dropdown picks one technique at a time (ripple, which turns
+  the floor into water with contact-shader foam, flat, position gradient, slope, matcap, Lambert, cel with
+  outlines, fake AO, fresnel rim and distance fog) on a calm scene of simple architectural and
+  rounded forms. It replaces an earlier voxel-city version that was too
+  busy to show the techniques. Lecture notes:
+  [Shaders — class notes](docs/notes/shaders-notes.md).
+
+  ![Shader Studio showing the position gradient](site/src/weeks/week04-shaders/screenshots/shader-studio.jpg)
 
 ## Firebase: Accounts & Saved Configurations
 
