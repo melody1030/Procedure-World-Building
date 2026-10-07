@@ -17,11 +17,10 @@ import { FIELD_NODES, nodeCoord, type IslandData } from "./island";
  *    step. Low-frequency noise nudges the boundaries so terrace edges wander.
  * 4. Clean-up: a majority filter removes one-column spikes and notches, and a flood fill drops
  *    islets too small to build on.
- * 5. Distance to water (breadth-first search from every water column) decides where beaches go,
- *    and is kept for the suitability map later.
+ * 5. Distance to water (breadth-first search from every water column) decides where beaches go.
  */
 
-export const SURFACE = { seabed: 0, sand: 1, grass: 2, rock: 3, riverbed: 4, bank: 5 } as const;
+export const SURFACE = { seabed: 0, sand: 1, grass: 2, rock: 3 } as const;
 export type Surface = (typeof SURFACE)[keyof typeof SURFACE];
 
 export type TerrainParams = WorldParams["terrain"];

@@ -74,8 +74,7 @@ export function TitleCard({ world, onSeed }: { world: WorldModel; onSeed: (seed:
       </form>
 
       <p className="mt-3 text-xs leading-snug text-slate-400">
-        {world.growth.buildings.length} buildings · tallest {Math.max(...world.growth.buildings.map((b) => b.storeys + (b.extension?.storeys ?? 0)))} storeys ·{" "}
-        {world.roads.roads.length} roads
+        {world.terrain.levels} terraces · {Math.round(world.terrain.landShare * 100)}% land
       </p>
       <p className="mt-1 text-[11px] leading-snug text-slate-500">
         {toMetres(world.size)} m across · 1 voxel = {VOXEL_M} m · 1 storey = {STOREY} voxels

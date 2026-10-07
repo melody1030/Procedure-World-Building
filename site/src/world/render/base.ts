@@ -57,7 +57,7 @@ export interface Sea {
   mirror: Reflector;
 }
 
-/** The sea: a mirror at sea level, so the city's lights reflect in it, plus see-through sides. */
+/** The sea: a dark mirror at sea level, plus see-through sides. */
 export function buildSea(half: number, seaLevel: number, renderer: THREE.WebGLRenderer): Sea {
   const outer = half + WATER_MARGIN;
   const group = new THREE.Group();
@@ -66,7 +66,8 @@ export function buildSea(half: number, seaLevel: number, renderer: THREE.WebGLRe
     clipBias: 0.002,
     textureWidth: Math.round(size.x * 0.6),
     textureHeight: Math.round(size.y * 0.6),
-    color: 0x6a7a96,
+    // Dark, so the mirror reads as water rather than an upside-down copy of the island.
+    color: 0x2e3a50,
   });
   mirror.rotation.x = -Math.PI / 2;
   mirror.position.y = seaLevel;
@@ -88,5 +89,3 @@ export function buildSea(half: number, seaLevel: number, renderer: THREE.WebGLRe
   }
   return { object: group, mirror };
 }
-
-/** Chunk boundaries, floating just above the highest ground like a planning grid. */

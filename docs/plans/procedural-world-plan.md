@@ -32,7 +32,15 @@ zero as a **seed → rules → city** pipeline.
 
 ---
 
-## Status (2026-09-30): the whole pipeline is built
+## Status (2026-10-07): back to the terrain
+
+The full pipeline below was committed as version 1 (commit `bd582ca`, screenshots in
+`site/src/world/screenshots/`) and then taken back to the ground: `/world` now has only the
+island, the terrain (noise, erosion, terraces) and its voxel mesh, on the plinth and sea, with a
+weekly-studio-style settings panel. The world will be rebuilt from here one step at a time; the
+table below records what version 1 had.
+
+## Version 1 (2026-09-30 to 2026-10-07): the whole pipeline is built
 
 Open **`/world`** (or `/world?seed=anything`). All 14 stages run in about 0.25–0.4 s per seed and
 the page holds 60 fps at 2.6k × 1.8k with bloom, tilt-shift and the mirror sea. Code is in
