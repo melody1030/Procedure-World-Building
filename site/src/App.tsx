@@ -4,6 +4,7 @@ import { WeekConfigProvider, type WeekConfigHandle } from "./firebase/weekConfig
 import HomePage from "./home/HomePage";
 import { usePath } from "./router";
 import { weeks } from "./weeks/registry";
+import WorldPage from "./world";
 
 export default function App() {
   const path = usePath();
@@ -13,8 +14,12 @@ export default function App() {
   const [configHandle, setConfigHandle] = useState<WeekConfigHandle | null>(null);
 
   useEffect(() => {
-    document.title = active ? `${active.title} · Procedural World Building` : "Procedural World Building — Weekly Workshops";
-  }, [active]);
+    if (path === "/world") document.title = "Blueprint City · Procedural World Building";
+    else document.title = active ? `${active.title} · Procedural World Building` : "Procedural World Building — Weekly Workshops";
+  }, [active, path]);
+
+  // The procedural world is the project's final piece: full screen, no top bar.
+  if (path === "/world") return <WorldPage />;
 
   return (
     <div className="flex min-h-screen flex-col">

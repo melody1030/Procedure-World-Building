@@ -70,6 +70,16 @@ function registerPanel(handle: PanelHandle): () => void {
 }
 
 /**
+ * Lets something that is not a side panel (a floating overlay, a toolbar) show and hide with the
+ * panels when E is pressed. It joins the same group, so "any open → close all" includes it.
+ */
+export function useShortcutToggle(open: boolean, onToggle: () => void) {
+  const latest = useRef({ open, onToggle });
+  latest.current = { open, onToggle };
+  useEffect(() => registerPanel({ isOpen: () => latest.current.open, toggle: () => latest.current.onToggle() }), []);
+}
+
+/**
  * Shared floating side panel used by every week's views. Pressing E toggles every mounted panel together, on either edge. Left and right use the
  * same card style, the same slide-in/out animation and the same round toggle button, so the
  * navigation sidebar and the settings panels behave identically.
@@ -93,10 +103,7 @@ export function SidePanel({
   children: ReactNode;
 }) {
   const isLeft = side === "left";
-
-  const latest = useRef({ open, onToggle });
-  latest.current = { open, onToggle };
-  useEffect(() => registerPanel({ isOpen: () => latest.current.open, toggle: () => latest.current.onToggle() }), []);
+  useShortcutToggle(open, onToggle);
 
   return (
     <>

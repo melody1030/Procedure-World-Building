@@ -106,10 +106,12 @@ function erodeAt(field: Float32Array, resolution: number, x: number, y: number, 
   const minIy = Math.max(0, y0 - radius);
   const maxIy = Math.min(resolution, y0 + radius);
 
+  // Math.sqrt rather than Math.hypot: same distance, but hypot is several times slower in V8
+  // and this runs for every node around every droplet step.
   let weightSum = 0;
   for (let iy = minIy; iy <= maxIy; iy++) {
     for (let ix = minIx; ix <= maxIx; ix++) {
-      const dist = Math.hypot(ix - x, iy - y);
+      const dist = Math.sqrt((ix - x) * (ix - x) + (iy - y) * (iy - y));
       if (dist >= radius) continue;
       weightSum += radius - dist;
     }
@@ -118,7 +120,7 @@ function erodeAt(field: Float32Array, resolution: number, x: number, y: number, 
 
   for (let iy = minIy; iy <= maxIy; iy++) {
     for (let ix = minIx; ix <= maxIx; ix++) {
-      const dist = Math.hypot(ix - x, iy - y);
+      const dist = Math.sqrt((ix - x) * (ix - x) + (iy - y) * (iy - y));
       if (dist >= radius) continue;
       const weight = (radius - dist) / weightSum;
       field[iy * cols + ix] -= amount * weight;
