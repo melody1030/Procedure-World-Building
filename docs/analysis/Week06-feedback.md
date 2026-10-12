@@ -1,0 +1,6 @@
+- Showing the procedural world itself instead of the exploring process
+	- include the technique into the project itself
+- explore the game "townscaper", knowing its algorithm, the mechanism
+- look for more reference in terms of lighting, rendering-style, terrain, building, landscape
+- Be careful of the scale
+- 

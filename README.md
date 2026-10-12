@@ -10,12 +10,15 @@ _A working repository for the Procedure World Building project (2026 Fall)._
 - [Project Concept: Blueprint City](docs/concept.md)
 - [Repository Structure](#repository-structure)
 - [Documentation](#documentation)
+- [Final Project: Blueprint City (procedural world)](#final-project-blueprint-city)
+  ([development log](site/src/world/README.md)): terrain, river, street network, districts and lots
 - [Weekly Progress](#weekly-progress)
   - [Week 1 — Three.js Basics](site/src/weeks/week01-threejs-basics/README.md): geometry, materials, lighting
   - [Week 2 — Noise Grid & Hydraulic Erosion](site/src/weeks/week02-noise-grid/README.md): noise stacks, shaping, droplet erosion
     ([presentation feedback](docs/analysis/week02-noise-grid-feedback.md))
   - [Week 3 — Voxels & Volumes](site/src/weeks/week03-voxels-volumes/README.md): voxel resolution, implicit surfaces, CSG, mesh generation
   - [Week 4 — Shader Studio](site/src/weeks/week04-shaders/README.md): pick a shader technique from a dropdown, tune it and see the value it computes
+  - [Week 5 — Scatter & Paths](site/src/weeks/week05-scatter-paths/README.md): scatter layers with rules, spline roads and rivers, particles in a wind field
 - [Firebase: Accounts & Saved Configurations](#firebase-accounts--saved-configurations)
 - [Getting Started](#getting-started)
 
@@ -24,7 +27,7 @@ _A working repository for the Procedure World Building project (2026 Fall)._
 This repository tracks my coursework for **Procedural World Building** at
 Cornell Tech (Fall 2026). The class is built around a single idea: instead
 of placing every rock, river, and tree by hand, you write rules and
-numbers — *procedures* — that generate a world from parameters. You turn
+numbers that generate a world from parameters. You turn
 a slider, an algorithm runs, and a planet (or a map of it) updates in
 front of you.
 
@@ -53,17 +56,23 @@ Procedure-World-Building/
 ├── docs/
 │   ├── concept.md             ← the project concept (Blueprint City)
 │   ├── analysis/              ← feedback and reflection notes from class presentations
-│   ├── notes/                 ← class notes from lectures (noise, shaders)
+│   ├── plans/                 ← build plans (shader studio, terrain, town)
+│   ├── notes/                 ← class notes from lectures (noise, shaders, distributions & paths)
 │   └── tutorial/              ← setup guides (React, Three.js, Git, Firebase)
 └── site/                      ← the React + TypeScript + Three.js workshop site
     ├── STYLE_GUIDE.md         ← shared visual style for every week
     └── src/
         ├── components/        ← UI shared by all weeks (side panel, controls)
+        ├── world/             ← the final project, Blueprint City (route /world)
+        │   ├── README.md      ← its development log
+        │   ├── terrain/       ← one file per pipeline stage
+        │   └── screenshots/
         └── weeks/
             ├── week01-threejs-basics/
             ├── week02-noise-grid/
             ├── week03-voxels-volumes/
-            └── week04-shaders/
+            ├── week04-shaders/
+            └── week05-scatter-paths/
                 ├── README.md      ← the study notes for that week
                 ├── screenshots/   ← images referenced by that README
                 └── *.ts / *.tsx   ← the week's code
@@ -75,6 +84,10 @@ Every week follows the same pattern: its code, a `README.md` study notebook, and
 ## Documentation
 
 - [`docs/concept.md`](docs/concept.md) — the project concept: a procedural voxel diorama that grows from a cliffside settlement into a neon cyberpunk megacity
+- [`site/src/world/README.md`](site/src/world/README.md) — the development log of the procedural city (live at `/world`)
+- [`docs/plans/terrain-plan.md`](docs/plans/terrain-plan.md) — the build plan for the city's terrain: noise, shaping, terraces, river, surfaces
+- [`docs/plans/town-plan.md`](docs/plans/town-plan.md) — the build plan for the town: street network, districts and lots, scatter
+- [`docs/analysis/Week06-feedback.md`](docs/analysis/Week06-feedback.md) — teacher feedback on the project direction (Week 6)
 - [`docs/analysis/week02-noise-grid-feedback.md`](docs/analysis/week02-noise-grid-feedback.md) — teacher feedback from the Week 2 presentation, and ideas for future work
 - [`site/STYLE_GUIDE.md`](site/STYLE_GUIDE.md) — the shared visual style for every page of the site (colours, fonts, panels, controls)
 
@@ -143,6 +156,39 @@ folder numbers track the syllabus, not build order.
   [Shaders — class notes](docs/notes/shaders-notes.md).
   ![Shader Studio](<site/src/weeks/week04-shaders/screenshots/截圖 2026-09-30 08.35.24.png>)
 
+- **2026-10-06 — [Week 5 — Scatter & Paths](site/src/weeks/week05-scatter-paths/README.md)** —
+  the three parts of Class 06 on one terrain. **Scatter:** four asset layers (trees, bushes,
+  rocks, windmills), each with its own distribution (random, noise, Poisson disk), height and
+  slope rules, surface alignment and terrain tint. **Paths:** a road and a river laid along
+  Catmull-Rom splines that read the terrain, flatten or carve it, keep scatter away and place
+  lamp posts. **Particles:** rain, wind and clouds driven by a curl-noise vector field, with
+  trails. Lecture notes:
+  [Distributions, Paths & Vector Fields — class notes](docs/notes/distribution-and-paths-notes.md).
+  ![Scatter & Paths](site/src/weeks/week05-scatter-paths/screenshots/2026-10-06-scatter-rain.jpg)
+
+## Final Project: Blueprint City
+
+The weeks come together in one procedural world at **`/world`**
+([concept](docs/concept.md)): a voxel diorama that grows from a seed into a terraced cyberpunk
+city. Each stage has its own settings, and each one reuses a week's technique: Week 2's noise
+for the terrain, Week 3's voxels and greedy meshing, Week 4's shaders for the voxel ground, and
+Week 5's paths for the river. Full dated log with screenshots:
+**[Blueprint City development log](site/src/world/README.md)**.
+
+- **2026-10-07 — Version 1, then a restart.** A complete 14-stage city pipeline was built and
+  committed (`bd582ca`), then taken back to an empty diorama to rebuild step by step. The terrain
+  was rebuilt on 0.25 m voxels: noise, shaping, slope-scaled terraces, surfaces and a voxel-grid
+  shader.
+- **2026-10-08 — River and claims.** A river valley laid with Week 5's spline technique; the ocean
+  removed so the river is the waterfront; a claim map so each stage keeps off the land earlier
+  stages use; a center plaza by the river and the first switchback street.
+- **2026-10-09 — Streets, districts and lots.** The street network went through three designs
+  and ended as wave function collapse on a tile grid, solved outward from the plaza: one
+  connected network with right-angle junctions. A district map (corporate core, neon strip,
+  megablocks, industrial, wealthy, parks) and building lots along the streets.
+- **Next:** scatter (lamps, street trees, forest), bridges, then buildings.
+
+![Blueprint City: wave function collapse streets with districts and lots](site/src/world/screenshots/2026-10-09-wfc-streets-districts.webp)
 
 ## Firebase: Accounts & Saved Configurations
 

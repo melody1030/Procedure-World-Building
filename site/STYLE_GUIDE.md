@@ -1,6 +1,6 @@
 # Style Guide
 
-The visual rules for every page of the Procedural World Building site (Weeks 1 to 4). The
+The visual rules for every page of the Procedural World Building site (Weeks 1 to 5). The
 look is **dark slate with cyan accents**: quiet translucent panels floating over a 3D scene, one
 accent colour, and a small set of reusable shapes. When you add or change anything, follow this
 guide so the weeks keep feeling like one product.
@@ -103,6 +103,12 @@ Do not introduce a second accent colour for UI. Amber, pink, orange and lime exi
 | Week 4 cel outlines | `#05080d` |
 | Week 4 Ripple water (shallow to deep), glint and foam | `#54b8cc`, `#1a528c`, `#99cce6`, `#f7fcff` |
 | Week 4 curve plot in the panel | cyan `#22d3ee` |
+| Week 5 terrain, natural (low to high), rock, river bank | `#22382f`, `#3f5c45`, `#6d7a5a`, `#9a9aa6`; `#5b5866`; `#1f2d33` |
+| Week 5 trees, bushes, rocks (low/flat to high/steep tint) | `#2f6f5e`→`#a3b86c`, `#2f5f50`→`#7a9a5a`, `#5b5866`→`#9a96a6` |
+| Week 5 windmills, road, lamp poles, lamp bulbs | `#cbd5e1`, `#253041`, `#475569`, cyan `#22d3ee` |
+| Week 5 river water | `#1a528c` (emissive `#0b2440`) |
+| Week 5 layer mask: allowed, slope fail, height fail, path | cyan `#22d3ee`, amber `#fbbf24`, `#334155`, pink `#f472b6` |
+| Week 5 particles: rain, wind, clouds, field arrows | `#a5f3fc`, `#22d3ee`, `#cbd5e1`, `#22d3ee` |
 
 Week 4's shaders write these as raw sRGB values and output them without colour-space conversion,
 so they show exactly as listed. While fog is in the shader, the stage background swaps to the fog
@@ -180,7 +186,8 @@ Tailwind's scale is set 10% smaller in `tailwind.config.js`.
 ```
 
 - **Top bar.** Translucent slate (`rgba(15,23,42,0.6)`), 24px blur, bottom border. Title left, week
-  tabs next to it. Tabs are transparent with a transparent border; hover is `slate-800/60` with
+  tabs next to it. Below `2xl` the tabs show a short label (`Week 5`) with the full title as a tooltip,
+  so five or more weeks fit; below `lg` they move into a menu. Tabs are transparent with a transparent border; hover is `slate-800/60` with
   `cyan-300` text; active is `rgba(6,182,212,0.15)` fill, `rgba(34,211,238,0.3)` border, `#67e8f9` text.
 - **Stage.** One rounded (`14.4px`), clipped (`overflow: hidden`) region that fills the rest of the
   page. The canvas covers it. Clipping matters: it is what hides a closed side panel.

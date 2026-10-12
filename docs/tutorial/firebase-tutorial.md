@@ -281,7 +281,7 @@ service cloud.firestore {
     function validConfig(data) {
       return data.keys().hasOnly(['name', 'weekId', 'dataJson', 'thumbnail', 'createdAt'])
         && data.name is string && data.name.size() > 0 && data.name.size() <= 80
-        && data.weekId in ['week01', 'week02', 'week03']
+        && data.weekId is string && data.weekId.matches('week[0-9]{2}')
         && data.dataJson is string && data.dataJson.size() < 500000
         && data.thumbnail is string && data.thumbnail.size() < 200000
         && data.createdAt == request.time;

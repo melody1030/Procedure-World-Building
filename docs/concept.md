@@ -92,10 +92,10 @@ Each week of the course is one layer of the final city:
 | [Week 1: Three.js basics](../site/src/weeks/week01-threejs-basics/README.md) | Materials and lights, including emissive neon and night lighting | Done |
 | [Week 2: Noise grid and hydraulic erosion](../site/src/weeks/week02-noise-grid/README.md) | The terrain: cliffs, coast and river valley | Done |
 | [Week 3: Voxels and volumes](../site/src/weeks/week03-voxels-volumes/README.md) | The voxel world, shape combination (CSG) for buildings, and meshing for performance | Done |
-| Populations | Scattering trees, props and signs by slope and zone | Upcoming |
-| Networks | Roads, bridges and the city's growth graph | Upcoming |
-| Flows | Rain, haze and moving traffic | Upcoming |
-| Performance | Level of detail and streaming for a city-sized voxel world | Upcoming |
+| Populations | Scattering trees, props and signs by slope and zone | Next in [`/world`](../site/src/world/README.md) ([town plan](plans/town-plan.md)) |
+| Networks | Roads, bridges and the city's growth graph | Streets, districts and lots built in [`/world`](../site/src/world/README.md); bridges next |
+| Flows | Rain, haze and moving traffic | Built in version 1 (commit `bd582ca`); not yet in the rebuild |
+| Performance | Level of detail and streaming for a city-sized voxel world | Greedy meshing and merged buffers built; level of detail not yet |
 
 ## 9. Keywords
 
