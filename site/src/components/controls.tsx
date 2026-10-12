@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
 
 /**
@@ -14,14 +14,52 @@ export const headingIconClass = "h-3.5 w-3.5 shrink-0 text-slate-500";
 /** Floating glass card for overlays on the stage (2D map, simulation player). */
 export const glassCardClass = "rounded-2xl border border-slate-700/50 bg-slate-900/70 shadow-2xl shadow-black/40 backdrop-blur-xl";
 
-export function Section({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {
+/**
+ * A titled group of controls. With `collapsible`, the heading becomes a button that shows and
+ * hides the controls, with a chevron that turns as it opens.
+ */
+export function Section({
+  icon,
+  title,
+  children,
+  collapsible = false,
+  defaultOpen = true,
+}: {
+  icon: ReactNode;
+  title: string;
+  children: ReactNode;
+  collapsible?: boolean;
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  const bodyId = useId();
+  const heading = (
+    <>
+      <span className="flex h-3.5 w-3.5 shrink-0 text-slate-500 [&>svg]:h-full [&>svg]:w-full">{icon}</span>
+      <span className="flex-1">{title}</span>
+    </>
+  );
   return (
     <section className="shrink-0">
-      <div className={headingClass}>
-        <span className="flex h-3.5 w-3.5 shrink-0 text-slate-500 [&>svg]:h-full [&>svg]:w-full">{icon}</span>
-        <span className="flex-1">{title}</span>
-      </div>
-      <div className="mt-3 flex flex-col gap-3.5">{children}</div>
+      {collapsible ? (
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          aria-controls={bodyId}
+          className={headingClass + " w-full cursor-pointer text-left transition-colors duration-150 hover:text-slate-200"}
+        >
+          {heading}
+          <ChevronDown className={"h-3.5 w-3.5 shrink-0 text-slate-500 transition-transform duration-200 " + (open ? "" : "-rotate-90")} />
+        </button>
+      ) : (
+        <div className={headingClass}>{heading}</div>
+      )}
+      {open && (
+        <div id={bodyId} className="mt-3 flex flex-col gap-3.5">
+          {children}
+        </div>
+      )}
     </section>
   );
 }
@@ -31,7 +69,7 @@ const labelTextClass = "text-xs font-semibold uppercase tracking-wide text-slate
 /** Mono cyan numeric readout that sits on the label row. */
 export const valueClass = "font-mono text-xs font-normal normal-case tracking-normal tabular-nums text-cyan-300";
 
-/** Label with a hover tooltip. `inline` puts the control on the same row (used for switches). */
+/** Label with a hover tooltip (none when `description` is empty). `inline` puts the control on the same row (used for switches). */
 export function Field({
   label,
   description,
@@ -48,14 +86,14 @@ export function Field({
   return (
     <label className={"relative flex gap-1.5 text-xs " + (inline ? "flex-row items-center justify-between" : "flex-col items-stretch")}>
       <span
-        className={"group/label relative flex cursor-help items-baseline justify-between " + labelTextClass + (inline ? "" : " w-full")}
-        title={description}
+        className={"group/label relative flex items-baseline justify-between " + (description ? "cursor-help " : "") + labelTextClass + (inline ? "" : " w-full")}
+        title={description || undefined}
       >
         {label}
         {valueLabel !== undefined && <span className={"ml-auto " + valueClass}>{valueLabel}</span>}
-        <span className="invisible absolute left-0 top-full z-30 mt-1.5 w-[220px] rounded-lg border border-slate-700/50 bg-slate-800 px-2.5 py-2 text-xs font-normal normal-case leading-snug tracking-normal text-slate-400 opacity-0 shadow-[0_8px_20px_rgba(0,0,0,0.4)] transition-opacity duration-100 group-hover/label:visible group-hover/label:opacity-100">
+        {description && <span className="invisible absolute left-0 top-full z-30 mt-1.5 w-[220px] rounded-lg border border-slate-700/50 bg-slate-800 px-2.5 py-2 text-xs font-normal normal-case leading-snug tracking-normal text-slate-400 opacity-0 shadow-[0_8px_20px_rgba(0,0,0,0.4)] transition-opacity duration-100 group-hover/label:visible group-hover/label:opacity-100">
           {description}
-        </span>
+        </span>}
       </span>
       {children}
     </label>

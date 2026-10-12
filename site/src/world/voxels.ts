@@ -1,11 +1,10 @@
 import * as THREE from "three";
 
 /**
- * Collects axis-aligned boxes and bakes them into one BufferGeometry with per-vertex colours, so a
+ * Collects axis-aligned boxes and bakes them into one BufferGeometry with per-vertex colors, so a
  * whole layer is a single draw call. Boxes are in voxel units: (x, y, z) is the minimum corner.
  *
- * This is the simple builder for large blocks (the base, the slab). Terrain voxels get a greedy
- * mesher in Step 3, which only emits the faces that are actually exposed.
+ * This is the simple builder for large blocks, such as the plinth.
  */
 export class VoxelBatch {
   private positions: number[] = [];
@@ -19,7 +18,7 @@ export class VoxelBatch {
   }
 
   box(x: number, y: number, z: number, w: number, h: number, d: number, hex: number) {
-    // hex is sRGB; THREE.Color stores it in linear space, which is what vertex colours need.
+    // hex is sRGB; THREE.Color stores it in linear space, which is what vertex colors need.
     this.color.setHex(hex);
     const { r, g, b } = this.color;
     const x1 = x + w;

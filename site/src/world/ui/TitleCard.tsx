@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
 import { glassCardClass } from "../../components/controls";
 import { linkProps } from "../../router";
-import type { WorldModel } from "../pipeline";
 import { randomSeed } from "../rng";
-import { STOREY, VOXEL_M, toMetres } from "../scale";
+import { VOXEL_M, WORLD_SIZE, toMeters } from "../scale";
 import { MAX_SEED_LENGTH } from "../state";
 
 const iconProps = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round" } as const;
@@ -28,20 +27,18 @@ function BackIcon() {
   );
 }
 
-/** Top-right card (where the weeks keep their seed card): the world's name, its seed, and a way home. */
-export function TitleCard({ world, onSeed }: { world: WorldModel; onSeed: (seed: string) => void }) {
-  const [draft, setDraft] = useState(world.seed);
-  useEffect(() => setDraft(world.seed), [world.seed]);
+/** Top-right card (where the weeks keep their seed card): the title, the seed, the scale, and a way home. */
+export function TitleCard({ seed, onSeed }: { seed: string; onSeed: (seed: string) => void }) {
+  const [draft, setDraft] = useState(seed);
+  useEffect(() => setDraft(seed), [seed]);
 
   return (
     <div className={glassCardClass + " pointer-events-auto absolute right-4 top-4 w-[17rem] max-w-[calc(100%-5.5rem)] p-5"}>
       <a {...linkProps("/")} className="flex w-fit items-center gap-1.5 text-[11px] uppercase tracking-wider text-slate-500 transition-colors hover:text-cyan-300">
         <BackIcon />
-        Blueprint City
+        Home
       </a>
-      <h1 className="mt-2 truncate font-display text-2xl font-bold text-slate-100" title={world.name}>
-        {world.name}
-      </h1>
+      <h1 className="mt-2 truncate font-display text-2xl font-bold text-slate-100">Blueprint City</h1>
 
       <form
         className="mt-4 flex gap-2"
@@ -57,8 +54,8 @@ export function TitleCard({ world, onSeed }: { world: WorldModel; onSeed: (seed:
             maxLength={MAX_SEED_LENGTH}
             spellCheck={false}
             onChange={(e) => setDraft(e.target.value)}
-            onBlur={() => draft.trim() !== world.seed && onSeed(draft)}
-            aria-label="World seed"
+            onBlur={() => draft.trim() !== seed && onSeed(draft)}
+            aria-label="Terrain seed"
             className="min-w-0 flex-1 bg-transparent font-mono text-[13px] text-cyan-300 outline-none"
           />
         </label>
@@ -73,11 +70,8 @@ export function TitleCard({ world, onSeed }: { world: WorldModel; onSeed: (seed:
         </button>
       </form>
 
-      <p className="mt-3 text-xs leading-snug text-slate-400">
-        {world.terrain.levels} terraces · {Math.round(world.terrain.landShare * 100)}% land
-      </p>
-      <p className="mt-1 text-[11px] leading-snug text-slate-500">
-        {toMetres(world.size)} m across · 1 voxel = {VOXEL_M} m · 1 storey = {STOREY} voxels
+      <p className="mt-3 text-[11px] leading-snug text-slate-500">
+        {toMeters(WORLD_SIZE)} m across · 1 voxel = {VOXEL_M} m
       </p>
     </div>
   );

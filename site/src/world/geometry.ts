@@ -4,7 +4,7 @@
  */
 
 export type RGB = [number, number, number];
-export type Colour = number | RGB;
+export type Color = number | RGB;
 
 export interface GeometryData {
   position: Float32Array;
@@ -16,7 +16,7 @@ export interface GeometryData {
 const linearCache = new Map<number, RGB>();
 const toLinear = (c: number) => (c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
 
-/** sRGB hex → linear RGB (what vertex colours need). Cached. */
+/** sRGB hex → linear RGB (what vertex colors need). Cached. */
 export function lin(hex: number): RGB {
   let rgb = linearCache.get(hex);
   if (!rgb) {
@@ -28,7 +28,7 @@ export function lin(hex: number): RGB {
 
 export const mix = (a: RGB, b: RGB, t: number): RGB => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
 export const shade = (a: RGB, s: number): RGB => [a[0] * s, a[1] * s, a[2] * s];
-const rgbOf = (c: Colour): RGB => (typeof c === "number" ? lin(c) : c);
+const rgbOf = (c: Color): RGB => (typeof c === "number" ? lin(c) : c);
 
 export class GeometryBuilder {
   private pos = new Float32Array(3 * 4096);
@@ -40,15 +40,15 @@ export class GeometryBuilder {
 
   private reserve(nv: number, ni: number) {
     if (this.v + nv > this.pos.length / 3) {
-      const size = Math.max(this.pos.length * 2, (this.v + nv) * 3);
-      const grow = (a: Float32Array) => {
-        const b = new Float32Array(size);
+      const verts = Math.max((this.pos.length / 3) * 2, this.v + nv);
+      const grow = (a: Float32Array, per: number) => {
+        const b = new Float32Array(verts * per);
         b.set(a);
         return b;
       };
-      this.pos = grow(this.pos);
-      this.nor = grow(this.nor);
-      this.col = grow(this.col);
+      this.pos = grow(this.pos, 3);
+      this.nor = grow(this.nor, 3);
+      this.col = grow(this.col, 3);
     }
     if (this.i + ni > this.idx.length) {
       const b = new Uint32Array(Math.max(this.idx.length * 2, this.i + ni));
@@ -59,9 +59,9 @@ export class GeometryBuilder {
 
   /**
    * One quad. `c` holds 4 corners × (x, y, z), counter-clockwise seen from the front. `bottom`
-   * colours corners 0–1 and `top` corners 2–3 (pass the same colour for a flat face).
+   * colors corners 0–1 and `top` corners 2–3 (pass the same color for a flat face).
    */
-  quad(c: ArrayLike<number>, nx: number, ny: number, nz: number, bottom: Colour, top: Colour = bottom) {
+  quad(c: ArrayLike<number>, nx: number, ny: number, nz: number, bottom: Color, top: Color = bottom) {
     this.reserve(4, 6);
     const b = rgbOf(bottom);
     const t = rgbOf(top);

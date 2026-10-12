@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { AnchorHTMLAttributes, ReactNode } from "react";
 import { ChromaGrid, chromaCardClass, trackChromaCard } from "../components/ChromaGrid";
 import CursorGrid from "../components/CursorGrid";
 import { linkProps } from "../router";
@@ -46,6 +46,18 @@ function ShaderSphereIcon() {
   );
 }
 
+function ScatterPathIcon() {
+  return (
+    <svg {...iconProps} className="h-11 w-11">
+      <path d="M3 20c5 0 4-8 9-8s4-8 9-8" />
+      <path d="M6 8.5l1.5-3.5L9 8.5zM15.5 19l1.5-3.5 1.5 3.5z" />
+      <circle cx="4.5" cy="13" r="0.9" />
+      <circle cx="19.5" cy="11" r="0.9" />
+      <circle cx="10" cy="19" r="0.9" />
+    </svg>
+  );
+}
+
 function ArrowIcon({ className = "h-4 w-4" }: { className?: string }) {
   return (
     <svg {...iconProps} strokeWidth={1.8} className={className}>
@@ -56,7 +68,7 @@ function ArrowIcon({ className = "h-4 w-4" }: { className?: string }) {
 
 function PlayIcon() {
   return (
-    <svg {...iconProps} strokeWidth={1.8} className="h-4 w-4">
+    <svg {...iconProps} strokeWidth={1.8} className="h-5 w-5">
       <path d="M7 4.5v15l12-7.5z" />
     </svg>
   );
@@ -67,6 +79,15 @@ function DocumentIcon() {
     <svg {...iconProps} strokeWidth={1.6} className="h-5 w-5">
       <path d="M14 2.5H6.5a2 2 0 0 0-2 2v15a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V8z" />
       <path d="M14 2.5V8h5.5M8.5 13h7M8.5 17h7" />
+    </svg>
+  );
+}
+
+function IslandIcon() {
+  return (
+    <svg {...iconProps} strokeWidth={1.6} className="h-5 w-5">
+      <path d="M2.5 19.5c2 0 2-1 4-1s2 1 4 1 2-1 4-1 2 1 4 1 2-1 3-1" />
+      <path d="M5 16.5V13h3v-3h3V6.5h3V10h3v6.5" />
     </svg>
   );
 }
@@ -85,7 +106,28 @@ const EXPERIMENTS: { number: string; title: string; description: string; path: s
   { number: "02", title: "Terrain", description: "Noise grids, shaping, hydraulic erosion.", path: "/week02", icon: <MountainIcon /> },
   { number: "03", title: "Volumes", description: "Voxels, CSG, implicit surfaces, mesh generation.", path: "/week03", icon: <VoxelIcon /> },
   { number: "04", title: "Shader Studio", description: "Stack, isolate and read shader techniques.", path: "/week04", icon: <ShaderSphereIcon /> },
+  { number: "05", title: "Scatter & Paths", description: "Scattering rules, spline roads and rivers, particles in a wind field.", path: "/week05", icon: <ScatterPathIcon /> },
 ];
+
+/**
+ * Hero call-to-action. All three buttons share one element: icon, label and an arrow that slides on
+ * hover, the same glow, lift and focus ring. `primary` only swaps the colours.
+ */
+function HeroButton({ primary = false, icon, label, ...link }: { primary?: boolean; icon: ReactNode; label: string } & AnchorHTMLAttributes<HTMLAnchorElement>) {
+  const tone = primary
+    ? "bg-cyan-400 text-slate-950 shadow-[0_0_24px_rgba(34,211,238,0.25)] hover:bg-cyan-300 hover:shadow-[0_0_32px_rgba(34,211,238,0.45)]"
+    : "border border-cyan-400/50 bg-slate-950/40 text-cyan-300 hover:border-cyan-300 hover:bg-cyan-500/10 hover:shadow-[0_0_18px_rgba(34,211,238,0.25)]";
+  return (
+    <a
+      {...link}
+      className={`group flex items-center justify-center gap-3 rounded-xl [&>svg]:shrink-0 px-5 py-3.5 font-sans text-[15px] font-medium transition duration-200 ease-in-out hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950 active:translate-y-0 ${tone}`}
+    >
+      {icon}
+      {label}
+      <ArrowIcon className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-0.5" />
+    </a>
+  );
+}
 
 /** Landing page: the project's entry point into the week-by-week experiments. */
 export default function HomePage() {
@@ -110,27 +152,8 @@ export default function HomePage() {
               <span className="text-cyan-400 [text-shadow:0_0_28px_rgba(34,211,238,0.35)]">from rules.</span>
             </h1>
             <p className="mt-6 max-w-md text-[15px] leading-relaxed text-slate-400">
-              Explore geometry, noise, erosion, voxels, volumes, mesh generation, and shaders through interactive procedural experiments.
+              Explore geometry, noise, erosion, voxels, volumes, mesh generation, shaders, scattering, and paths through interactive procedural experiments.
             </p>
-            <div className="mt-9 flex flex-wrap gap-3">
-              <a
-                {...linkProps("/week01")}
-                className="group flex items-center gap-3 rounded-xl bg-cyan-400 px-5 py-3.5 font-sans text-[15px] font-medium text-slate-950 shadow-[0_0_24px_rgba(34,211,238,0.25)] transition hover:bg-cyan-300 hover:shadow-[0_0_32px_rgba(34,211,238,0.45)]"
-              >
-                <PlayIcon />
-                Start Exploring
-                <ArrowIcon className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-              </a>
-              <a
-                href={DOCS_URL}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center gap-3 rounded-xl border border-cyan-400/50 bg-slate-950/40 px-5 py-3.5 font-sans text-[15px] font-medium text-cyan-300 transition hover:border-cyan-300 hover:bg-cyan-500/10 hover:shadow-[0_0_18px_rgba(34,211,238,0.25)]"
-              >
-                <DocumentIcon />
-                View Documentation
-              </a>
-            </div>
           </div>
 
           <div className="relative -mx-6 h-[300px] sm:-mx-10 sm:h-[380px] md:mx-0 md:-mr-10 md:h-[440px] lg:-mr-20 lg:h-[520px]">
@@ -138,8 +161,16 @@ export default function HomePage() {
           </div>
         </div>
 
+        {/* Calls to action: one centred row under the hero, every button the same fixed width (wide enough
+            for the longest label). Wraps onto more rows on narrow screens. */}
+        <div className="relative z-10 mx-auto flex max-w-[1600px] flex-wrap justify-center gap-3 whitespace-nowrap px-6 pb-10 pt-6 sm:px-10 lg:px-20 [&>a]:w-[15.5rem]">
+          <HeroButton {...linkProps("/week01")} primary icon={<PlayIcon />} label="Start Exploring" />
+          <HeroButton href={DOCS_URL} target="_blank" rel="noreferrer" icon={<DocumentIcon />} label="View Documentation" />
+          <HeroButton {...linkProps("/world")} icon={<IslandIcon />} label="Enter the World" />
+        </div>
+
         {/* Hovering the cards shows a cursor spotlight: everything outside it turns grayscale. */}
-        <ChromaGrid className="mx-auto grid max-w-[1600px] grid-cols-1 gap-5 px-6 pb-16 pt-4 sm:px-10 md:grid-cols-2 lg:px-20 2xl:grid-cols-4">
+        <ChromaGrid className="mx-auto grid max-w-[1600px] grid-cols-1 gap-5 px-6 pb-16 pt-4 sm:px-10 md:grid-cols-2 lg:px-20 xl:grid-cols-3">
           {EXPERIMENTS.map((experiment) => (
             <a
               key={experiment.path}

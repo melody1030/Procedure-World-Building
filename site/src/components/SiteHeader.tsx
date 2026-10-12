@@ -4,7 +4,11 @@ import { linkProps } from "../router";
 import { weeks } from "../weeks/registry";
 import { AccountMenu } from "./AccountMenu";
 
-const NAV_ITEMS = [{ path: "/", label: "Home" }, ...weeks.map((week) => ({ path: `/${week.id}`, label: week.title }))];
+// `short` ("Week 5") is shown in the top bar until there is room for the full title.
+const NAV_ITEMS = [
+  { path: "/", label: "Home", short: "Home" },
+  ...weeks.map((week) => ({ path: `/${week.id}`, label: week.title, short: week.title.split(" — ")[0] })),
+];
 
 function MenuIcon({ open }: { open: boolean }) {
   return (
@@ -14,10 +18,11 @@ function MenuIcon({ open }: { open: boolean }) {
   );
 }
 
-function NavLink({ path, active, children }: { path: string; active: boolean; children: ReactNode }) {
+function NavLink({ path, active, title, children }: { path: string; active: boolean; title: string; children: ReactNode }) {
   return (
     <a
       {...linkProps(path)}
+      title={title}
       aria-current={active ? "page" : undefined}
       className={
         // The underline sits on the header's bottom border, glowing cyan on the active page.
@@ -46,8 +51,9 @@ export function SiteHeader({ path, configHandle, weekTitle }: { path: string; co
         </a>
         <nav className="hidden items-stretch gap-2 lg:flex" aria-label="Main">
           {NAV_ITEMS.map((item) => (
-            <NavLink key={item.path} path={item.path} active={item.path === path}>
-              {item.label}
+            <NavLink key={item.path} path={item.path} active={item.path === path} title={item.label}>
+              <span className="2xl:hidden">{item.short}</span>
+              <span className="hidden 2xl:inline">{item.label}</span>
             </NavLink>
           ))}
         </nav>
