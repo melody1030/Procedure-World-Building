@@ -9,12 +9,14 @@ import { NO_WATER } from "./voxelize";
  * The build animation's data. The finished ground is drawn as always; this adds what the later
  * stages changed, so the timeline can replay them in order:
  *
- * 1. the terrain prints from the plinth up, as it was before the river and the streets (until the
- *    paving starts, the ground drawn is `beforeStreets`, so no street shows early);
+ * 1. the terrain prints from the plinth up, as it was before the river and the streets: every
+ *    column the plaza or the streets change shows `beforeStreets` until the paving front reaches
+ *    it, so no trace of the network shows early;
  * 2. the river carves its channel (the cut ground is dug away from the top down);
  * 3. the river fills, its water running down the channel from the source to the mouth;
  * 4. the plaza is paved, from its center out;
- * 5. the streets grow from the plaza along the network, cutting and paving as they go.
+ * 5. the streets grow from the plaza along the network: as the front reaches a column, its old
+ *    ground gives way to the finished one, cut, filled and paved, embankments and all.
  *
  * Nothing here changes the terrain: it is drawn on top of it and cleared as the timeline passes.
  */
@@ -36,16 +38,18 @@ export interface BuildUp {
   n: number;
   /**
    * The ground before the streets: the river carved, nothing paved (no roads, curbs or plaza,
-   * no cuts or fills). Drawn instead of the finished ground until the paving starts, so no trace
-   * of the street network shows while the terrain prints, the river is carved and it fills.
+   * no cuts or fills). Each column the streets change shows it until the paving front reaches
+   * that column (the finished ground shows everything else), so the network is carved and built
+   * up along the front instead of appearing all at once.
    */
   beforeStreets: GeometryData;
-  /** The ground the river cut away (null if none), and the ground the plaza and streets cut away. */
+  /** The ground the river cut away (null if none); the streets' cuts need none (always null). */
   riverCut: GeometryData | null;
   streetCut: GeometryData | null;
   /**
-   * When each paved column is built, as a share of the paving (0–1]: the plaza from its center
-   * out, then the streets by their distance along the network from the plaza. 0 elsewhere.
+   * When each column the plaza or the streets change is built, as a share of the paving (0–1]:
+   * the plaza from its center out, then everything else they change (paving, cuts, fills,
+   * embankments) by its distance along the changed land from the plaza. 0 elsewhere.
    */
   order: Float32Array<ArrayBuffer>;
   /** When the water reaches each channel column, as a share of the fill (0–1], from the source down. */
@@ -68,14 +72,12 @@ export function buildUp(t: Terrain): BuildUp {
   // The two cuts: ground above the finished ground before the river (off the street land) and
   // before the streets (on it).
   const riverTop = new Int16Array(n * n).fill(NO_WATER);
-  const streetTop = new Int16Array(n * n).fill(NO_WATER);
   let top = t.columns.max;
   let riverHigh = 0;
   let riverLow = Infinity;
   for (let k = 0; k < n * n; k++) {
     if (paved(k)) {
       const h = before(t.river.h[k]);
-      if (h > height[k]) streetTop[k] = h;
       top = Math.max(top, h);
     } else {
       const h = before(t.terraced.h[k]);
@@ -88,8 +90,14 @@ export function buildUp(t: Terrain): BuildUp {
     }
   }
 
-  // Paving order: the plaza by its distance from the center, then a walk outward along the paved
-  // land from the plaza's edge.
+  // The ground before the streets: river-carved heights. A column the plaza or the streets change
+  // (paved, or cut or filled, embankments included) is rebuilt when the paving front reaches it.
+  const early = new Int16Array(n * n);
+  for (let k = 0; k < n * n; k++) early[k] = before(t.river.h[k]);
+  const changed = (k: number) => paved(k) || early[k] !== height[k];
+
+  // Paving order: the plaza by its distance from the center, then a walk outward from the plaza's
+  // edge over every changed column, so cuts, fills and embankments come with their street.
   const order = new Float32Array(n * n);
   const dist = new Int32Array(n * n).fill(-1);
   const queue = new Int32Array(n * n);
@@ -118,14 +126,14 @@ export function buildUp(t: Terrain): BuildUp {
       const nz = z + dz;
       if (nx < 0 || nz < 0 || nx >= n || nz >= n) continue;
       const j = nz * n + nx;
-      if (dist[j] >= 0 || !paved(j)) continue;
+      if (dist[j] >= 0 || !changed(j)) continue;
       dist[j] = dist[k] + 1;
       far = Math.max(far, dist[j]);
       queue[tail++] = j;
     }
   }
   for (let k = 0; k < n * n; k++) {
-    if (!paved(k) || claim[k] === CLAIM.plaza) continue;
+    if (!changed(k) || claim[k] === CLAIM.plaza) continue;
     order[k] = dist[k] < 0 ? 1 : PLAZA_SHARE + (1 - PLAZA_SHARE) * (dist[k] / far);
   }
 
@@ -157,13 +165,10 @@ export function buildUp(t: Terrain): BuildUp {
     for (let k = 0; k < n * n; k++) if (water[k] !== NO_WATER) flow[k] = reach[k] < 0 ? 1 : Math.max(1e-3, reach[k] / longest);
   }
 
-  // The ground before the streets: river-carved heights, and the surfaces with every paved kind
-  // turned back to grass (its tone kept).
-  const early = new Int16Array(n * n);
+  // Its mesh: the river-carved heights, with every paved kind turned back to grass (tone kept).
   let earlyMin = Infinity;
   let earlyMax = -Infinity;
   for (let k = 0; k < n * n; k++) {
-    early[k] = before(t.river.h[k]);
     earlyMin = Math.min(earlyMin, early[k]);
     earlyMax = Math.max(earlyMax, early[k]);
   }
@@ -175,7 +180,8 @@ export function buildUp(t: Terrain): BuildUp {
     n,
     beforeStreets,
     riverCut: meshCut(n, riverTop, height, t.columns.top),
-    streetCut: meshCut(n, streetTop, height, t.columns.top),
+    // (The street cuts need no mesh of their own: `beforeStreets` holds them until the front comes.)
+    streetCut: null,
     order,
     flow,
     top,

@@ -181,6 +181,12 @@ export interface PrintExtras {
   reveal?: Pick<LookUniforms, "uBuild" | "uBuildT" | "uClaimSize">;
   /** With `reveal`, the other way round: discard columns not reached yet (the water flowing in). */
   arriving?: boolean;
+  /**
+   * With `reveal`, one side of the build front for the ground: `built` keeps the columns the
+   * paving has reached and the columns it never changes; `unbuilt` keeps only the changed columns
+   * it has not reached yet. Two meshes drawn with the two parts show every column exactly once.
+   */
+  part?: "built" | "unbuilt";
   /** No blueprint tint on what is above the print height (for the rising water). */
   plain?: boolean;
   /** Lift what is flattened onto the print layer a little, so a mesh drawn over the ground (the
@@ -216,7 +222,9 @@ export function printMaterial(uniforms: PrintUniforms, options: THREE.MeshStanda
         .replace("#include <common>", "#include <common>\n" + (look ? "" : "uniform sampler2D uBuild;\nuniform float uBuildT;\nuniform float uClaimSize;\n") + "varying vec3 vRevealPos;\nvarying vec3 vRevealNormal;")
         .replace(
           "#include <clipping_planes_fragment>",
-          `#include <clipping_planes_fragment>\n{ vec2 column = floor(vRevealPos.xz - vRevealNormal.xz * 0.5 + uClaimSize * 0.5); if (texture2D(uBuild, (column + 0.5) / uClaimSize).r ${extras.arriving ? ">" : "<="} uBuildT) discard; }`,
+          `#include <clipping_planes_fragment>\n{ vec2 column = floor(vRevealPos.xz - vRevealNormal.xz * 0.5 + uClaimSize * 0.5); float o = texture2D(uBuild, (column + 0.5) / uClaimSize).r; if (${
+            extras.part === "built" ? "o > 0.0 && o > uBuildT" : extras.part === "unbuilt" ? "o <= 0.0 || o <= uBuildT" : extras.arriving ? "o > uBuildT" : "o <= uBuildT"
+          }) discard; }`,
         );
     }
     shader.uniforms.uPrintColor = uniforms.uPrintColor;
@@ -239,7 +247,7 @@ export function printMaterial(uniforms: PrintUniforms, options: THREE.MeshStanda
       .replace("#include <color_fragment>", "#include <color_fragment>\ndiffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.012, 0.03, 0.06), vPrinting * 0.85);")
       .replace("#include <emissivemap_fragment>", "#include <emissivemap_fragment>\ntotalEmissiveRadiance += uPrintColor * vPrinting * 0.12;");
   };
-  material.customProgramCacheKey = () => (look ? "print-look" : "print") + (extras.cap ? "-cap" : "") + (extras.reveal ? "-reveal" : "") + (extras.plain ? "-plain" : "") + (extras.arriving ? "-arriving" : "") + (extras.lift ? "-lift" : "");
+  material.customProgramCacheKey = () => (look ? "print-look" : "print") + (extras.cap ? "-cap" : "") + (extras.reveal ? "-reveal" : "") + (extras.plain ? "-plain" : "") + (extras.arriving ? "-arriving" : "") + (extras.part ? "-" + extras.part : "") + (extras.lift ? "-lift" : "");
   return material;
 }
 

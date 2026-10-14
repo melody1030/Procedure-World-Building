@@ -171,7 +171,8 @@ export class WorldView {
     this.makeBuild = makeBuild;
     this.groundTop = top;
     this.terrainTop = top;
-    this.terrain = new THREE.Mesh(toGeometry(ground), printMaterial(this.print, {}, this.look));
+    // The finished ground keeps the columns the paving front has reached and those it never changes.
+    this.terrain = new THREE.Mesh(toGeometry(ground), printMaterial(this.print, {}, this.look, { reveal: this.look, part: "built" }));
     this.terrain.customDepthMaterial = printDepthMaterial(this.print);
     this.terrain.castShadow = true;
     this.terrain.receiveShadow = true;
@@ -191,9 +192,9 @@ export class WorldView {
     this.build = build;
     this.terrainTop = Math.max(this.groundTop, build.top);
     this.look.uGroundTop.value = build.groundTop;
-    this.beforeStreets = new THREE.Mesh(toGeometry(build.beforeStreets), printMaterial(this.print, {}, this.look));
-    this.beforeStreets.customDepthMaterial = printDepthMaterial(this.print);
-    this.beforeStreets.castShadow = true;
+    // The old ground for the columns the paving front hasn't reached; the finished ground keeps the
+    // rest (see `part`), so every column is drawn once. It casts no shadow of its own.
+    this.beforeStreets = new THREE.Mesh(toGeometry(build.beforeStreets), printMaterial(this.print, {}, this.look, { reveal: this.look, part: "unbuilt" }));
     this.beforeStreets.receiveShadow = true;
     this.beforeStreets.visible = false;
     this.scene.add(this.beforeStreets);
@@ -212,11 +213,6 @@ export class WorldView {
         this.riverCut = new THREE.Mesh(toGeometry(build.riverCut), printMaterial(this.print, {}, this.look, { cap: this.carve, lift: true }));
         this.riverCut.receiveShadow = true;
         this.scene.add(this.riverCut);
-      }
-      if (build.streetCut) {
-        this.streetCut = new THREE.Mesh(toGeometry(build.streetCut), printMaterial(this.print, {}, this.look, { reveal: this.look, lift: true }));
-        this.streetCut.receiveShadow = true;
-        this.scene.add(this.streetCut);
       }
     }
   }
@@ -564,11 +560,8 @@ export class WorldView {
     // 4–5. Paving, from the plaza out along the streets; the street cuts go as the paving reaches them.
     const paving = done || !b ? 2 : t < PAVING_FROM ? -1 : (t - PAVING_FROM) / (1 - PAVING_FROM);
     this.look.uBuildT.value = paving;
-    // Until the paving starts, the ground before the streets stands in for the finished ground.
-    const early = !!b && !done && t < PAVING_FROM;
-    if (this.beforeStreets) this.beforeStreets.visible = early;
-    if (this.terrain) this.terrain.visible = !early;
-    if (this.streetCut) this.streetCut.visible = paving < 1;
+    // Until the front reaches a changed column, it shows the ground before the streets.
+    if (this.beforeStreets) this.beforeStreets.visible = !!b && !done;
   }
 
   private resize() {
