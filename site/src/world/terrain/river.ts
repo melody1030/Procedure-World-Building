@@ -21,6 +21,8 @@ import type { TerrainParams } from "./params";
  *    - Steady descent: the running minimum is flat for long stretches, then drops at once. Each
  *      drop is spread back along the flat stretch before it (up to 0.75 m), so the river keeps
  *      falling gently. Bigger drops keep the rest as a fall: a waterfall at a terrace edge.
+ *    - The level never drops below one channel depth above the lowest bed, so where the river
+ *      cuts through to the floor (after a low pit, say) it still holds water.
  *    - Finally no water cell may stand above a dry neighbor: at bends, where the carve and the
  *      level can disagree, the water is lowered to the bank.
  * 4. Path → terrain: for every column near the curve, the distance to it. Inside the channel
@@ -120,6 +122,11 @@ export function buildRiver(seed: number, map: HeightMap, p: TerrainParams["river
   const smooth = smoothProfile(g, 6, SMOOTHING);
   for (let i = 0; i < samples; i++) smooth[i] = Math.min(smooth[i], g[i]);
   const level = steadyDescent(neverRising(smooth), SPREAD);
+  // The level never drops below one channel depth above the lowest bed (a voxel above the plinth).
+  // After a low pit the falling level would otherwise sink below the floor, leaving a dry trench
+  // all the way to the mouth: the bed can't go lower, so there was no room for water above it.
+  const floor = 1 + voxels(p.depth);
+  for (let i = 0; i < samples; i++) level[i] = Math.max(level[i], floor);
 
   // 4. Distance from every nearby column to the curve, with the level at the nearest point.
   const valley = voxels(p.valleyWidth);
