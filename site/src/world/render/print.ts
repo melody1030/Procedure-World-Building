@@ -66,12 +66,16 @@ export interface LookUniforms {
   uBuild: { value: THREE.Texture | null };
   uBuildT: { value: number };
   uUnbuilt: { value: THREE.Color };
+  /** Unbuilt paving takes the grass's own gradient: grassLow (uUnbuilt) at the plinth to this at
+   * uGroundTop, as the mesh colors grass. */
+  uGrassHigh: { value: THREE.Color };
+  uGroundTop: { value: number };
   uBuildGlow: { value: THREE.Color };
 }
 
 export function createLookUniforms(): LookUniforms {
   const colors = [0, ...Object.values(CLAIM_COLORS)].map((c) => new THREE.Color(c));
-  return { uLookGrid: { value: 0.35 }, uLookStrata: { value: 7 }, uClaims: { value: null }, uClaimSize: { value: 1 }, uShowClaims: { value: 0 }, uClaimColors: { value: colors }, uSuit: { value: null }, uShowSuit: { value: 0 }, uDistricts: { value: null }, uShowDistricts: { value: 0 }, uDistrictColors: { value: DISTRICTS.map((d) => new THREE.Color(d.color)) }, uLots: { value: null }, uShowLots: { value: 0 }, uParks: { value: null }, uShowParks: { value: 0 }, uParkColor: { value: new THREE.Color(CLAIM_COLORS.park) }, uBuild: { value: null }, uBuildT: { value: 2 }, uUnbuilt: { value: new THREE.Color(TERRAIN.grassLow).lerp(new THREE.Color(TERRAIN.grassHigh), 0.4) }, uBuildGlow: { value: new THREE.Color(BLUEPRINT.cyan) } };
+  return { uLookGrid: { value: 0.35 }, uLookStrata: { value: 7 }, uClaims: { value: null }, uClaimSize: { value: 1 }, uShowClaims: { value: 0 }, uClaimColors: { value: colors }, uSuit: { value: null }, uShowSuit: { value: 0 }, uDistricts: { value: null }, uShowDistricts: { value: 0 }, uDistrictColors: { value: DISTRICTS.map((d) => new THREE.Color(d.color)) }, uLots: { value: null }, uShowLots: { value: 0 }, uParks: { value: null }, uShowParks: { value: 0 }, uParkColor: { value: new THREE.Color(CLAIM_COLORS.park) }, uBuild: { value: null }, uBuildT: { value: 2 }, uUnbuilt: { value: new THREE.Color(TERRAIN.grassLow) }, uGrassHigh: { value: new THREE.Color(TERRAIN.grassHigh) }, uGroundTop: { value: 1 }, uBuildGlow: { value: new THREE.Color(BLUEPRINT.cyan) } };
 }
 
 const LOOK_FRAGMENT = /* glsl */ `
@@ -88,7 +92,8 @@ const LOOK_FRAGMENT = /* glsl */ `
     float fade = smoothstep(3.0, 6.0, pixelsPerVoxel);
     vec2 cell = floor(uv) + (an.y > 0.5 ? vec2(floor(p.y) * 0.37) : vec2(0.0));
     float h = fract(sin(dot(cell, vec2(12.9898, 78.233))) * 43758.5453);
-    diffuseColor.rgb *= (1.0 - uLookGrid * 0.35 * line * fade) * (1.0 + uLookGrid * 0.12 * (h - 0.5) * fade);
+    float lookShade = (1.0 - uLookGrid * 0.35 * line * fade) * (1.0 + uLookGrid * 0.12 * (h - 0.5) * fade);
+    diffuseColor.rgb *= lookShade;
     // Strata: alternate bands down cliff sides, like the plinth's cut edge.
     if (an.y < 0.5) diffuseColor.rgb *= mix(1.0, 0.86, mod(floor(p.y / uLookStrata), 2.0));
     // The debug tints below skip the diorama's outer walls: those faces would read the edge
@@ -101,8 +106,12 @@ const LOOK_FRAGMENT = /* glsl */ `
       float o = texture2D(uBuild, (column + 0.5) / uClaimSize).r;
       if (o > 0.0) {
         // (Ground not printed yet keeps its blueprint tint.)
-        if (o > uBuildT) diffuseColor.rgb = mix(diffuseColor.rgb, uUnbuilt, 0.85 * (1.0 - vPrinting));
-        else if (o > uBuildT - 0.03) diffuseColor.rgb = mix(diffuseColor.rgb, uBuildGlow, 0.65 * (1.0 - vPrinting));
+        vec3 grass = mix(uUnbuilt, uGrassHigh, clamp(p.y / uGroundTop, 0.0, 1.0)) * lookShade;
+        // Not built yet: its top is grass, its sides keep their own color. Only paving the front
+        // has just reached glows (an unbuilt side must not fall through to the glow).
+        if (o > uBuildT) {
+          if (an.y > 0.5) diffuseColor.rgb = mix(diffuseColor.rgb, grass, 1.0 - vPrinting);
+        } else if (o > uBuildT - 0.03) diffuseColor.rgb = mix(diffuseColor.rgb, uBuildGlow, 0.65 * (1.0 - vPrinting));
       }
     }
     // Show network: dark where nothing can be built; elsewhere a heat map of suitability for the
@@ -161,7 +170,7 @@ const VERTEX = /* glsl */ `
   #include <begin_vertex>
   // Only the print layer is tinted; a cap (the river being dug) just lowers the ground.
   vPrinting = step(uPrintY, transformed.y);
-  transformed.y = min(transformed.y, min(uPrintY, uCapY));
+  transformed.y = min(transformed.y, min(uPrintY, uCapY)) + PRINT_LIFT * vPrinting;
 `;
 
 /** Extra clamps for the build animation's meshes. */
@@ -174,15 +183,18 @@ export interface PrintExtras {
   arriving?: boolean;
   /** No blueprint tint on what is above the print height (for the rising water). */
   plain?: boolean;
+  /** Lift what is flattened onto the print layer a little, so a mesh drawn over the ground (the
+   * cut-away ground) never shares that plane with it. */
+  lift?: boolean;
 }
 
 const NO_CAP = { value: 1e5 };
 
-function patchVertex(shader: THREE.WebGLProgramParametersWithUniforms, uniforms: PrintUniforms, cap: { value: number } = NO_CAP) {
+function patchVertex(shader: THREE.WebGLProgramParametersWithUniforms, uniforms: PrintUniforms, cap: { value: number } = NO_CAP, lift = false) {
   shader.uniforms.uPrintY = uniforms.uPrintY;
   shader.uniforms.uCapY = cap;
   shader.vertexShader = shader.vertexShader
-    .replace("#include <common>", "#include <common>\nuniform float uPrintY;\nuniform float uCapY;\nvarying float vPrinting;")
+    .replace("#include <common>", `#include <common>\nuniform float uPrintY;\nuniform float uCapY;\nvarying float vPrinting;\n#define PRINT_LIFT ${lift ? "0.15" : "0.0"}`)
     .replace("#include <begin_vertex>", VERTEX);
 }
 
@@ -193,14 +205,15 @@ function patchVertex(shader: THREE.WebGLProgramParametersWithUniforms, uniforms:
 export function printMaterial(uniforms: PrintUniforms, options: THREE.MeshStandardMaterialParameters = {}, look?: LookUniforms, extras: PrintExtras = {}): THREE.MeshStandardMaterial {
   const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, ...options });
   material.onBeforeCompile = (shader) => {
-    patchVertex(shader, uniforms, extras.cap);
+    patchVertex(shader, uniforms, extras.cap, extras.lift);
     if (extras.reveal) {
       Object.assign(shader.uniforms, extras.reveal);
       shader.vertexShader = shader.vertexShader
         .replace("#include <common>", "#include <common>\nvarying vec3 vRevealPos;\nvarying vec3 vRevealNormal;")
         .replace("#include <project_vertex>", "#include <project_vertex>\nvRevealPos = (modelMatrix * vec4(transformed, 1.0)).xyz;\nvRevealNormal = normalize((modelMatrix * vec4(objectNormal, 0.0)).xyz);");
       shader.fragmentShader = shader.fragmentShader
-        .replace("#include <common>", "#include <common>\nuniform sampler2D uBuild;\nuniform float uBuildT;\nuniform float uClaimSize;\nvarying vec3 vRevealPos;\nvarying vec3 vRevealNormal;")
+        // (With the look, its uniforms are already declared; GLSL won't take them twice.)
+        .replace("#include <common>", "#include <common>\n" + (look ? "" : "uniform sampler2D uBuild;\nuniform float uBuildT;\nuniform float uClaimSize;\n") + "varying vec3 vRevealPos;\nvarying vec3 vRevealNormal;")
         .replace(
           "#include <clipping_planes_fragment>",
           `#include <clipping_planes_fragment>\n{ vec2 column = floor(vRevealPos.xz - vRevealNormal.xz * 0.5 + uClaimSize * 0.5); if (texture2D(uBuild, (column + 0.5) / uClaimSize).r ${extras.arriving ? ">" : "<="} uBuildT) discard; }`,
@@ -216,7 +229,7 @@ export function printMaterial(uniforms: PrintUniforms, options: THREE.MeshStanda
           "#include <project_vertex>\nvLookPos = (modelMatrix * vec4(transformed, 1.0)).xyz;\nvLookNormal = normalize((modelMatrix * vec4(objectNormal, 0.0)).xyz);",
         );
       shader.fragmentShader = shader.fragmentShader
-        .replace("#include <common>", `#include <common>\nuniform float uLookGrid;\nuniform float uLookStrata;\nuniform sampler2D uClaims;\nuniform float uClaimSize;\nuniform float uShowClaims;\nuniform sampler2D uSuit;\nuniform float uShowSuit;\nuniform sampler2D uDistricts;\nuniform float uShowDistricts;\nuniform sampler2D uLots;\nuniform float uShowLots;\nuniform sampler2D uParks;\nuniform float uShowParks;\nuniform vec3 uParkColor;\nuniform sampler2D uBuild;\nuniform float uBuildT;\nuniform vec3 uUnbuilt;\nuniform vec3 uBuildGlow;\n#define DISTRICT_COUNT ${look.uDistrictColors.value.length}\nuniform vec3 uDistrictColors[DISTRICT_COUNT];\n#define CLAIM_COUNT ${look.uClaimColors.value.length}\nuniform vec3 uClaimColors[CLAIM_COUNT];\nvarying vec3 vLookPos;\nvarying vec3 vLookNormal;`)
+        .replace("#include <common>", `#include <common>\nuniform float uLookGrid;\nuniform float uLookStrata;\nuniform sampler2D uClaims;\nuniform float uClaimSize;\nuniform float uShowClaims;\nuniform sampler2D uSuit;\nuniform float uShowSuit;\nuniform sampler2D uDistricts;\nuniform float uShowDistricts;\nuniform sampler2D uLots;\nuniform float uShowLots;\nuniform sampler2D uParks;\nuniform float uShowParks;\nuniform vec3 uParkColor;\nuniform sampler2D uBuild;\nuniform float uBuildT;\nuniform vec3 uUnbuilt;\nuniform vec3 uGrassHigh;\nuniform float uGroundTop;\nuniform vec3 uBuildGlow;\n#define DISTRICT_COUNT ${look.uDistrictColors.value.length}\nuniform vec3 uDistrictColors[DISTRICT_COUNT];\n#define CLAIM_COUNT ${look.uClaimColors.value.length}\nuniform vec3 uClaimColors[CLAIM_COUNT];\nvarying vec3 vLookPos;\nvarying vec3 vLookNormal;`)
         .replace("#include <color_fragment>", "#include <color_fragment>\n" + LOOK_FRAGMENT);
     }
     if (extras.plain) return;
@@ -226,7 +239,7 @@ export function printMaterial(uniforms: PrintUniforms, options: THREE.MeshStanda
       .replace("#include <color_fragment>", "#include <color_fragment>\ndiffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.012, 0.03, 0.06), vPrinting * 0.85);")
       .replace("#include <emissivemap_fragment>", "#include <emissivemap_fragment>\ntotalEmissiveRadiance += uPrintColor * vPrinting * 0.12;");
   };
-  material.customProgramCacheKey = () => (look ? "print-look" : "print") + (extras.cap ? "-cap" : "") + (extras.reveal ? "-reveal" : "") + (extras.plain ? "-plain" : "") + (extras.arriving ? "-arriving" : "");
+  material.customProgramCacheKey = () => (look ? "print-look" : "print") + (extras.cap ? "-cap" : "") + (extras.reveal ? "-reveal" : "") + (extras.plain ? "-plain" : "") + (extras.arriving ? "-arriving" : "") + (extras.lift ? "-lift" : "");
   return material;
 }
 

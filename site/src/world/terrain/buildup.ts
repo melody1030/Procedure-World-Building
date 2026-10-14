@@ -1,6 +1,7 @@
 import type { GeometryData } from "../geometry";
 import { CLAIM } from "./claims";
-import { meshCut } from "./mesh";
+import { meshColumns, meshCut } from "./mesh";
+import { SURFACE } from "./surfaces";
 import type { Terrain } from "./pipeline";
 import { NO_WATER } from "./voxelize";
 
@@ -8,7 +9,8 @@ import { NO_WATER } from "./voxelize";
  * The build animation's data. The finished ground is drawn as always; this adds what the later
  * stages changed, so the timeline can replay them in order:
  *
- * 1. the terrain prints from the plinth up, as it was before the river and the streets;
+ * 1. the terrain prints from the plinth up, as it was before the river and the streets (until the
+ *    paving starts, the ground drawn is `beforeStreets`, so no street shows early);
  * 2. the river carves its channel (the cut ground is dug away from the top down);
  * 3. the river fills, its water running down the channel from the source to the mouth;
  * 4. the plaza is paved, from its center out;
@@ -32,6 +34,12 @@ const PLAZA_SHARE = (BUILD_PHASES[3].end - PAVING_FROM) / (1 - PAVING_FROM);
 
 export interface BuildUp {
   n: number;
+  /**
+   * The ground before the streets: the river carved, nothing paved (no roads, curbs or plaza,
+   * no cuts or fills). Drawn instead of the finished ground until the paving starts, so no trace
+   * of the street network shows while the terrain prints, the river is carved and it fills.
+   */
+  beforeStreets: GeometryData;
   /** The ground the river cut away (null if none), and the ground the plaza and streets cut away. */
   riverCut: GeometryData | null;
   streetCut: GeometryData | null;
@@ -44,6 +52,8 @@ export interface BuildUp {
   flow: Float32Array<ArrayBuffer>;
   /** The highest ground at any point of the build, in voxels. */
   top: number;
+  /** The highest the ground may reach (Shaping's Height), which the grass's colors run up to. */
+  groundTop: number;
   /** The river cut's highest top and lowest floor. */
   riverHigh: number;
   riverLow: number;
@@ -147,13 +157,29 @@ export function buildUp(t: Terrain): BuildUp {
     for (let k = 0; k < n * n; k++) if (water[k] !== NO_WATER) flow[k] = reach[k] < 0 ? 1 : Math.max(1e-3, reach[k] / longest);
   }
 
+  // The ground before the streets: river-carved heights, and the surfaces with every paved kind
+  // turned back to grass (its tone kept).
+  const early = new Int16Array(n * n);
+  let earlyMin = Infinity;
+  let earlyMax = -Infinity;
+  for (let k = 0; k < n * n; k++) {
+    early[k] = before(t.river.h[k]);
+    earlyMin = Math.min(earlyMin, early[k]);
+    earlyMax = Math.max(earlyMax, early[k]);
+  }
+  const kind = t.surfaces.kind.slice();
+  for (let k = 0; k < n * n; k++) if (kind[k] === SURFACE.road || kind[k] === SURFACE.curb || kind[k] === SURFACE.plaza) kind[k] = SURFACE.grass;
+  const beforeStreets = meshColumns({ n, height: early, water: new Int16Array(n * n).fill(NO_WATER), min: earlyMin, max: earlyMax, top: t.columns.top }, { kind, tone: t.surfaces.tone }, t.params.surfaces.tones).geometry;
+
   return {
     n,
+    beforeStreets,
     riverCut: meshCut(n, riverTop, height, t.columns.top),
     streetCut: meshCut(n, streetTop, height, t.columns.top),
     order,
     flow,
     top,
+    groundTop: t.columns.top,
     riverHigh,
     riverLow: Number.isFinite(riverLow) ? riverLow : 0,
   };

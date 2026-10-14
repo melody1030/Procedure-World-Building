@@ -4,6 +4,8 @@ import { BUILD_PHASES } from "../terrain/buildup";
 
 /** Seconds for the whole build: terrain, river, water, plaza and streets. */
 const PRINT_SECONDS = 8;
+/** Playback speeds offered by the speed menu; 1 is PRINT_SECONDS for the whole build. */
+const SPEEDS = [0.5, 1, 2, 4];
 
 const iconProps = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round" } as const;
 
@@ -11,6 +13,14 @@ function PlayIcon() {
   return (
     <svg {...iconProps} className="h-4 w-4">
       <path d="M7 4.5v15l12-7.5z" fill="currentColor" />
+    </svg>
+  );
+}
+
+function ChevronDown() {
+  return (
+    <svg {...iconProps} className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-cyan-300">
+      <path d="M6 9l6 6 6-6" />
     </svg>
   );
 }
@@ -27,13 +37,17 @@ function PauseIcon() {
  * The generation timeline at the bottom: the terrain prints layer by layer from the plinth up,
  * then the river carves its channel and fills, the plaza is built and the streets grow from it.
  * It plays by itself when a new seed loads (`replayKey` changes); the slider scrubs it and the
- * button plays or pauses. It owns its own time, so only this bar re-renders while it plays.
+ * button plays or pauses, and the speed menu sets the playback speed (it applies at once, even
+ * mid-play). It owns its own time, so only this bar re-renders while it plays.
  */
 export function PrintBar({ replayKey, onChange, busy = false }: { replayKey: string; onChange: (t: number) => void; busy?: boolean }) {
   const [t, setT] = useState(0);
   const [playing, setPlaying] = useState(true);
   const tRef = useRef(t);
   tRef.current = t;
+  const [speed, setSpeed] = useState(1);
+  const speedRef = useRef(speed);
+  speedRef.current = speed;
 
   // A new seed prints from the start.
   useEffect(() => {
@@ -48,7 +62,7 @@ export function PrintBar({ replayKey, onChange, busy = false }: { replayKey: str
     let frame = 0;
     let last = performance.now();
     const tick = (now: number) => {
-      const next = Math.min(1, tRef.current + (now - last) / 1000 / PRINT_SECONDS);
+      const next = Math.min(1, tRef.current + ((now - last) / 1000 / PRINT_SECONDS) * speedRef.current);
       last = now;
       setT(next);
       if (next >= 1) {
@@ -64,7 +78,7 @@ export function PrintBar({ replayKey, onChange, busy = false }: { replayKey: str
   const status = busy ? "Generating…" : t >= 1 ? "Built" : (BUILD_PHASES.find((p) => t < p.end) ?? BUILD_PHASES[0]).label;
 
   return (
-    <div className={glassCardClass + " pointer-events-auto flex w-[30rem] max-w-full items-center gap-3 px-3.5 py-3"}>
+    <div className={glassCardClass + " pointer-events-auto flex w-[34rem] max-w-full items-center gap-3 px-3.5 py-3"}>
       <button
         onClick={() => {
           if (playing) setPlaying(false);
@@ -89,7 +103,24 @@ export function PrintBar({ replayKey, onChange, busy = false }: { replayKey: str
         }}
         aria-label="Generation timeline"
       />
-      <span className={valueClass + " w-[10rem] shrink-0 text-right"}>{status}</span>
+      {/* The browser's own arrow can't be moved, so it is hidden and a chevron drawn in from the edge. */}
+      <span className="relative shrink-0">
+        <select
+          value={speed}
+          onChange={(e) => setSpeed(Number(e.target.value))}
+          aria-label="Playback speed"
+          title="Playback speed"
+          className={valueClass + " h-7 cursor-pointer appearance-none rounded-full border border-slate-600/60 bg-slate-800/60 pl-3 pr-8 outline-none transition-colors hover:border-cyan-400/60 focus:border-cyan-400/60"}
+        >
+          {SPEEDS.map((v) => (
+            <option key={v} value={v}>
+              {v}×
+            </option>
+          ))}
+        </select>
+        <ChevronDown />
+      </span>
+      <span className={valueClass + " w-[9rem] shrink-0"}>{status}</span>
     </div>
   );
 }

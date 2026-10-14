@@ -65,6 +65,7 @@ export class WorldView {
   /** The build animation: the cut ground of the river and the streets, the river cut's digging
    * ceiling, the water (unclamped; it flows in by `flow`), and the numbers that pace them. */
   private riverCut: THREE.Mesh | null = null;
+  private beforeStreets: THREE.Mesh | null = null;
   private streetCut: THREE.Mesh | null = null;
   private readonly carve = { value: 1e5 };
   private readonly fill = createPrintUniforms();
@@ -162,8 +163,10 @@ export class WorldView {
     this.remove(this.water);
     this.remove(this.riverCut);
     this.remove(this.streetCut);
+    this.remove(this.beforeStreets);
     this.riverCut = null;
     this.streetCut = null;
+    this.beforeStreets = null;
     this.build = null;
     this.makeBuild = makeBuild;
     this.groundTop = top;
@@ -187,6 +190,13 @@ export class WorldView {
     const build = this.makeBuild();
     this.build = build;
     this.terrainTop = Math.max(this.groundTop, build.top);
+    this.look.uGroundTop.value = build.groundTop;
+    this.beforeStreets = new THREE.Mesh(toGeometry(build.beforeStreets), printMaterial(this.print, {}, this.look));
+    this.beforeStreets.customDepthMaterial = printDepthMaterial(this.print);
+    this.beforeStreets.castShadow = true;
+    this.beforeStreets.receiveShadow = true;
+    this.beforeStreets.visible = false;
+    this.scene.add(this.beforeStreets);
     {
       this.look.uBuild.value?.dispose();
       const texture = new THREE.DataTexture(build.order, build.n, build.n, THREE.RedFormat, THREE.FloatType);
@@ -199,12 +209,12 @@ export class WorldView {
       this.flow.uBuild.value = flow;
       this.flow.uClaimSize.value = build.n;
       if (build.riverCut) {
-        this.riverCut = new THREE.Mesh(toGeometry(build.riverCut), printMaterial(this.print, {}, undefined, { cap: this.carve }));
+        this.riverCut = new THREE.Mesh(toGeometry(build.riverCut), printMaterial(this.print, {}, this.look, { cap: this.carve, lift: true }));
         this.riverCut.receiveShadow = true;
         this.scene.add(this.riverCut);
       }
       if (build.streetCut) {
-        this.streetCut = new THREE.Mesh(toGeometry(build.streetCut), printMaterial(this.print, {}, undefined, { reveal: this.look }));
+        this.streetCut = new THREE.Mesh(toGeometry(build.streetCut), printMaterial(this.print, {}, this.look, { reveal: this.look, lift: true }));
         this.streetCut.receiveShadow = true;
         this.scene.add(this.streetCut);
       }
@@ -554,6 +564,10 @@ export class WorldView {
     // 4–5. Paving, from the plaza out along the streets; the street cuts go as the paving reaches them.
     const paving = done || !b ? 2 : t < PAVING_FROM ? -1 : (t - PAVING_FROM) / (1 - PAVING_FROM);
     this.look.uBuildT.value = paving;
+    // Until the paving starts, the ground before the streets stands in for the finished ground.
+    const early = !!b && !done && t < PAVING_FROM;
+    if (this.beforeStreets) this.beforeStreets.visible = early;
+    if (this.terrain) this.terrain.visible = !early;
     if (this.streetCut) this.streetCut.visible = paving < 1;
   }
 
