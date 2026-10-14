@@ -9,6 +9,7 @@ import type { Streets } from "../terrain/streets";
 import type { RiverPath } from "../terrain/river";
 import { BASE, WORLD_SIZE, voxels } from "../scale";
 import { buildPlinth } from "./base";
+import { BUILD_PHASES, PAVING_FROM, type BuildUp } from "../terrain/buildup";
 import { createLookUniforms, createPrintUniforms, printDepthMaterial, printMaterial } from "./print";
 
 /** Diorama framing: looking down on the whole table-top from a raised corner. */
@@ -61,6 +62,17 @@ export class WorldView {
   private terrainTop = 0;
   private readonly print = createPrintUniforms();
   private readonly look = createLookUniforms();
+  /** The build animation: the cut ground of the river and the streets, the river cut's digging
+   * ceiling, the water (unclamped; it flows in by `flow`), and the numbers that pace them. */
+  private riverCut: THREE.Mesh | null = null;
+  private streetCut: THREE.Mesh | null = null;
+  private readonly carve = { value: 1e5 };
+  private readonly fill = createPrintUniforms();
+  private readonly flow = { uBuild: { value: null as THREE.Texture | null }, uBuildT: { value: 2 }, uClaimSize: { value: 1 } };
+  private build: BuildUp | null = null;
+  /** Makes the build animation's data for the current terrain; called the first time it plays. */
+  private makeBuild: (() => BuildUp) | null = null;
+  private groundTop = 0;
   private frame = 0;
 
   constructor(private readonly mount: HTMLElement) {
@@ -140,10 +152,21 @@ export class WorldView {
     this.scene.remove(mesh);
   }
 
-  /** Replaces the terrain: the ground, the river water (if any), and `top`, its highest column in voxels. */
-  setTerrain(ground: GeometryData, water: GeometryData | null, top: number) {
+  /**
+   * Replaces the terrain: the ground, the river water (if any), `top` (its highest column in
+   * voxels) and how to make the build animation's data. That data takes a while, so it is made
+   * only when the timeline first plays or is scrubbed (a settings change doesn't replay it).
+   */
+  setTerrain(ground: GeometryData, water: GeometryData | null, top: number, makeBuild: (() => BuildUp) | null = null) {
     this.remove(this.terrain);
     this.remove(this.water);
+    this.remove(this.riverCut);
+    this.remove(this.streetCut);
+    this.riverCut = null;
+    this.streetCut = null;
+    this.build = null;
+    this.makeBuild = makeBuild;
+    this.groundTop = top;
     this.terrainTop = top;
     this.terrain = new THREE.Mesh(toGeometry(ground), printMaterial(this.print, {}, this.look));
     this.terrain.customDepthMaterial = printDepthMaterial(this.print);
@@ -152,9 +175,39 @@ export class WorldView {
     this.scene.add(this.terrain);
     this.water = null;
     if (water) {
-      this.water = new THREE.Mesh(toGeometry(water), printMaterial(this.print, { roughness: 0.15, metalness: 0.1, transparent: true, opacity: 0.85 }));
+      this.water = new THREE.Mesh(toGeometry(water), printMaterial(this.fill, { roughness: 0.15, metalness: 0.1, transparent: true, opacity: 0.85 }, undefined, { plain: true, reveal: this.flow, arriving: true }));
       this.water.receiveShadow = true;
       this.scene.add(this.water);
+    }
+  }
+
+  /** Makes and uploads the build animation's data, once per terrain. */
+  private ensureBuild() {
+    if (this.build || !this.makeBuild) return;
+    const build = this.makeBuild();
+    this.build = build;
+    this.terrainTop = Math.max(this.groundTop, build.top);
+    {
+      this.look.uBuild.value?.dispose();
+      const texture = new THREE.DataTexture(build.order, build.n, build.n, THREE.RedFormat, THREE.FloatType);
+      texture.needsUpdate = true;
+      this.look.uBuild.value = texture;
+      this.look.uClaimSize.value = build.n;
+      this.flow.uBuild.value?.dispose();
+      const flow = new THREE.DataTexture(build.flow, build.n, build.n, THREE.RedFormat, THREE.FloatType);
+      flow.needsUpdate = true;
+      this.flow.uBuild.value = flow;
+      this.flow.uClaimSize.value = build.n;
+      if (build.riverCut) {
+        this.riverCut = new THREE.Mesh(toGeometry(build.riverCut), printMaterial(this.print, {}, undefined, { cap: this.carve }));
+        this.riverCut.receiveShadow = true;
+        this.scene.add(this.riverCut);
+      }
+      if (build.streetCut) {
+        this.streetCut = new THREE.Mesh(toGeometry(build.streetCut), printMaterial(this.print, {}, undefined, { reveal: this.look }));
+        this.streetCut.receiveShadow = true;
+        this.scene.add(this.streetCut);
+      }
     }
   }
 
@@ -476,11 +529,32 @@ export class WorldView {
   }
 
   /**
-   * How far the terrain is printed, 0 (nothing above the plinth) to 1 (finished). Printing rises
-   * one whole voxel layer at a time, so every step shows a real layer of blocks.
+   * Where the build timeline is, 0 (nothing above the plinth) to 1 (finished), in the phases of
+   * BUILD_PHASES: the terrain prints one whole voxel layer at a time, the river cut is dug away
+   * layer by layer, the water runs down the channel from the source, then the paving spreads
+   * from the plaza.
    */
   setPrint(t: number) {
-    this.print.uPrintY.value = t >= 1 ? 1e5 : Math.floor(BASE + t * (this.terrainTop + 1 - BASE));
+    const [terrain, river, water] = BUILD_PHASES;
+    const share = (from: number, to: number) => Math.min(1, Math.max(0, (t - from) / (to - from)));
+    const done = t >= 1;
+    if (!done) this.ensureBuild();
+    const b = this.build;
+    // 1. The terrain, as it was before the river and the streets.
+    const printed = share(0, terrain.end);
+    this.print.uPrintY.value = done || printed >= 1 ? 1e5 : Math.floor(BASE + printed * (this.terrainTop + 1 - BASE));
+    // 2. The river cut, dug from its top down to the channel floor.
+    const dug = share(terrain.end, river.end);
+    this.carve.value = dug <= 0 || !b ? 1e5 : Math.floor(b.riverHigh - dug * (b.riverHigh - b.riverLow + 1));
+    if (this.riverCut) this.riverCut.visible = !done && dug < 1;
+    // 3. The water, running down the channel from the source.
+    const filled = share(river.end, water.end);
+    if (this.water) this.water.visible = done || filled > 0 || !b;
+    this.flow.uBuildT.value = done || !b ? 2 : filled;
+    // 4–5. Paving, from the plaza out along the streets; the street cuts go as the paving reaches them.
+    const paving = done || !b ? 2 : t < PAVING_FROM ? -1 : (t - PAVING_FROM) / (1 - PAVING_FROM);
+    this.look.uBuildT.value = paving;
+    if (this.streetCut) this.streetCut.visible = paving < 1;
   }
 
   private resize() {

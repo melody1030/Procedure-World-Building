@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { RangeInput, glassCardClass, valueClass } from "../../components/controls";
-import { BASE, toMeters } from "../scale";
+import { BUILD_PHASES } from "../terrain/buildup";
 
-/** Seconds for a whole print, plinth to the highest column. */
-const PRINT_SECONDS = 1.5;
+/** Seconds for the whole build: terrain, river, water, plaza and streets. */
+const PRINT_SECONDS = 8;
 
 const iconProps = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round" } as const;
 
@@ -24,11 +24,12 @@ function PauseIcon() {
 }
 
 /**
- * The generation timeline at the bottom: the terrain prints layer by layer from the plinth up.
+ * The generation timeline at the bottom: the terrain prints layer by layer from the plinth up,
+ * then the river carves its channel and fills, the plaza is built and the streets grow from it.
  * It plays by itself when a new seed loads (`replayKey` changes); the slider scrubs it and the
  * button plays or pauses. It owns its own time, so only this bar re-renders while it plays.
  */
-export function PrintBar({ replayKey, top, onChange }: { replayKey: string; top: number; onChange: (t: number) => void }) {
+export function PrintBar({ replayKey, onChange, busy = false }: { replayKey: string; onChange: (t: number) => void; busy?: boolean }) {
   const [t, setT] = useState(0);
   const [playing, setPlaying] = useState(true);
   const tRef = useRef(t);
@@ -60,8 +61,7 @@ export function PrintBar({ replayKey, top, onChange }: { replayKey: string; top:
     return () => cancelAnimationFrame(frame);
   }, [playing]);
 
-  const layer = Math.floor(BASE + t * (top + 1 - BASE));
-  const status = t >= 1 ? "Printed" : `Layer ${toMeters(layer).toFixed(2)} m`;
+  const status = busy ? "Generating…" : t >= 1 ? "Built" : (BUILD_PHASES.find((p) => t < p.end) ?? BUILD_PHASES[0]).label;
 
   return (
     <div className={glassCardClass + " pointer-events-auto flex w-[30rem] max-w-full items-center gap-3 px-3.5 py-3"}>
@@ -89,7 +89,7 @@ export function PrintBar({ replayKey, top, onChange }: { replayKey: string; top:
         }}
         aria-label="Generation timeline"
       />
-      <span className={valueClass + " w-[7.5rem] shrink-0 text-right"}>{status}</span>
+      <span className={valueClass + " w-[10rem] shrink-0 text-right"}>{status}</span>
     </div>
   );
 }

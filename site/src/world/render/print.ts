@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { BLUEPRINT } from "../palette";
+import { BLUEPRINT, TERRAIN } from "../palette";
 import { CLAIM_COLORS } from "../terrain/claims";
 import { DISTRICTS } from "../terrain/districts";
 
@@ -60,11 +60,18 @@ export interface LookUniforms {
   /** 1 tints the parks (Show parks), 0 off. */
   uShowParks: { value: number };
   uParkColor: { value: THREE.Color };
+  /** The build animation: when each paved column is built (0–1, 0 for unpaved), and how far the
+   * paving has got (below 0 nothing paved, above 1 all). Unbuilt paving shows as the grass around
+   * it, so the streets appear only as they grow; the columns just built glow. */
+  uBuild: { value: THREE.Texture | null };
+  uBuildT: { value: number };
+  uUnbuilt: { value: THREE.Color };
+  uBuildGlow: { value: THREE.Color };
 }
 
 export function createLookUniforms(): LookUniforms {
   const colors = [0, ...Object.values(CLAIM_COLORS)].map((c) => new THREE.Color(c));
-  return { uLookGrid: { value: 0.35 }, uLookStrata: { value: 7 }, uClaims: { value: null }, uClaimSize: { value: 1 }, uShowClaims: { value: 0 }, uClaimColors: { value: colors }, uSuit: { value: null }, uShowSuit: { value: 0 }, uDistricts: { value: null }, uShowDistricts: { value: 0 }, uDistrictColors: { value: DISTRICTS.map((d) => new THREE.Color(d.color)) }, uLots: { value: null }, uShowLots: { value: 0 }, uParks: { value: null }, uShowParks: { value: 0 }, uParkColor: { value: new THREE.Color(CLAIM_COLORS.park) } };
+  return { uLookGrid: { value: 0.35 }, uLookStrata: { value: 7 }, uClaims: { value: null }, uClaimSize: { value: 1 }, uShowClaims: { value: 0 }, uClaimColors: { value: colors }, uSuit: { value: null }, uShowSuit: { value: 0 }, uDistricts: { value: null }, uShowDistricts: { value: 0 }, uDistrictColors: { value: DISTRICTS.map((d) => new THREE.Color(d.color)) }, uLots: { value: null }, uShowLots: { value: 0 }, uParks: { value: null }, uShowParks: { value: 0 }, uParkColor: { value: new THREE.Color(CLAIM_COLORS.park) }, uBuild: { value: null }, uBuildT: { value: 2 }, uUnbuilt: { value: new THREE.Color(TERRAIN.grassLow).lerp(new THREE.Color(TERRAIN.grassHigh), 0.4) }, uBuildGlow: { value: new THREE.Color(BLUEPRINT.cyan) } };
 }
 
 const LOOK_FRAGMENT = /* glsl */ `
@@ -88,6 +95,16 @@ const LOOK_FRAGMENT = /* glsl */ `
     // column and paint it all the way down to the plinth.
     bool outerWall = an.y < 0.5 && max(abs(p.x), abs(p.z)) > uClaimSize * 0.5 - 0.01;
     if (!outerWall) {
+    // The build animation: paving not yet built looks like grass; the newest paving glows.
+    if (uBuildT < 1.5) {
+      vec2 column = floor(p.xz - vLookNormal.xz * 0.5 + uClaimSize * 0.5);
+      float o = texture2D(uBuild, (column + 0.5) / uClaimSize).r;
+      if (o > 0.0) {
+        // (Ground not printed yet keeps its blueprint tint.)
+        if (o > uBuildT) diffuseColor.rgb = mix(diffuseColor.rgb, uUnbuilt, 0.85 * (1.0 - vPrinting));
+        else if (o > uBuildT - 0.03) diffuseColor.rgb = mix(diffuseColor.rgb, uBuildGlow, 0.65 * (1.0 - vPrinting));
+      }
+    }
     // Show network: dark where nothing can be built; elsewhere a heat map of suitability for the
     // city center, from violet (0) to amber (1). The texture holds 0 for unbuildable, 1–255 otherwise.
     if (uShowSuit > 0.5) {
@@ -142,14 +159,30 @@ const LOOK_FRAGMENT = /* glsl */ `
 
 const VERTEX = /* glsl */ `
   #include <begin_vertex>
+  // Only the print layer is tinted; a cap (the river being dug) just lowers the ground.
   vPrinting = step(uPrintY, transformed.y);
-  transformed.y = min(transformed.y, uPrintY);
+  transformed.y = min(transformed.y, min(uPrintY, uCapY));
 `;
 
-function patchVertex(shader: THREE.WebGLProgramParametersWithUniforms, uniforms: PrintUniforms) {
+/** Extra clamps for the build animation's meshes. */
+export interface PrintExtras {
+  /** A second ceiling (voxels), lowered to dig a mesh away from the top down. */
+  cap?: { value: number };
+  /** Discard columns already built, by the paving order (see LookUniforms.uBuild). */
+  reveal?: Pick<LookUniforms, "uBuild" | "uBuildT" | "uClaimSize">;
+  /** With `reveal`, the other way round: discard columns not reached yet (the water flowing in). */
+  arriving?: boolean;
+  /** No blueprint tint on what is above the print height (for the rising water). */
+  plain?: boolean;
+}
+
+const NO_CAP = { value: 1e5 };
+
+function patchVertex(shader: THREE.WebGLProgramParametersWithUniforms, uniforms: PrintUniforms, cap: { value: number } = NO_CAP) {
   shader.uniforms.uPrintY = uniforms.uPrintY;
+  shader.uniforms.uCapY = cap;
   shader.vertexShader = shader.vertexShader
-    .replace("#include <common>", "#include <common>\nuniform float uPrintY;\nvarying float vPrinting;")
+    .replace("#include <common>", "#include <common>\nuniform float uPrintY;\nuniform float uCapY;\nvarying float vPrinting;")
     .replace("#include <begin_vertex>", VERTEX);
 }
 
@@ -157,10 +190,22 @@ function patchVertex(shader: THREE.WebGLProgramParametersWithUniforms, uniforms:
  * Lit vertex colors with the print clamp and the glowing layer. `options` tune it (e.g. for
  * water); `look` adds the voxel look (the ground).
  */
-export function printMaterial(uniforms: PrintUniforms, options: THREE.MeshStandardMaterialParameters = {}, look?: LookUniforms): THREE.MeshStandardMaterial {
+export function printMaterial(uniforms: PrintUniforms, options: THREE.MeshStandardMaterialParameters = {}, look?: LookUniforms, extras: PrintExtras = {}): THREE.MeshStandardMaterial {
   const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, ...options });
   material.onBeforeCompile = (shader) => {
-    patchVertex(shader, uniforms);
+    patchVertex(shader, uniforms, extras.cap);
+    if (extras.reveal) {
+      Object.assign(shader.uniforms, extras.reveal);
+      shader.vertexShader = shader.vertexShader
+        .replace("#include <common>", "#include <common>\nvarying vec3 vRevealPos;\nvarying vec3 vRevealNormal;")
+        .replace("#include <project_vertex>", "#include <project_vertex>\nvRevealPos = (modelMatrix * vec4(transformed, 1.0)).xyz;\nvRevealNormal = normalize((modelMatrix * vec4(objectNormal, 0.0)).xyz);");
+      shader.fragmentShader = shader.fragmentShader
+        .replace("#include <common>", "#include <common>\nuniform sampler2D uBuild;\nuniform float uBuildT;\nuniform float uClaimSize;\nvarying vec3 vRevealPos;\nvarying vec3 vRevealNormal;")
+        .replace(
+          "#include <clipping_planes_fragment>",
+          `#include <clipping_planes_fragment>\n{ vec2 column = floor(vRevealPos.xz - vRevealNormal.xz * 0.5 + uClaimSize * 0.5); if (texture2D(uBuild, (column + 0.5) / uClaimSize).r ${extras.arriving ? ">" : "<="} uBuildT) discard; }`,
+        );
+    }
     shader.uniforms.uPrintColor = uniforms.uPrintColor;
     if (look) {
       Object.assign(shader.uniforms, look);
@@ -171,16 +216,17 @@ export function printMaterial(uniforms: PrintUniforms, options: THREE.MeshStanda
           "#include <project_vertex>\nvLookPos = (modelMatrix * vec4(transformed, 1.0)).xyz;\nvLookNormal = normalize((modelMatrix * vec4(objectNormal, 0.0)).xyz);",
         );
       shader.fragmentShader = shader.fragmentShader
-        .replace("#include <common>", `#include <common>\nuniform float uLookGrid;\nuniform float uLookStrata;\nuniform sampler2D uClaims;\nuniform float uClaimSize;\nuniform float uShowClaims;\nuniform sampler2D uSuit;\nuniform float uShowSuit;\nuniform sampler2D uDistricts;\nuniform float uShowDistricts;\nuniform sampler2D uLots;\nuniform float uShowLots;\nuniform sampler2D uParks;\nuniform float uShowParks;\nuniform vec3 uParkColor;\n#define DISTRICT_COUNT ${look.uDistrictColors.value.length}\nuniform vec3 uDistrictColors[DISTRICT_COUNT];\n#define CLAIM_COUNT ${look.uClaimColors.value.length}\nuniform vec3 uClaimColors[CLAIM_COUNT];\nvarying vec3 vLookPos;\nvarying vec3 vLookNormal;`)
+        .replace("#include <common>", `#include <common>\nuniform float uLookGrid;\nuniform float uLookStrata;\nuniform sampler2D uClaims;\nuniform float uClaimSize;\nuniform float uShowClaims;\nuniform sampler2D uSuit;\nuniform float uShowSuit;\nuniform sampler2D uDistricts;\nuniform float uShowDistricts;\nuniform sampler2D uLots;\nuniform float uShowLots;\nuniform sampler2D uParks;\nuniform float uShowParks;\nuniform vec3 uParkColor;\nuniform sampler2D uBuild;\nuniform float uBuildT;\nuniform vec3 uUnbuilt;\nuniform vec3 uBuildGlow;\n#define DISTRICT_COUNT ${look.uDistrictColors.value.length}\nuniform vec3 uDistrictColors[DISTRICT_COUNT];\n#define CLAIM_COUNT ${look.uClaimColors.value.length}\nuniform vec3 uClaimColors[CLAIM_COUNT];\nvarying vec3 vLookPos;\nvarying vec3 vLookNormal;`)
         .replace("#include <color_fragment>", "#include <color_fragment>\n" + LOOK_FRAGMENT);
     }
+    if (extras.plain) return;
     shader.fragmentShader = shader.fragmentShader
       .replace("#include <common>", "#include <common>\nuniform vec3 uPrintColor;\nvarying float vPrinting;")
       // Unprinted ground: a dark blueprint plate with a faint cyan glow, so the printed terrain reads against it.
       .replace("#include <color_fragment>", "#include <color_fragment>\ndiffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.012, 0.03, 0.06), vPrinting * 0.85);")
       .replace("#include <emissivemap_fragment>", "#include <emissivemap_fragment>\ntotalEmissiveRadiance += uPrintColor * vPrinting * 0.12;");
   };
-  material.customProgramCacheKey = () => (look ? "print-look" : "print");
+  material.customProgramCacheKey = () => (look ? "print-look" : "print") + (extras.cap ? "-cap" : "") + (extras.reveal ? "-reveal" : "") + (extras.plain ? "-plain" : "") + (extras.arriving ? "-arriving" : "");
   return material;
 }
 

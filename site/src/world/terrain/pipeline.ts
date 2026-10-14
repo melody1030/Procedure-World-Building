@@ -43,6 +43,8 @@ export interface Terrain {
   districts: Districts;
   /** How long each stage took; `cached` stages were reused from the previous terrain. */
   timings: { id: StageId; ms: number; cached: boolean }[];
+  /** True while `districts` is still the previous terrain's: see `finishTerrain`. */
+  pendingDistricts?: boolean;
 }
 
 export type StageId = "noise" | "shape" | "heights" | "terraces" | "river" | "claims" | "hubs" | "streets" | "voxelize" | "surfaces" | "mesh" | "districts";
@@ -78,7 +80,12 @@ export const STAGES: Stage[] = [
 
 const same = (a: TerrainParams, b: TerrainParams, group: ParamGroup) => JSON.stringify(a[group]) === JSON.stringify(b[group]);
 
-export function generateTerrain(seed: string, params: TerrainParams, previous: Terrain | null = null): Terrain {
+/**
+ * Runs the pipeline. With `deferDistricts` (and a previous terrain to borrow from), the last stage
+ * is left out: the ground can be drawn first, `districts` stays the previous terrain's for a moment
+ * (`pendingDistricts`), and `finishTerrain` runs it afterward.
+ */
+export function generateTerrain(seed: string, params: TerrainParams, previous: Terrain | null = null, options: { deferDistricts?: boolean } = {}): Terrain {
   let start = 0;
   if (previous && previous.seed === seed) {
     start = STAGES.findIndex((s) => s.params !== undefined && !same(previous.params, params, s.params));
@@ -87,10 +94,25 @@ export function generateTerrain(seed: string, params: TerrainParams, previous: T
   const draft: Draft = start > 0 && previous ? { ...previous, params } : { seed, params };
   const timings: Terrain["timings"] = start > 0 && previous ? previous.timings.slice(0, start).map((t) => ({ ...t, cached: true })) : [];
   const seedHash = hashSeed(seed);
+  const defer = options.deferDistricts && previous?.districts !== undefined;
   for (let i = start; i < STAGES.length; i++) {
+    if (defer && STAGES[i].id === "districts") {
+      draft.districts = previous!.districts;
+      return { ...(draft as Omit<Terrain, "timings">), timings, pendingDistricts: true };
+    }
     const begin = performance.now();
     STAGES[i].run(draft, seedHash);
     timings.push({ id: STAGES[i].id, ms: performance.now() - begin, cached: false });
   }
-  return { ...(draft as Omit<Terrain, "timings">), timings };
+  return { ...(draft as Omit<Terrain, "timings">), timings, pendingDistricts: false };
+}
+
+/** Runs the stage `generateTerrain` deferred (districts), giving the finished terrain. */
+export function finishTerrain(t: Terrain): Terrain {
+  if (!t.pendingDistricts) return t;
+  const stage = STAGES.find((s) => s.id === "districts")!;
+  const draft: Draft = { ...t };
+  const begin = performance.now();
+  stage.run(draft, hashSeed(t.seed));
+  return { ...(draft as Omit<Terrain, "timings">), timings: [...t.timings, { id: "districts", ms: performance.now() - begin, cached: false }], pendingDistricts: false };
 }

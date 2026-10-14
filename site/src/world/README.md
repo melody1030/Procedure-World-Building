@@ -6,8 +6,9 @@ Route: `/world` (seed in the URL, e.g. `/world?seed=blueprint`).
 
 A voxel diorama generated from a seed: terrain first, then a river, a street network, districts
 and lots, with buildings to come. Every stage has its own settings on the left panel, and a change
-reruns only the stages from the one it touched. The print bar at the bottom replays the terrain
-printing layer by layer from the plinth up.
+reruns only the stages from the one it touched. The timeline at the bottom replays the city being
+made, in the order the stages run: the terrain prints from the plinth up, the river carves its
+channel and fills, the plaza is built, and the streets grow out from it.
 
 ## Where it stands (2026-10-13)
 
@@ -27,7 +28,7 @@ seed → noise → shaping → heights → terraces → river → claims → hub
 Overlays can be opened from the URL: `/world?show=districts,lots,parks`.
 
 Code: `terrain/` holds one file per stage; `ui/TerrainPanel.tsx` is the panel, `ui/PrintBar.tsx`
-the print timeline, `render/print.ts` the ground shader. `noise.ts` and `rng.ts` are shared with
+the build timeline, `render/print.ts` the ground shader, `terrain/buildup.ts` the timeline's data. `noise.ts` and `rng.ts` are shared with
 Week 5.
 
 ---
@@ -267,3 +268,42 @@ others reached the street only through shops. Now:
 
 Where it ends up: eleven archetypes, every one with no clashes on 8 seeds and under 0.5 m² of
 flicker (the Vertical Neighborhood has about 4 m² left, not yet tracked down).
+
+### 2026-10-14: the build timeline
+
+The timeline at the bottom used to print the finished ground layer by layer, so the river and
+streets were already cut into it. It now replays the city in the order it is made, over 8 s:
+1. **Printing terrain:** the ground before the river and the streets.
+2. **Carving the river:** the river's cut sinks layer by layer to the channel floor.
+3. **Filling the river:** the water runs down the channel from the source to the mouth.
+4. **Building the plaza:** paving spreads from its center out.
+5. **Growing streets:** paving spreads along the network by distance from the plaza, the street
+   cuts open as it reaches them, and a glowing build front leads it. Streets not yet built look
+   like the grass around them.
+
+The finished ground is drawn as always. The ground the river and the streets cut away is drawn
+on top of it as two extra meshes (`terrain/buildup.ts`) and cleared as the timeline passes.
+Paving order is one value per column, which the ground shader reads, so nothing is rebuilt per
+frame.
+
+**The dry river, fixed.** Watching the fill showed the downstream half of the default river had
+no water. The river's level only ever falls, and after it passed a low pit it kept falling below
+the plinth floor (−1.3 voxels at the mouth). The bed can't go lower than one voxel above the
+plinth, so there was no room for water above it, and the river cut a dry trench through the high
+ground to the mouth. The level now stops one channel depth (1 m) above the lowest bed. Four of
+eight test seeds had dry stretches (the default only 47% wet); all eight are now fully wet. The
+channel floor is unchanged; the valley sides beside those stretches are a little gentler.
+
+**Faster settings changes.** A change (slider released) used to block the page for about
+1.3 s with no feedback: the whole pipeline (0.8–1.15 s in the browser, districts alone up to
+0.5 s), the new build-animation data (0.18 s) and the upload, all before the next frame.
+- The timeline bar shows **Generating…** right away (1 ms after release), and the slider stays
+  where it was let go, because the work starts two frames later.
+- The ground is drawn as soon as its mesh is ready. Districts and lots, which only the overlays
+  use, finish a moment later (`generateTerrain(..., { deferDistricts })`, then `finishTerrain`).
+- The build animation's data is made only when the timeline plays or is scrubbed. A settings
+  change doesn't replay it, so it no longer pays for it.
+
+A Terrace Height change is now done in about 1.07 s end to end, with the new ground on screen
+well before that.
+

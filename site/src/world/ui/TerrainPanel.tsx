@@ -124,7 +124,7 @@ const read = (params: TerrainParams, [g, key]: ParamKey) => (params[g] as unknow
 const specOf = ([g, key]: ParamKey) => (PARAM_SPECS[g] as Record<string, ParamSpec>)[key];
 
 export function TerrainPanel({ terrain, ctl, open, onToggle }: { terrain: Terrain; ctl: WorldController; open: boolean; onToggle: () => void }) {
-  const changed = ALL_KEYS.some((k) => read(terrain.params, k) !== read(DEFAULT_PARAMS, k));
+  const changed = ALL_KEYS.some((k) => read(ctl.state.params, k) !== read(DEFAULT_PARAMS, k));
 
   return (
     <SidePanel side="left" open={open} onToggle={onToggle} widthRem={16.2} label="settings panel">
@@ -132,9 +132,9 @@ export function TerrainPanel({ terrain, ctl, open, onToggle }: { terrain: Terrai
         <Section key={section.title} icon={section.icon} title={section.title} collapsible defaultOpen={false}>
           {/* With the river off, only its on/off switch is shown; while it is hidden, none of it. */}
           {section.keys
-            .filter((k) => k[0] !== "river" || (RIVER_VISIBLE && (k[1] === "enabled" || terrain.params.river.enabled)))
+            .filter((k) => k[0] !== "river" || (RIVER_VISIBLE && (k[1] === "enabled" || ctl.state.params.river.enabled)))
             .map((k) => (
-              <ParamControl key={k.join(".")} spec={specOf(k)} value={read(terrain.params, k)} onChange={(v) => ctl.setParam(k[0], { [k[1]]: v })} />
+              <ParamControl key={k.join(".")} spec={specOf(k)} value={read(ctl.state.params, k)} onChange={(v) => ctl.setParam(k[0], { [k[1]]: v })} />
             ))}
           {section.title === "Town" && (
             <>
@@ -182,13 +182,13 @@ export function TerrainPanel({ terrain, ctl, open, onToggle }: { terrain: Terrai
               )}
             </>
           )}
-          {section.title === "River" && RIVER_VISIBLE && terrain.params.river.enabled && (
+          {section.title === "River" && RIVER_VISIBLE && ctl.state.params.river.enabled && (
             <>
               <Field label="Show path" description="Draw the control points and the curve over the terrain." inline>
                 <Switch checked={ctl.state.showPath} onChange={(e) => ctl.setShowPath(e.target.checked)} />
               </Field>
               {ctl.state.showPath && <FieldNote>Drag a point to move it.</FieldNote>}
-              {terrain.params.river.control && (
+              {ctl.state.params.river.control && (
                 <PanelButton className="flex flex-none items-center justify-center gap-2" onClick={() => ctl.setRiverControl(null)}>
                   <ResetIcon />
                   Reset path

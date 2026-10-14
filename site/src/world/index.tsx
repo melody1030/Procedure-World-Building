@@ -2,8 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useShortcutToggle } from "../components/SidePanel";
 import { WorldView } from "./render/WorldView";
 import { useWorldState } from "./state";
-import { generateTerrain, type Terrain } from "./terrain/pipeline";
+import { finishTerrain, generateTerrain, type Terrain } from "./terrain/pipeline";
 import { PrintBar } from "./ui/PrintBar";
+import { buildUp } from "./terrain/buildup";
 import { TerrainPanel } from "./ui/TerrainPanel";
 import { TitleCard } from "./ui/TitleCard";
 
@@ -19,15 +20,42 @@ export default function WorldPage() {
   const viewRef = useRef<WorldView | null>(null);
   const [overlays, setOverlays] = useState(true);
   const [panelOpen, setPanelOpen] = useState(() => window.matchMedia("(min-width: 1024px)").matches);
+  const [seedOpen, setSeedOpen] = useState(true);
+  // E slides the seed card away with the settings panel (each keeps its round button).
+  useShortcutToggle(seedOpen, () => setSeedOpen((v) => !v));
   useShortcutToggle(overlays, () => setOverlays((v) => !v));
 
-  // The last terrain, so a settings change reruns only the stages from the one it touches.
+  // The seed and settings the terrain is made for follow the requested ones two frames later, so
+  // "Generating…" shows (and the slider stays where it was let go) before the work blocks the page.
+  const [applied, setApplied] = useState({ seed: state.seed, params: state.params });
+  const generating = applied.seed !== state.seed || applied.params !== state.params;
+  useEffect(() => {
+    if (!generating) return;
+    let frame = requestAnimationFrame(() => {
+      frame = requestAnimationFrame(() => setApplied({ seed: state.seed, params: state.params }));
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [generating, state.seed, state.params]);
+
+  // The last terrain, so a settings change reruns only the stages from the one it touches. The
+  // ground is drawn first; districts and lots (used only by the overlays) finish a moment later.
   const previousRef = useRef<Terrain | null>(null);
-  const terrain = useMemo(() => {
-    const next = generateTerrain(state.seed, state.params, previousRef.current);
+  const ground = useMemo(() => {
+    const next = generateTerrain(applied.seed, applied.params, previousRef.current, { deferDistricts: true });
     previousRef.current = next;
     return next;
-  }, [state.seed, state.params]);
+  }, [applied]);
+  const [finished, setFinished] = useState<Terrain | null>(null);
+  useEffect(() => {
+    if (!ground.pendingDistricts) return;
+    const timer = setTimeout(() => {
+      const full = finishTerrain(ground);
+      previousRef.current = full;
+      setFinished(full);
+    }, 30);
+    return () => clearTimeout(timer);
+  }, [ground]);
+  const terrain = finished && finished.mesh === ground.mesh && finished.params === ground.params ? finished : ground;
 
   // The latest terrain, for the drag handler set up once below.
   const terrainRef = useRef(terrain);
@@ -56,7 +84,8 @@ export default function WorldPage() {
 
   // Re-upload only when the mesh itself changed: a look-only change keeps the same mesh object.
   useEffect(() => {
-    viewRef.current?.setTerrain(terrain.mesh.geometry, terrain.mesh.water, terrain.columns.max);
+    const t = terrain;
+    viewRef.current?.setTerrain(t.mesh.geometry, t.mesh.water, t.columns.max, () => buildUp(t));
     viewRef.current?.setPrint(printRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [terrain.mesh]);
@@ -87,14 +116,14 @@ export default function WorldPage() {
     <div className="relative h-screen w-full overflow-hidden bg-stage">
       <div ref={mountRef} className="absolute inset-0" />
       <div className="pointer-events-none absolute inset-0">
-        {overlays && <TitleCard seed={state.seed} onSeed={setSeed} />}
+        <TitleCard seed={state.seed} onSeed={setSeed} open={seedOpen} onToggle={() => setSeedOpen((v) => !v)} />
         <TerrainPanel terrain={terrain} ctl={ctl} open={panelOpen} onToggle={() => setPanelOpen((v) => !v)} />
         {/* Hidden rather than removed with E, so the print keeps its place. Clear of the open panel. */}
         <div
           className={"absolute bottom-4 right-4 flex justify-center transition-[left] duration-300 " + (overlays ? "" : "hidden")}
           style={{ left: panelOpen ? "18.2rem" : "1rem" }}
         >
-          <PrintBar replayKey={terrain.seed} top={terrain.columns.max} onChange={setPrint} />
+          <PrintBar replayKey={terrain.seed} onChange={setPrint} busy={generating || !!terrain.pendingDistricts} />
         </div>
       </div>
     </div>

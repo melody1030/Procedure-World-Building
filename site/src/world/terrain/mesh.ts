@@ -242,3 +242,29 @@ export function meshColumns(cols: Columns, surfaces: Surfaces, tones: number): T
 
   return { geometry: ground.finish(), water: waterGeometry, voxelFaces: faces.count, quads };
 }
+
+/**
+ * The ground a later stage cut away, for the build animation: column k stands from `floor[k]`
+ * (the finished ground) up to `top[k]` (the ground before the cut), or not at all where `top` is
+ * NO_WATER. Grass on top, cliff on the sides; only what stands above the finished ground is drawn.
+ */
+export function meshCut(n: number, top: Int16Array, floor: Int16Array, maxTop: number): GeometryData | null {
+  if (!top.some((h) => h !== NO_WATER)) return null;
+  const b = new GeometryBuilder();
+  const faces = { count: 0 };
+  greedyTops(n, (k) => top[k], () => 0, b, (_k, y) => topColor(SURFACE.grass, 1, y, maxTop, 0), faces);
+  sideRuns(
+    n,
+    (k) => top[k],
+    (x, z, own) => {
+      if (x < 0 || z < 0 || x >= n || z >= n) return floor[own];
+      const j = z * n + x;
+      return Math.max(top[j] !== NO_WATER ? top[j] : floor[j], floor[own]);
+    },
+    () => 0,
+    b,
+    (low, high) => sideColor(low, high, maxTop),
+    faces,
+  );
+  return b.finish();
+}
