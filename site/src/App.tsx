@@ -5,6 +5,7 @@ import HomePage from "./home/HomePage";
 import { usePath } from "./router";
 import { weeks } from "./weeks/registry";
 import WorldPage from "./world";
+import BuildingsPreview from "./world/buildings/Preview";
 
 export default function App() {
   const path = usePath();
@@ -15,11 +16,14 @@ export default function App() {
 
   useEffect(() => {
     if (path === "/world") document.title = "Blueprint City · Procedural World Building";
+    else if (path === "/buildings") document.title = "Building library · Procedural World Building";
     else document.title = active ? `${active.title} · Procedural World Building` : "Procedural World Building — Weekly Workshops";
   }, [active, path]);
 
   // The procedural world is the project's final piece: full screen, no top bar.
   if (path === "/world") return <WorldPage />;
+  // The city's building library, on its own (a preview of the assets /world places on lots).
+  if (path === "/buildings") return <BuildingsPreview />;
 
   return (
     <div className="flex min-h-screen flex-col">

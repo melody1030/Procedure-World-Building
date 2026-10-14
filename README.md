@@ -186,9 +186,20 @@ Week 5's paths for the river. Full dated log with screenshots:
   and ended as wave function collapse on a tile grid, solved outward from the plaza: one
   connected network with right-angle junctions. A district map (corporate core, neon strip,
   megablocks, industrial, wealthy, parks) and building lots along the streets.
-- **Next:** scatter (lamps, street trees, forest), bridges, then buildings.
+- **2026-10-12 — Districts like Cities: Skylines, and parks.** The city always takes the larger
+  side of the river. Districts became a few whole areas (a compact corporate core, a commercial
+  ring, megablocks, industrial, wealthy), every lot fronts a street, and 3 to 6 round parks sit
+  on their own layer.
+- **2026-10-12/13 — The building library.** Eleven cyberpunk voxel buildings for the lots,
+  previewed at `/buildings`. Four were redesigned from real references: the Corporate Megatower
+  (SUMMIT and Edge), the Neon Commercial Tower, a Research Lab Tower (Kahn's Richards Labs) and a
+  TV-tower Landmark (CN Tower). Every building has a street entrance (five styles) and shop fronts
+  of mixed units, checked automatically for clashes and flicker.
+- **Next:** place the buildings on the lots by district, then scatter and bridges.
 
-![Blueprint City: wave function collapse streets with districts and lots](site/src/world/screenshots/2026-10-09-wfc-streets-districts.webp)
+| Districts and parks | The building library |
+|---|---|
+| ![Blueprint City: districts and round parks over the street network](site/src/world/screenshots/2026-10-12-districts-parks.webp) | ![The eleven buildings in the /buildings preview](site/src/world/screenshots/2026-10-13-building-library.webp) |
 
 ## Firebase: Accounts & Saved Configurations
 
