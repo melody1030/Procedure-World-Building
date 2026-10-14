@@ -6,7 +6,7 @@ import { DEFAULT_PARAMS, PARAM_SPECS, RIVER_VISIBLE, type ParamKey, type ParamSp
 import { CLAIM_COLORS } from "../terrain/claims";
 import { DISTRICTS } from "../terrain/districts";
 import type { Terrain } from "../terrain/pipeline";
-import { GridIcon, NoiseIcon, ResetIcon, RiverIcon, ShapingIcon, SurfaceIcon, TerraceIcon, TownIcon } from "./icons";
+import { NoiseIcon, ResetIcon, RiverIcon, ShapingIcon, SurfaceIcon, TerraceIcon, TownIcon } from "./icons";
 
 /**
  * The terrain's settings, laid out like the weekly studios: icon sections in pipeline order and
@@ -26,7 +26,6 @@ const SECTIONS: { title: string; icon: ReactNode; keys: ParamKey[] }[] = [
       ["noise", "lacunarity"],
     ],
   },
-  { title: "Grid", icon: <GridIcon />, keys: [["noise", "resolution"]] },
   { title: "Shaping", icon: <ShapingIcon />, keys: [["shaping", "power"], ["shaping", "ridge"], ["shaping", "height"]] },
   {
     title: "Terraces",
@@ -76,6 +75,7 @@ const CLAIM_LEGEND: [string, number][] = [
   ["Verge", CLAIM_COLORS.verge],
   ["Plaza", CLAIM_COLORS.plaza],
   ["Lot", CLAIM_COLORS.lot],
+  ["Park", CLAIM_COLORS.park],
 ];
 
 /** Every key Reset restores: the panel's controls plus the hand-placed river points. */
@@ -146,7 +146,7 @@ export function TerrainPanel({ terrain, ctl, open, onToggle }: { terrain: Terrai
                   {terrain.streets.streets.filter((st) => st.kind === "main").length} main and {terrain.streets.streets.filter((st) => st.kind === "street").length} side street segments, {terrain.streets.junctions.length} junctions.
                 </FieldNote>
               )}
-              <Field label="Show districts" description="Tint the ground by district: corporate core, neon strip, megablocks, industrial and docks, wealthy enclave, parks." inline>
+              <Field label="Show districts" description="Tint the ground by district: corporate core, commercial, megablocks, industrial and docks, wealthy enclave." inline>
                 <Switch checked={ctl.state.showDistricts} onChange={(e) => ctl.setShowDistricts(e.target.checked)} />
               </Field>
               {ctl.state.showDistricts && (
@@ -159,10 +159,14 @@ export function TerrainPanel({ terrain, ctl, open, onToggle }: { terrain: Terrai
                   ))}
                 </div>
               )}
-              <Field label="Show lots" description="Outline every building lot in its district's color, with a tick on the side that faces the street." inline>
+              <Field label="Show lots" description="Fill every building lot in its district's color, with a stronger edge." inline>
                 <Switch checked={ctl.state.showLots} onChange={(e) => ctl.setShowLots(e.target.checked)} />
               </Field>
-              {ctl.state.showLots && <FieldNote>{terrain.districts.lots.length} lots along the streets.</FieldNote>}
+              {ctl.state.showLots && <FieldNote>{terrain.districts.lots.length} lots, each facing a street.</FieldNote>}
+              <Field label="Show parks" description="Draw the parks, a layer of their own over the districts: 3 to 6 per city, each kept at least 25 m from the others. No lot goes on a park." inline>
+                <Switch checked={ctl.state.showParks} onChange={(e) => ctl.setShowParks(e.target.checked)} />
+              </Field>
+              {ctl.state.showParks && <FieldNote>{terrain.districts.parks} parks.</FieldNote>}
               <Field label="Show claims" description="Tint the ground by what owns each column. Later stages only build on free ground." inline>
                 <Switch checked={ctl.state.showClaims} onChange={(e) => ctl.setShowClaims(e.target.checked)} />
               </Field>

@@ -9,13 +9,6 @@ export const NoiseIcon = () => (
   </svg>
 );
 
-export const GridIcon = () => (
-  <svg {...props}>
-    <rect x="3" y="3" width="18" height="18" rx="1" />
-    <path d="M9 3v18M15 3v18M3 9h18M3 15h18" />
-  </svg>
-);
-
 export const ShapingIcon = () => (
   <svg {...props}>
     <path d="M3 20h18" />

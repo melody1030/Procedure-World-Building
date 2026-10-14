@@ -14,8 +14,6 @@ export interface TerrainParams {
     octaves: number;
     persistence: number;
     lacunarity: number;
-    /** Field samples across the land; columns between samples are interpolated. */
-    resolution: number;
   };
   shaping: {
     /** Exponent applied to the noise: above 1 flattens lowlands. */
@@ -83,7 +81,7 @@ export type ParamGroup = keyof TerrainParams;
 export type ParamKey = { [G in ParamGroup]: [G, keyof TerrainParams[G] & string] }[ParamGroup];
 
 export const DEFAULT_PARAMS: TerrainParams = {
-  noise: { type: "perlin", scale: 3, octaves: 5, persistence: 0.5, lacunarity: 2, resolution: 96 },
+  noise: { type: "perlin", scale: 3, octaves: 5, persistence: 0.5, lacunarity: 2 },
   shaping: { power: 1.3, ridge: 0.2, height: 24 },
   terraces: { strength: 0.3, height: 3, wander: 0.25, slope: 10 },
   river: { enabled: true, points: 8, width: 4, depth: 1, valleyWidth: 7, valleyShape: 0.4, water: true, control: null },
@@ -164,15 +162,6 @@ export const PARAM_SPECS: { [G in ParamGroup]: { [K in Exclude<keyof TerrainPara
       max: 3,
       step: 0.05,
       format: fixed(2),
-    },
-    resolution: {
-      kind: "range",
-      label: "Resolution",
-      description: "Noise samples across the land; columns in between are interpolated. Low values smooth away fine detail; high values take longer.",
-      min: 24,
-      max: 384,
-      step: 24,
-      format: (v) => `${v} × ${v}`,
     },
   },
   shaping: {

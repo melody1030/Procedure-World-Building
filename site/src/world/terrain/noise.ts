@@ -52,8 +52,11 @@ function base(type: NoiseType, x: number, y: number, seed: number): number {
   }
 }
 
+/** Field samples across the land (one per 2.4 m); columns between samples are interpolated. */
+const RESOLUTION = 96;
+
 export function buildNoiseField(seed: number, p: TerrainParams["noise"]): NoiseField {
-  const res = p.resolution;
+  const res = RESOLUTION;
   const nodes = res + 1;
   const values = new Float32Array(nodes * nodes);
 

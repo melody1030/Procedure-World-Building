@@ -1,4 +1,4 @@
-import { fbm } from "../noise";
+import { fbm, smoothstep } from "../noise";
 import type { P2 } from "../path";
 import { Rng } from "../rng";
 import { VOXEL_M, voxels } from "../scale";
@@ -21,66 +21,105 @@ import type { Columns } from "./voxelize";
  *    - height rank: a buildable cell's height as a percentile of all buildable cells;
  *    - river distance, and distance to the avenue exits at the diorama's edge.
  * 2. Districts, first match wins:
- *      parks        not buildable, or a slow noise patch (PARK_SHARE of buildable land, not in
- *                   the core)
- *      core         the CORE_SHARE of buildable land nearest the plaza (by access)
+ *      core         the CORE_SHARE of the land nearest the plaza in a straight line, at most
+ *                   CORE_MAX from it: one compact disc around the plaza
  *      industrial   near the river (DOCK_RIVER) on low ground (height rank under DOCK_LOW), or
  *                   near an exit (DOCK_EXIT)
- *      neon         within NEON_FRONTAGE of an avenue in the nearer NEON_AVENUE_SHARE, or within
- *                   NEON_RING_FRONTAGE of any street in the nearer NEON_RING_SHARE (the inner ring)
+ *      commercial   street frontage (within COMMERCIAL_FRONTAGE of a street) in a ring
+ *                   COMMERCIAL_RING wide around the core, and along the avenues in the nearer
+ *                   COMMERCIAL_AVENUE_SHARE (shops, bars and neon signs at street level):
+ *                   one band hugging the core, with strips running out along the avenues
  *      wealthy      high ground (rank over WEALTHY_HIGH), in the farther half by access, and at
  *                   least WEALTHY_GAP from industrial
  *      megablocks   everything else buildable
  *    Access thresholds are shares of the buildable land, so every city's districts scale with it.
- *    Then two majority passes smooth the edges, and any region under MIN_REGION joins the
- *    neighbor it shares the most border with.
+ *    Then districts are smoothed into whole areas, as Cities: Skylines districts are painted
+ *    areas: SMOOTH_PASSES majority passes within SMOOTH_RADIUS (the core and the commercial strips stay
+ *    as their rules draw them), and any region still under MIN_REGION joins the neighbor it
+ *    shares the most border with (the core never does, and commercial only under COMMERCIAL_MIN).
+ *    Parks are not a district: see 3b.
  * 3. Density per cell: the district's base density · (1 − 0.5 · access / span).
- * 4. Lots: along every street (avenues first), on both sides, behind the verge, a rectangle
- *    aligned to the street of the district's width (±15%, seeded) and depth, with an ALLEY gap.
- *    A lot is kept only if every column is free, buildable and not a park, and its ground spans
- *    at most MAX_LOT_STEP (megablocks MAX_STACK_STEP: they stack down slopes). Its columns are
- *    claimed `lot`.
+ *    3b. Parks, a layer of their own over the districts: PARKS_MIN to PARKS_MAX of them (the seed
+ *    picks), each PARK_SIZE_MIN to PARK_SIZE_MAX, a round patch grown outward from a spot on
+ *    steep or hilly ground (plus slow noise) outside the core. Every park keeps at least PARK_APART of ground from every other;
+ *    a spot that can't fit half a park is skipped for the next. Their free columns are claimed
+ *    `park`, so no lot goes there. If the land runs out, there are fewer.
+ * 4. Lots, as in Cities: Skylines' zoning: only along the streets, so every lot fronts one. Each
+ *    street side (avenues first) is cut behind the verge into lots ZONE meters a cell: the
+ *    district's width in cells (± one, seeded; fewer where a full one doesn't fit). A lot starts
+ *    MIN_DEPTH deep and deepens a meter at a time to the district's depth (up to 4 cells), while
+ *    the street straight behind the block is still farther than the lot is deep: lots from
+ *    facing streets meet half an ALLEY short of halfway. A lot is kept only if it touches the
+ *    verge, every column is free (so not a park), no column is within an
+ *    ALLEY of another lot, and its ground spans at most MAX_LOT_STEP (megablocks MAX_STACK_STEP:
+ *    they stack down slopes). Its columns are claimed `lot`.
+ * 5. Corner lots: the frontage the walk leaves (rounded corners, short runs, odd pockets) is
+ *    packed with grid-aligned rectangles, the district's size or smaller down to MIN_DEPTH a
+ *    side, each fronting a verge or street along at least half its narrower side, with the same
+ *    alley and ground rules. So every lot still fronts a street.
  */
 
-export const DISTRICT = { core: 0, neon: 1, megablock: 2, industrial: 3, wealthy: 4, park: 5 } as const;
+export const DISTRICT = { core: 0, commercial: 1, megablock: 2, industrial: 3, wealthy: 4 } as const;
 export type District = (typeof DISTRICT)[keyof typeof DISTRICT];
 /** No district: road, plaza, river or bank. */
 export const NO_DISTRICT = 255;
 
-/** Names, debug colors, lot sizes (meters) and base density, by district. */
+/** Names, debug colors, lot width and the deepest a lot grows (zone cells of ZONE meters), and
+ * base density, by district. */
 export const DISTRICTS: { name: string; color: number; width: number; depth: number; density: number }[] = [
-  { name: "Corporate core", color: 0x22d3ee, width: 16, depth: 16, density: 1 },
-  { name: "Neon strip", color: 0xe879f9, width: 8, depth: 10, density: 0.75 },
-  { name: "Megablocks", color: 0x8b5cf6, width: 10, depth: 12, density: 0.6 },
-  { name: "Industrial", color: 0xf59e0b, width: 20, depth: 20, density: 0.35 },
-  { name: "Wealthy", color: 0xfde68a, width: 14, depth: 14, density: 0.3 },
-  { name: "Parks", color: 0x4ade80, width: 0, depth: 0, density: 0 },
+  { name: "Corporate core", color: 0x22d3ee, width: 2, depth: 4, density: 1 },
+  { name: "Commercial", color: 0xe879f9, width: 1, depth: 3, density: 0.75 },
+  { name: "Megablocks", color: 0x8b5cf6, width: 2, depth: 4, density: 0.6 },
+  { name: "Industrial", color: 0xf59e0b, width: 3, depth: 4, density: 0.35 },
+  { name: "Wealthy", color: 0xfde68a, width: 2, depth: 3, density: 0.3 },
 ];
 
 const BUILD_SLOPE = 30;
 const REACH = 30;
-const PARK_SHARE = 0.1;
-const PARK_FREQ = 4;
-/** Access thresholds are shares of the buildable land, nearest the plaza first, so every city's
- * core and strips scale with it. */
+/** Parks: how many (the seed picks), each one's size (m², the seed picks), and the least ground
+ * between any two parks (meters). */
+const PARKS_MIN = 3;
+const PARKS_MAX = 6;
+const PARK_SIZE_MIN = 700;
+const PARK_SIZE_MAX = 1400;
+const PARK_APART = 25;
+/** A park never reaches past this times the radius of a circle of its size. */
+const PARK_ROUND = 1.1;
+/** The least share of its size a park must reach within that radius, or the spot is skipped. */
+const PARK_FILL = 0.8;
+const PARK_FREQ = 3;
+/** Cells either side over which slope is averaged when choosing parks. */
+const PARK_BLUR = 3;
+/** The core: the CORE_SHARE of the land nearest the plaza, but never past CORE_MAX meters from
+ * it, so it stays one compact disc around the plaza. */
 const CORE_SHARE = 0.15;
+const CORE_MAX = 50;
 const DOCK_RIVER = 50;
 const DOCK_LOW = 0.5;
 const DOCK_EXIT = 30;
-const NEON_FRONTAGE = 14;
-/** Neon runs along avenues within this share of access, and along any street in the inner ring. */
-const NEON_AVENUE_SHARE = 0.6;
-const NEON_RING_SHARE = 0.35;
-const NEON_RING_FRONTAGE = 10;
+/** Commercial: how far it reaches back from a street (meters). */
+const COMMERCIAL_FRONTAGE = 28;
+/** Commercial also rings the core: street frontage within COMMERCIAL_RING meters outside it. */
+const COMMERCIAL_RING = 40;
+/** A commercial piece smaller than this (m²) is a speck and joins its neighbor. */
+const COMMERCIAL_MIN = 400;
+/** Commercial runs along the avenues within this share of access. */
+const COMMERCIAL_AVENUE_SHARE = 0.6;
 const WEALTHY_HIGH = 0.8;
 const WEALTHY_FAR_SHARE = 0.5;
 const WEALTHY_GAP = 40;
-const MIN_REGION = 100;
-/** Lots: gap between neighbors, size variation, the narrower width tried when a full one doesn't
- * fit, and the most their ground may span (meters; the building stage terraces them). */
-const NARROW = 0.6;
+/** Districts: the radius (meters) and passes of the majority smoothing, and the smallest region
+ * kept (m²). */
+const SMOOTH_RADIUS = 8;
+const SMOOTH_PASSES = 3;
+const MIN_REGION = 2000;
+/** How many cells a district region reaches across a street. */
+const ACROSS = 3;
+/** Lots: a zone cell (meters), the depth every lot starts at, the gap between lots, and the most
+ * their ground may span (meters; the building stage terraces them). */
+const ZONE = 8;
+const MIN_DEPTH = 6;
 const ALLEY = 1;
-const LOT_VARIATION = 0.15;
 const MAX_LOT_STEP = 6;
 const MAX_STACK_STEP = 10;
 /** The strip between a street's edge and its lots (the verge), in meters. */
@@ -117,6 +156,8 @@ export interface Districts {
   claims: Claims;
   /** Each district's share of the land that has one. */
   shares: number[];
+  /** How many parks were placed (their columns are claimed `park`). */
+  parks: number;
 }
 
 const N8: [number, number, number][] = [
@@ -141,7 +182,7 @@ export function buildDistricts(seed: number, cols: Columns, streets: Streets, hu
   const access = new Float32Array(total).fill(Infinity);
   const density = new Float32Array(total);
   const lotId = new Int32Array(n * n);
-  const empty: Districts = { cells, district, access, density, lots: [], lotId, claims, shares: DISTRICTS.map(() => 0) };
+  const empty: Districts = { cells, district, access, density, lots: [], lotId, claims, shares: DISTRICTS.map(() => 0), parks: 0 };
   const plaza = streets.plazas[0];
   if (!plaza) return empty;
 
@@ -234,16 +275,20 @@ export function buildDistricts(seed: number, cols: Columns, streets: Streets, hu
   const ground = hubs.mean;
   const at = (cx: number, cz: number) => ground[Math.min(cells - 1, Math.max(0, cz)) * cells + Math.min(cells - 1, Math.max(0, cx))];
   const buildable = new Uint8Array(total);
+  // Land: every cell that gets a district (not road, water, or across the river).
+  const land = new Uint8Array(total);
+  const slope = new Float32Array(total);
   for (let c = 0; c < total; c++) {
-    if (road[c] || wet[c] || free[c] < (CELL * CELL) / 2 || !hubs.side[c]) continue;
+    if (road[c] || wet[c] || !hubs.side[c]) continue;
+    land[c] = 1;
     const cx = c % cells;
     const cz = (c - cx) / cells;
     const gx = (at(cx + 1, cz) - at(cx - 1, cz)) / (2 * CELL);
     const gz = (at(cx, cz + 1) - at(cx, cz - 1)) / (2 * CELL);
-    const slope = (Math.atan(Math.hypot(gx, gz)) * 180) / Math.PI;
-    if (slope <= BUILD_SLOPE && roadDist[c] <= REACH) buildable[c] = 1;
+    slope[c] = (Math.atan(Math.hypot(gx, gz)) * 180) / Math.PI;
+    if (free[c] >= (CELL * CELL) / 2 && slope[c] <= BUILD_SLOPE && roadDist[c] <= REACH) buildable[c] = 1;
   }
-  const order = Array.from({ length: total }, (_, c) => c).filter((c) => buildable[c]).sort((a, b) => ground[a] - ground[b]);
+  const order = Array.from({ length: total }, (_, c) => c).filter((c) => land[c]).sort((a, b) => ground[a] - ground[b]);
   const rank = new Float32Array(total);
   order.forEach((c, i) => (rank[c] = order.length > 1 ? i / (order.length - 1) : 0.5));
   const riverM = (c: number) => {
@@ -261,31 +306,121 @@ export function buildDistricts(seed: number, cols: Columns, streets: Streets, hu
     return exits.reduce((m, e) => Math.min(m, Math.hypot(e.x - q.x, e.z - q.z) * VOXEL_M), Infinity);
   };
 
-  // Access thresholds as shares of the buildable land.
+  // Access thresholds as shares of the land; the core is the land nearest the plaza in a straight line.
   const byAccess = order.map((c) => access[c]).sort((a, b) => a - b);
+  const fromPlaza = (c: number) => {
+    const q = cellCenter(c);
+    return Math.hypot(q.x - plaza.x, q.z - plaza.z) * VOXEL_M;
+  };
+  const byPlaza = order.map(fromPlaza).sort((a, b) => a - b);
+  const CORE_RADIUS = Math.min(CORE_MAX, byPlaza.length ? byPlaza[Math.min(byPlaza.length - 1, Math.floor(CORE_SHARE * byPlaza.length))] : 0);
   const accessAt = (share: number) => (byAccess.length ? byAccess[Math.min(byAccess.length - 1, Math.floor(share * byAccess.length))] : 0);
-  const CORE_ACCESS = accessAt(CORE_SHARE);
-  const NEON_ACCESS = accessAt(NEON_AVENUE_SHARE);
-  const RING_ACCESS = accessAt(NEON_RING_SHARE);
+  const COMMERCIAL_ACCESS = accessAt(COMMERCIAL_AVENUE_SHARE);
   const WEALTHY_ACCESS = accessAt(WEALTHY_FAR_SHARE);
 
-  // 2. Districts. Parks: unbuildable land, plus the noisiest PARK_SHARE of buildable land outside the core.
-  const parkNoise = new Float32Array(total);
+  // Parks (placed here, claimed after the districts, 3b): PARKS_MIN to PARKS_MAX whole parks (the
+  // seed picks), each PARK_SIZE_MIN to PARK_SIZE_MAX, outside the core. The score is the slope
+  // averaged over PARK_BLUR cells around (steep hillsides) plus slow noise.
   const salt = seed ^ 0x2f6b8a1d;
-  const noisy: number[] = [];
+  const parkScore = new Float32Array(total);
+  const outside: number[] = [];
   for (let c = 0; c < total; c++) {
-    if (!buildable[c]) continue;
-    parkNoise[c] = fbm(((c % cells) / cells) * PARK_FREQ, (Math.floor(c / cells) / cells) * PARK_FREQ, salt, 3);
-    if (access[c] > CORE_ACCESS) noisy.push(parkNoise[c]);
+    if (!land[c] || fromPlaza(c) <= CORE_RADIUS) continue;
+    const cx = c % cells;
+    const cz = (c - cx) / cells;
+    let sum = 0;
+    let count = 0;
+    for (let dz = -PARK_BLUR; dz <= PARK_BLUR; dz++) {
+      for (let dx = -PARK_BLUR; dx <= PARK_BLUR; dx++) {
+        const x = cx + dx;
+        const z = cz + dz;
+        if (x < 0 || z < 0 || x >= cells || z >= cells || !land[z * cells + x]) continue;
+        sum += slope[z * cells + x];
+        count++;
+      }
+    }
+    const noise = fbm((cx / cells) * PARK_FREQ, (cz / cells) * PARK_FREQ, salt, 3);
+    parkScore[c] = smoothstep(BUILD_SLOPE * 0.5, BUILD_SLOPE * 1.5, sum / count) + noise;
+    outside.push(c);
   }
-  noisy.sort((a, b) => b - a);
-  const parkLine = noisy.length ? noisy[Math.floor(noisy.length * PARK_SHARE)] : Infinity;
+  outside.sort((a, b) => parkScore[b] - parkScore[a]);
+  // Each park starts at the best-scoring spot at least PARK_APART from every other park and grows
+  // outward, nearest cell first, so it comes out round, to its size, never coming within PARK_APART
+  // of another park.
+  const parkRng = new Rng(seed ^ 0x51ed270b);
+  let parksLeft = PARKS_MIN + Math.floor(parkRng.next() * (PARKS_MAX - PARKS_MIN + 1));
+  const isPark = new Uint8Array(total);
+  // Which park (id + 1) each cell belongs to, so a park keeps PARK_APART from the others. With
+  // id −1, any park counts.
+  const parkOf = new Uint8Array(total);
+  const apart = Math.ceil(PARK_APART / cellM);
+  const nearOther = (c: number, id: number) => {
+    const cx = c % cells;
+    const cz = (c - cx) / cells;
+    for (let dz = -apart; dz <= apart; dz++) {
+      for (let dx = -apart; dx <= apart; dx++) {
+        const x = cx + dx;
+        const z = cz + dz;
+        if (x < 0 || z < 0 || x >= cells || z >= cells) continue;
+        const o = parkOf[z * cells + x];
+        if (o && o !== id + 1) return true;
+      }
+    }
+    return false;
+  };
+  const starts: P2[] = [];
+  for (const start of outside) {
+    if (parksLeft <= 0) break;
+    const q = cellCenter(start);
+    if (isPark[start] || nearOther(start, -1)) continue;
+    const frontier = new MinHeap();
+    const seen = new Set([start]);
+    const sx = start % cells;
+    const sz = (start - sx) / cells;
+    frontier.push(start, 0);
+    let grown = 0;
+    const target = Math.round((PARK_SIZE_MIN + parkRng.next() * (PARK_SIZE_MAX - PARK_SIZE_MIN)) / (cellM * cellM));
+    const radius = PARK_ROUND * Math.sqrt(target / Math.PI);
+    const id = starts.length;
+    const cellsOf: number[] = [];
+    while (frontier.size && grown < target) {
+      const c = frontier.pop();
+      isPark[c] = 1;
+      parkOf[c] = id + 1;
+      cellsOf.push(c);
+      grown++;
+      const cx = c % cells;
+      const cz = (c - cx) / cells;
+      for (const [dx, dz] of N8.slice(0, 4)) {
+        const x = cx + dx;
+        const z = cz + dz;
+        if (x < 0 || z < 0 || x >= cells || z >= cells) continue;
+        const nc = z * cells + x;
+        if (seen.has(nc) || isPark[nc] || !land[nc] || fromPlaza(nc) <= CORE_RADIUS || nearOther(nc, id)) continue;
+        seen.add(nc);
+        // Round: the nearest cell to the park's center grows first, and nothing past the radius of
+        // a circle a little larger than its size, so a park cut by a street stays a disc and doesn't
+        // wrap around the street's end.
+        const r = Math.hypot(x - sx, z - sz);
+        if (r > radius) continue;
+        frontier.push(nc, r);
+      }
+    }
+    // A spot where too little of the disc fits (a street or the edge cuts it): undo it and try the
+    // next spot, so every park is a whole round patch.
+    if (grown < PARK_FILL * target) {
+      for (const c of cellsOf) isPark[c] = parkOf[c] = 0;
+      continue;
+    }
+    starts.push(q);
+    parksLeft--;
+  }
+  // 2. Districts.
   for (let c = 0; c < total; c++) {
-    if (road[c] || wet[c] || !hubs.side[c]) continue;
-    if (!buildable[c] || (access[c] > CORE_ACCESS && parkNoise[c] >= parkLine)) district[c] = DISTRICT.park;
-    else if (access[c] <= CORE_ACCESS) district[c] = DISTRICT.core;
+    if (!land[c]) continue;
+    if (fromPlaza(c) <= CORE_RADIUS) district[c] = DISTRICT.core;
     else if ((riverM(c) <= DOCK_RIVER && rank[c] <= DOCK_LOW) || exitM(c) <= DOCK_EXIT) district[c] = DISTRICT.industrial;
-    else if ((roadDist[c] <= NEON_FRONTAGE && avenue[nearest[c]] && access[c] <= NEON_ACCESS) || (roadDist[c] <= NEON_RING_FRONTAGE && access[c] <= RING_ACCESS)) district[c] = DISTRICT.neon;
+    else if (roadDist[c] <= COMMERCIAL_FRONTAGE && ((avenue[nearest[c]] && access[c] <= COMMERCIAL_ACCESS) || fromPlaza(c) <= CORE_RADIUS + COMMERCIAL_RING)) district[c] = DISTRICT.commercial;
     else district[c] = DISTRICT.megablock;
   }
   // Wealthy needs the distance to industrial, so it comes second.
@@ -301,27 +436,31 @@ export function buildDistricts(seed: number, cols: Columns, streets: Streets, hu
     if (district[c] === DISTRICT.megablock && rank[c] >= WEALTHY_HIGH && access[c] >= WEALTHY_ACCESS && fromIndustry[c] >= WEALTHY_GAP) district[c] = DISTRICT.wealthy;
   }
 
-  // Smoothing: two majority passes over buildable cells, then small regions join a neighbor.
-  const votes = new Uint8Array(DISTRICTS.length);
-  for (let pass = 0; pass < 2; pass++) {
+  // Smoothing into whole areas, like painted districts: SMOOTH_PASSES majority passes over the land
+  // within SMOOTH_RADIUS. The core and the commercial strips are drawn whole by their own rules: they
+  // stay as they are and don't vote, so they never spread or fray.
+  const fixed = (d: number) => d === DISTRICT.core || d === DISTRICT.commercial;
+  const votes = new Float32Array(DISTRICTS.length);
+  const reachCells = Math.round(SMOOTH_RADIUS / cellM);
+  for (let pass = 0; pass < SMOOTH_PASSES; pass++) {
     const next = district.slice();
     for (let c = 0; c < total; c++) {
-      if (!buildable[c] || district[c] === NO_DISTRICT) continue;
+      if (!land[c] || fixed(district[c])) continue;
       votes.fill(0);
       const cx = c % cells;
       const cz = (c - cx) / cells;
-      for (let dz = -1; dz <= 1; dz++) {
-        for (let dx = -1; dx <= 1; dx++) {
+      for (let dz = -reachCells; dz <= reachCells; dz++) {
+        for (let dx = -reachCells; dx <= reachCells; dx++) {
+          if (dx * dx + dz * dz > reachCells * reachCells) continue;
           const x = cx + dx;
           const z = cz + dz;
           if (x < 0 || z < 0 || x >= cells || z >= cells) continue;
-          const d = district[z * cells + x];
-          if (d !== NO_DISTRICT) votes[d]++;
+          const nc = z * cells + x;
+          if (land[nc] && !fixed(district[nc])) votes[district[nc]]++;
         }
       }
-      // A cell changes only if another district clearly outvotes its own.
       let best = district[c];
-      for (let d = 0; d < votes.length; d++) if (votes[d] > votes[best] + 1) best = d;
+      for (let d = 0; d < votes.length; d++) if (votes[d] > votes[best]) best = d;
       next[c] = best;
     }
     district.set(next);
@@ -338,19 +477,27 @@ export function buildDistricts(seed: number, cols: Columns, streets: Streets, hu
       const c = members[i];
       const cx = c % cells;
       const cz = (c - cx) / cells;
-      for (const [dx, dz] of N8.slice(0, 4)) {
-        const x = cx + dx;
-        const z = cz + dz;
-        if (x < 0 || z < 0 || x >= cells || z >= cells) continue;
-        const nc = z * cells + x;
-        const d = district[nc];
-        if (d === d0 && region[nc] < 0) {
-          region[nc] = c0;
-          members.push(nc);
-        } else if (d !== d0 && d !== NO_DISTRICT) border.set(d, (border.get(d) ?? 0) + 1);
+      // A region reaches across a street (up to ACROSS cells), so a district on both sides of
+      // one counts as one area; its border is counted with the four direct neighbors.
+      for (let dz = -ACROSS; dz <= ACROSS; dz++) {
+        for (let dx = -ACROSS; dx <= ACROSS; dx++) {
+          const x = cx + dx;
+          const z = cz + dz;
+          if (x < 0 || z < 0 || x >= cells || z >= cells) continue;
+          const nc = z * cells + x;
+          const d = district[nc];
+          if (d === d0 && region[nc] < 0) {
+            region[nc] = c0;
+            members.push(nc);
+          } else if (Math.abs(dx) + Math.abs(dz) === 1 && d !== d0 && d !== NO_DISTRICT) border.set(d, (border.get(d) ?? 0) + 1);
+        }
       }
     }
-    if (members.length >= minCells || !border.size) continue;
+    // The core never merges away (it is whole by construction), and commercial only as a speck
+    // (under COMMERCIAL_MIN): its strips are thin.
+    const keep = d0 === DISTRICT.core ? 0 : d0 === DISTRICT.commercial ? COMMERCIAL_MIN / (cellM * cellM) : minCells;
+    if (members.length >= keep || !border.size) continue;
+    // It joins the neighbor it shares the most border with.
     let into = d0;
     let most = 0;
     for (const [d, count] of border) if (count > most) [into, most] = [d, count];
@@ -364,10 +511,35 @@ export function buildDistricts(seed: number, cols: Columns, streets: Streets, hu
     density[c] = DISTRICTS[district[c]].density * Math.max(0, 1 - (0.5 * Math.min(access[c], span)) / span);
   }
 
-  // 4. Lots along the streets, avenues first.
+  // 3b. Parks: their free columns are claimed, so lots keep off them.
+  for (let z = 0; z < n; z++) {
+    const row = ((z / CELL) | 0) * cells;
+    for (let x = 0; x < n; x++) {
+      const k = z * n + x;
+      if (isPark[row + ((x / CELL) | 0)] && claim[k] === CLAIM.free) claim[k] = CLAIM.park;
+    }
+  }
+
+  // 4. Lots along the streets, avenues first. `gap` is the alley around every lot placed so far,
+  // which no other lot may use.
+  const gap = new Uint8Array(n * n);
+  // How far paving lies straight ahead of a point, in columns (up to `limit`).
+  const ahead = (x: number, z: number, dx: number, dz: number, limit: number) => {
+    for (let i = 0; i <= limit; i++) {
+      const X = Math.round(x + dx * i);
+      const Z = Math.round(z + dz * i);
+      if (X < 0 || Z < 0 || X >= n || Z >= n) return Infinity;
+      const what = claim[Z * n + X];
+      if (what === CLAIM.road || what === CLAIM.plaza || what === CLAIM.verge) return i;
+    }
+    return Infinity;
+  };
   const rng = new Rng(seed ^ 0x7b3c1e95);
   const lots: Lot[] = [];
   const cellOf = (x: number, z: number) => Math.min(cells - 1, Math.max(0, Math.floor(z / CELL))) * cells + Math.min(cells - 1, Math.max(0, Math.floor(x / CELL)));
+  // A column a lot may use: free (not a park), outside every lot's alley, in a district. (The
+  // lot's ground-step limit keeps lots off ground too steep to build on.)
+  const usable = (k: number) => claim[k] === CLAIM.free && !gap[k] && district[cellOf(k % n, Math.floor(k / n))] !== NO_DISTRICT;
   const ordered = [...streets.streets].sort((a, b) => (a.kind === b.kind ? 0 : a.kind === "main" ? -1 : 1));
   for (const st of ordered) {
     const curve = st.curve;
@@ -398,19 +570,21 @@ export function buildDistricts(seed: number, cols: Columns, streets: Streets, hu
         const p = pointAt(Math.min(length, s));
         const nx = -Math.sin(p.angle) * side;
         const nz = Math.cos(p.angle) * side;
-        // The district is read a few meters in, at the middle of a typical lot.
-        const probe = offset + voxels(5);
+        // The district is read a few meters in.
+        const probe = offset + voxels(MIN_DEPTH / 2);
         const d = district[cellOf(p.x + nx * probe, p.z + nz * probe)];
-        if (d === NO_DISTRICT || d === DISTRICT.park) {
+        if (d === NO_DISTRICT) {
           s += voxels(1);
           continue;
         }
         const spec = DISTRICTS[d];
-        const jitter = 1 + LOT_VARIATION * (2 * rng.next() - 1);
+        const maxStep = voxels(d === DISTRICT.megablock ? MAX_STACK_STEP : MAX_LOT_STEP);
+        // Width in zone cells: the district's, give or take one, then fewer where it doesn't fit.
+        const want = Math.max(1, spec.width + Math.floor(rng.next() * 3) - 1);
         let placed = 0;
-        for (const factor of [1, NARROW]) {
-          const w = voxels(spec.width * jitter * factor);
-          const depth = voxels(spec.depth);
+        for (let wc = want; wc >= 1 && !placed; wc--) {
+          const w = voxels(wc * ZONE);
+          const depth = voxels(MIN_DEPTH);
           if (s + w > length) continue;
           // The lot's axis follows the street at its middle; the street must be nearly straight along it.
           const mid = pointAt(s + w / 2);
@@ -427,59 +601,211 @@ export function buildDistricts(seed: number, cols: Columns, streets: Streets, hu
             { x: fc.x + (tx * w) / 2 + mx * depth, z: fc.z + (tz * w) / 2 + mz * depth },
             { x: fc.x - (tx * w) / 2 + mx * depth, z: fc.z - (tz * w) / 2 + mz * depth },
           ];
-          // A quick look at the corners and the middle first, before testing every column.
-          const middle = { x: fc.x + (mx * depth) / 2, z: fc.z + (mz * depth) / 2 };
-          const inset = Math.min(0.25, 2 / Math.min(w, depth));
-          const probes = [...corners.map((q) => ({ x: q.x + (middle.x - q.x) * inset, z: q.z + (middle.z - q.z) * inset })), middle];
-          const quick = probes.every((q) => {
-            if (q.x < 0 || q.z < 0 || q.x > n - 1 || q.z > n - 1) return false;
-            const k = Math.round(q.z) * n + Math.round(q.x);
-            const cd = district[cellOf(q.x, q.z)];
-            return claim[k] === CLAIM.free && cd !== NO_DISTRICT && cd !== DISTRICT.park;
-          });
-          if (!quick) continue;
-          const columns = rasterize(corners, n);
+          let columns = rasterize(corners, n);
           let ok = columns.length > 0;
           let low = Infinity;
           let high = -Infinity;
           for (const k of columns) {
-            const cd = district[cellOf(k % n, Math.floor(k / n))];
-            if (claim[k] !== CLAIM.free || cd === NO_DISTRICT || cd === DISTRICT.park) {
+            if (!usable(k)) {
               ok = false;
               break;
             }
             low = Math.min(low, height[k]);
             high = Math.max(high, height[k]);
           }
-          if (!ok || high - low > voxels(d === DISTRICT.megablock ? MAX_STACK_STEP : MAX_LOT_STEP)) continue;
+          if (!ok || high - low > maxStep) continue;
+          // It must touch its verge or street (diagonally counts): on a curve the rounding can
+          // leave a sliver between them.
+          const fronted = columns.some((k) => {
+            const x = k % n;
+            const z = (k - x) / n;
+            for (let dz = -1; dz <= 1; dz++) {
+              for (let dx = -1; dx <= 1; dx++) {
+                const X = x + dx;
+                const Z = z + dz;
+                if (X < 0 || Z < 0 || X >= n || Z >= n) continue;
+                const what = claim[Z * n + X];
+                if (what === CLAIM.verge || what === CLAIM.road || what === CLAIM.plaza) return true;
+              }
+            }
+            return false;
+          });
+          if (!fronted) continue;
+          // Deepen toward the back of the block, a meter at a time, while every new column is usable,
+          // the ground stays within the step, and the paving straight ahead (the street behind the
+          // block) is still farther than the lot is deep: lots from facing streets meet halfway.
+          // Cross streets at the block's ends don't stop it. Then back off half an alley.
+          const grow = voxels(1);
+          let deep = depth;
+          let stopped = false;
+          while (deep + grow <= voxels(spec.depth * ZONE) + 0.01) {
+            const strip = rasterize([corners[3], corners[2], { x: corners[2].x + mx * grow, z: corners[2].z + mz * grow }, { x: corners[3].x + mx * grow, z: corners[3].z + mz * grow }], n);
+            let lo = low;
+            let hi = high;
+            let fits = strip.length > 0;
+            const t = deep + grow;
+            for (const q of [corners[3], corners[2], { x: (corners[2].x + corners[3].x) / 2, z: (corners[2].z + corners[3].z) / 2 }]) {
+              // From the strip's far edge, pulled half a column in from the lot's sides.
+              const inX = q === corners[3] ? tx * 0.5 : q === corners[2] ? -tx * 0.5 : 0;
+              const inZ = q === corners[3] ? tz * 0.5 : q === corners[2] ? -tz * 0.5 : 0;
+              if (ahead(q.x + inX + mx * grow, q.z + inZ + mz * grow, mx, mz, Math.ceil(t)) < t - 0.5) fits = false;
+            }
+            for (const k of strip) {
+              if (!fits) break;
+              if (!usable(k)) {
+                fits = false;
+                break;
+              }
+              lo = Math.min(lo, height[k]);
+              hi = Math.max(hi, height[k]);
+            }
+            if (!fits || hi - lo > maxStep) {
+              stopped = true;
+              break;
+            }
+            for (const q of [2, 3]) corners[q] = { x: corners[q].x + mx * grow, z: corners[q].z + mz * grow };
+            deep += grow;
+          }
+          const back = stopped ? Math.min(deep - depth, voxels(ALLEY / 2)) : 0;
+          if (back > 0) for (const q of [2, 3]) corners[q] = { x: corners[q].x - mx * back, z: corners[q].z - mz * back };
+          if (deep > depth) {
+            columns = rasterize(corners, n);
+            low = Infinity;
+            high = -Infinity;
+            for (const k of columns) {
+              low = Math.min(low, height[k]);
+              high = Math.max(high, height[k]);
+            }
+          }
           const id = lots.length;
           for (const k of columns) {
             claim[k] = CLAIM.lot;
             lotId[k] = id + 1;
           }
-          const centerCell = cellOf(middle.x, middle.z);
+          // The lot grown by an alley on every side (the front's alley falls on the verge).
+          const a = voxels(ALLEY);
+          const ring = [
+            { x: corners[0].x - tx * a - mx * a, z: corners[0].z - tz * a - mz * a },
+            { x: corners[1].x + tx * a - mx * a, z: corners[1].z + tz * a - mz * a },
+            { x: corners[2].x + tx * a + mx * a, z: corners[2].z + tz * a + mz * a },
+            { x: corners[3].x - tx * a + mx * a, z: corners[3].z - tz * a + mz * a },
+          ];
+          for (const k of rasterize(ring, n, false)) gap[k] = 1;
+          const centerCell = cellOf((corners[0].x + corners[2].x) / 2, (corners[0].z + corners[2].z) / 2);
           lots.push({ id, corners, facing: Math.atan2(-mz, -mx), district: d as District, density: density[centerCell], area: columns.length * VOXEL_M * VOXEL_M, low, high });
           placed = w;
-          break;
         }
         s += placed ? placed + voxels(ALLEY) : voxels(1);
       }
     }
   }
 
-  // Shares of the buildable land.
+  // 5. Corner lots: the frontage the street walk leaves (rounded corners, short runs, odd
+  // pockets) is packed with grid-aligned rectangles, the district's size or smaller down to
+  // MIN_DEPTH a side, each touching a verge or street, an alley from every other lot. A summed-area
+  // table of usable columns tests a rectangle at once; `taken` holds those placed so far.
+  const alley = voxels(ALLEY);
+  const sat = new Int32Array((n + 1) * (n + 1));
+  for (let z = 0; z < n; z++) {
+    let row = 0;
+    for (let x = 0; x < n; x++) {
+      if (usable(z * n + x)) row++;
+      sat[(z + 1) * (n + 1) + x + 1] = sat[z * (n + 1) + x + 1] + row;
+    }
+  }
+  const openIn = (x0: number, z0: number, w: number, d: number) =>
+    sat[(z0 + d) * (n + 1) + x0 + w] - sat[z0 * (n + 1) + x0 + w] - sat[(z0 + d) * (n + 1) + x0] + sat[z0 * (n + 1) + x0] === w * d;
+  const isFront = (x: number, z: number) => {
+    if (x < 0 || z < 0 || x >= n || z >= n) return false;
+    const what = claim[z * n + x];
+    return what === CLAIM.verge || what === CLAIM.road || what === CLAIM.plaza;
+  };
+  // Columns of a side of the rectangle that touch paving just outside it.
+  const touching = (x0: number, z0: number, x1: number, z1: number) => {
+    let north = 0;
+    let south = 0;
+    let west = 0;
+    let east = 0;
+    for (let x = x0; x < x1; x++) {
+      if (isFront(x, z0 - 1)) north++;
+      if (isFront(x, z1)) south++;
+    }
+    for (let z = z0; z < z1; z++) {
+      if (isFront(x0 - 1, z)) west++;
+      if (isFront(x1, z)) east++;
+    }
+    return [north, east, south, west];
+  };
+  const taken = new Uint8Array(n * n);
+  const stride = voxels(0.5);
+  const minSide = voxels(MIN_DEPTH);
+  for (let z0 = 0; z0 + minSide <= n; z0 += stride) {
+    for (let x0 = 0; x0 + minSide <= n; x0 += stride) {
+      if (taken[z0 * n + x0] || !openIn(x0, z0, 1, 1)) continue;
+      const d = district[cellOf(x0, z0)] as District;
+      const spec = DISTRICTS[d];
+      const maxStep = voxels(d === DISTRICT.megablock ? MAX_STACK_STEP : MAX_LOT_STEP);
+      const wide = Math.max(minSide, voxels(spec.width * ZONE));
+      const deepest = Math.max(minSide, voxels(Math.min(spec.depth * ZONE, 2 * ZONE)));
+      for (const [w, dd] of [[wide, deepest], [deepest, wide], [wide, minSide], [minSide, wide], [minSide, minSide]]) {
+        if (x0 + w > n || z0 + dd > n || !openIn(x0, z0, w, dd)) continue;
+        // Every earlier corner lot starts before this one in scan order, so one that overlaps it
+        // crosses its top row or its left column.
+        let ok = true;
+        for (let x = x0; x < x0 + w && ok; x++) if (taken[z0 * n + x]) ok = false;
+        for (let z = z0; z < z0 + dd && ok; z++) if (taken[z * n + x0]) ok = false;
+        if (!ok) continue;
+        const x1 = x0 + w;
+        const z1 = z0 + dd;
+        const sides = touching(x0, z0, x1, z1);
+        const front = sides.indexOf(Math.max(...sides));
+        // It must front a street along at least half its narrower side.
+        if (sides[front] < Math.min(w, dd) / 2) continue;
+        let low = Infinity;
+        let high = -Infinity;
+        for (let z = z0; z < z1; z++) {
+          for (let x = x0; x < x1; x++) {
+            const v = height[z * n + x];
+            if (v < low) low = v;
+            if (v > high) high = v;
+          }
+        }
+        if (high - low > maxStep) continue;
+        const A = { x: x0, z: z0 };
+        const B = { x: x1, z: z0 };
+        const C = { x: x1, z: z1 };
+        const D = { x: x0, z: z1 };
+        const corners = [[A, B, C, D], [B, C, D, A], [C, D, A, B], [D, A, B, C]][front];
+        const facing = [Math.atan2(-1, 0), 0, Math.atan2(1, 0), Math.PI][front];
+        const id = lots.length;
+        for (let z = z0; z < z1; z++) {
+          for (let x = x0; x < x1; x++) {
+            claim[z * n + x] = CLAIM.lot;
+            lotId[z * n + x] = id + 1;
+          }
+        }
+        for (let z = Math.max(0, z0 - alley); z < Math.min(n, z1 + alley); z++) taken.fill(1, z * n + Math.max(0, x0 - alley), z * n + Math.min(n, x1 + alley));
+        const center = cellOf((x0 + x1) / 2, (z0 + z1) / 2);
+        lots.push({ id, corners, facing, district: d, density: density[center], area: w * dd * VOXEL_M * VOXEL_M, low, high });
+        break;
+      }
+    }
+  }
+
+  // Shares of the land.
   const counts = DISTRICTS.map(() => 0);
   let any = 0;
   for (let c = 0; c < total; c++) {
-    if (district[c] === NO_DISTRICT || !buildable[c]) continue;
+    if (district[c] === NO_DISTRICT) continue;
     counts[district[c]]++;
     any++;
   }
-  return { cells, district, access, density, lots, lotId, claims, shares: counts.map((k) => (any ? k / any : 0)) };
+  return { cells, district, access, density, lots, lotId, claims, shares: counts.map((k) => (any ? k / any : 0)), parks: starts.length };
 }
 
-/** Column indices inside a convex quadrilateral (corners in order), clipped to the map. */
-function rasterize(corners: P2[], n: number): number[] {
+/** Column indices inside a convex quadrilateral (corners in order), clipped to the map; with
+ * `dropOffMap`, a quadrilateral that runs off the map gives none. */
+function rasterize(corners: P2[], n: number, dropOffMap = true): number[] {
   const xs = corners.map((q) => q.x);
   const zs = corners.map((q) => q.z);
   const x0 = Math.max(0, Math.floor(Math.min(...xs)));
@@ -507,7 +833,7 @@ function rasterize(corners: P2[], n: number): number[] {
     }
   }
   // A lot that runs off the map is dropped.
-  return xs.some((x) => x < 0 || x > n - 1) || zs.some((z) => z < 0 || z > n - 1) ? [] : out;
+  return dropOffMap && (xs.some((x) => x < 0 || x > n - 1) || zs.some((z) => z < 0 || z > n - 1)) ? [] : out;
 }
 
 /** A binary min-heap of indices by priority. */

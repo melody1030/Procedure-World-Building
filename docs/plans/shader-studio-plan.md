@@ -1,7 +1,6 @@
 # Shader Studio: plan
 
-Replaces the Week 4 voxel city with **Shader Studio**, a calm scene for learning what each
-shader technique does. The city was too noisy (grime, windows, neon, rain) and its voxel faces
+A calm scene for learning what each shader technique does. The city was too noisy (grime, windows, neon, rain) and its voxel faces
 hid every technique that depends on smooth normals, so it is removed.
 
 ## Goal

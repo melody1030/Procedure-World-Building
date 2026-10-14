@@ -18,6 +18,7 @@ export interface WorldState {
   showDistricts: boolean;
   /** Outline the lots. */
   showLots: boolean;
+  showParks: boolean;
 }
 
 type Action =
@@ -29,6 +30,7 @@ type Action =
   | { type: "setShowNetwork"; on: boolean }
   | { type: "setShowDistricts"; on: boolean }
   | { type: "setShowLots"; on: boolean }
+  | { type: "setShowParks"; on: boolean }
   | { type: "setRiverControl"; control: TerrainParams["river"]["control"] };
 
 function reducer(state: WorldState, action: Action): WorldState {
@@ -57,6 +59,8 @@ function reducer(state: WorldState, action: Action): WorldState {
       return { ...state, showDistricts: action.on };
     case "setShowLots":
       return { ...state, showLots: action.on };
+    case "setShowParks":
+      return { ...state, showParks: action.on };
     case "setRiverControl":
       return { ...state, params: { ...state.params, river: { ...state.params.river, control: action.control } } };
   }
@@ -72,8 +76,22 @@ function seedFromUrl(): string {
   return cleanSeed(new URLSearchParams(window.location.search).get("seed") ?? "");
 }
 
+/** Overlays to start with, also from the URL (`/world?show=districts,lots,parks`), so a view can be linked. */
+function shownFromUrl(name: string): boolean {
+  return (new URLSearchParams(window.location.search).get("show") ?? "").split(",").includes(name);
+}
+
 export function useWorldState() {
-  const [state, dispatch] = useReducer(reducer, undefined, (): WorldState => ({ seed: seedFromUrl(), params: DEFAULT_PARAMS, showPath: false, showClaims: false, showNetwork: false, showDistricts: false, showLots: false }));
+  const [state, dispatch] = useReducer(reducer, undefined, (): WorldState => ({
+    seed: seedFromUrl(),
+    params: DEFAULT_PARAMS,
+    showPath: shownFromUrl("path"),
+    showClaims: shownFromUrl("claims"),
+    showNetwork: shownFromUrl("network"),
+    showDistricts: shownFromUrl("districts"),
+    showLots: shownFromUrl("lots"),
+    showParks: shownFromUrl("parks"),
+  }));
   return {
     state,
     setSeed: (seed: string) => dispatch({ type: "setSeed", seed: cleanSeed(seed) }),
@@ -84,6 +102,7 @@ export function useWorldState() {
     setShowNetwork: (on: boolean) => dispatch({ type: "setShowNetwork", on }),
     setShowDistricts: (on: boolean) => dispatch({ type: "setShowDistricts", on }),
     setShowLots: (on: boolean) => dispatch({ type: "setShowLots", on }),
+    setShowParks: (on: boolean) => dispatch({ type: "setShowParks", on }),
     setRiverControl: (control: TerrainParams["river"]["control"]) => dispatch({ type: "setRiverControl", control }),
   };
 }

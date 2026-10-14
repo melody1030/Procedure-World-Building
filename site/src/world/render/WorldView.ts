@@ -2,8 +2,9 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import type { GeometryData } from "../geometry";
 import { BLUEPRINT, SKY } from "../palette";
+import { CLAIM } from "../terrain/claims";
 import type { Hubs } from "../terrain/hubs";
-import { DISTRICTS, NO_DISTRICT, type Districts } from "../terrain/districts";
+import { NO_DISTRICT, type Districts } from "../terrain/districts";
 import type { Streets } from "../terrain/streets";
 import type { RiverPath } from "../terrain/river";
 import { BASE, WORLD_SIZE, voxels } from "../scale";
@@ -48,9 +49,6 @@ export class WorldView {
   /** The town overlay (Show network): hub pins; the heat map is a ground tint. */
   private network: THREE.Group | null = null;
   private networkVisible = false;
-  /** Lot outlines (Show lots). */
-  private lots: THREE.Group | null = null;
-  private lotsVisible = false;
   /** One dot per control point, in control-point order, so a dot can be dragged on its own. */
   private dots: THREE.Points[] = [];
   /** Index of the dot being dragged, or −1. */
@@ -241,24 +239,34 @@ export class WorldView {
       }
       const geometry = new THREE.BufferGeometry();
       geometry.setAttribute("position", new THREE.Float32BufferAttribute(position, 3));
-      group.add(new THREE.Points(geometry, new THREE.PointsMaterial({ color, size, sizeAttenuation: false, depthTest: false, transparent: true })));
+      group.add(new THREE.Points(geometry, new THREE.PointsMaterial({ color, size, sizeAttenuation: false, transparent: true })));
     };
     dots(hubs.hubs.slice(0, 1), 0xffffff, 18, pin);
     dots(network.junctions, BLUEPRINT.cyan, 8, 2);
-    // The street tiles the network was collapsed on: a faint square around every road tile.
+    // The street tiles the network was collapsed on: a faint square around every road tile, laid
+    // over the ground a meter at a time so it follows the slopes.
     const crosses: number[] = [];
     const t = network.tiles.size / 2;
+    const step = voxels(1);
+    const drape = (ax: number, az: number, bx: number, bz: number) => {
+      const parts = Math.max(1, Math.round(Math.hypot(bx - ax, bz - az) / step));
+      for (let i = 0; i < parts; i++) {
+        const x0 = ax + ((bx - ax) * i) / parts;
+        const z0 = az + ((bz - az) * i) / parts;
+        const x1 = ax + ((bx - ax) * (i + 1)) / parts;
+        const z1 = az + ((bz - az) * (i + 1)) / parts;
+        crosses.push(x0 - half, heightAt(x0, z0) + 1, z0 - half, x1 - half, heightAt(x1, z1) + 1, z1 - half);
+      }
+    };
     for (const q of network.tiles.centers) {
-      const y = heightAt(q.x, q.z) + 1;
-      const x0 = q.x - half - t;
-      const x1 = q.x - half + t;
-      const z0 = q.z - half - t;
-      const z1 = q.z - half + t;
-      crosses.push(x0, y, z0, x1, y, z0, x1, y, z0, x1, y, z1, x1, y, z1, x0, y, z1, x0, y, z1, x0, y, z0);
+      drape(q.x - t, q.z - t, q.x + t, q.z - t);
+      drape(q.x + t, q.z - t, q.x + t, q.z + t);
+      drape(q.x + t, q.z + t, q.x - t, q.z + t);
+      drape(q.x - t, q.z + t, q.x - t, q.z - t);
     }
     const crossGeometry = new THREE.BufferGeometry();
     crossGeometry.setAttribute("position", new THREE.Float32BufferAttribute(crosses, 3));
-    group.add(new THREE.LineSegments(crossGeometry, new THREE.LineBasicMaterial({ color: 0xffffff, depthTest: false, transparent: true, opacity: 0.35 })));
+    group.add(new THREE.LineSegments(crossGeometry, new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.35 })));
     // Each street's center line, a little above its surface.
     for (const street of network.streets) {
       street.curve.forEach((q, i) => {
@@ -269,7 +277,7 @@ export class WorldView {
     }
     const lineGeometry = new THREE.BufferGeometry();
     lineGeometry.setAttribute("position", new THREE.Float32BufferAttribute(lines, 3));
-    group.add(new THREE.LineSegments(lineGeometry, new THREE.LineBasicMaterial({ color: BLUEPRINT.cyan, depthTest: false, transparent: true, opacity: 0.8 })));
+    group.add(new THREE.LineSegments(lineGeometry, new THREE.LineBasicMaterial({ color: BLUEPRINT.cyan, transparent: true, opacity: 0.8 })));
     group.traverse((o) => (o.renderOrder = 10));
     group.visible = this.networkVisible;
     this.network = group;
@@ -289,65 +297,76 @@ export class WorldView {
   }
 
   /**
-   * Districts and lots: the district map as a texture for Show districts, and the lot outlines (in
-   * their district's color, with a tick on the street side) for Show lots. `heightAt` gives the
-   * ground's top at a column, in voxels.
+   * Districts and lots, both as ground tints with one texel per column, drawn by the ground
+   * shader so they follow the terrain and hide behind hills like the ground itself.
+   * - Districts: each unpaved column takes its 2 m cell's district. A cell that is mostly road has
+   *   none, so its unpaved columns (the strip beside the street) take the nearest district around
+   *   them. Paving and water stay clear. Parks are ignored here: they are a layer of their own.
+   * - Parks: 1 per park column, 2 on its edge (Show parks).
+   * - Lots: district + 1 per lot column, plus 64 on columns at a lot's edge.
    */
-  setDistricts(districts: Districts, heightAt: (x: number, z: number) => number) {
-    const data = Uint8Array.from(districts.district, (d) => (d === NO_DISTRICT ? 0 : d + 1));
-    this.look.uDistricts.value?.dispose();
-    const texture = new THREE.DataTexture(data, districts.cells, districts.cells, THREE.RedFormat, THREE.UnsignedByteType);
-    texture.magFilter = THREE.NearestFilter;
-    texture.minFilter = THREE.NearestFilter;
-    texture.unpackAlignment = 1;
-    texture.needsUpdate = true;
-    this.look.uDistricts.value = texture;
-
-    if (this.lots) {
-      this.lots.traverse((o) => {
-        if (o instanceof THREE.LineSegments || o instanceof THREE.Mesh) {
-          o.geometry.dispose();
-          (o.material as THREE.Material).dispose();
+  setDistricts(districts: Districts) {
+    const { lotId, lots, cells, district } = districts;
+    const claim = districts.claims.claim;
+    const n = districts.claims.n;
+    const cell = n / cells;
+    const areas = new Uint8Array(n * n);
+    const marks = new Uint8Array(n * n);
+    const parks = new Uint8Array(n * n);
+    const isPark = (x: number, z: number) => x >= 0 && z >= 0 && x < n && z < n && claim[z * n + x] === CLAIM.park;
+    for (let z = 0; z < n; z++) {
+      const cz = Math.floor(z / cell);
+      for (let x = 0; x < n; x++) {
+        const k = z * n + x;
+        const what = claim[k];
+        if (what === CLAIM.park) parks[k] = isPark(x - 1, z) && isPark(x + 1, z) && isPark(x, z - 1) && isPark(x, z + 1) ? 1 : 2;
+        if (what !== CLAIM.road && what !== CLAIM.plaza && what !== CLAIM.river && what !== CLAIM.bank) {
+          const cx = Math.floor(x / cell);
+          let d = district[cz * cells + cx];
+          if (d === NO_DISTRICT) {
+            // The nearest cell with a district within two cells, by distance to its edge.
+            let best = Infinity;
+            for (let dz = -2; dz <= 2; dz++) {
+              for (let dx = -2; dx <= 2; dx++) {
+                const nx = cx + dx;
+                const nz = cz + dz;
+                if (nx < 0 || nz < 0 || nx >= cells || nz >= cells) continue;
+                const nd = district[nz * cells + nx];
+                if (nd === NO_DISTRICT) continue;
+                const ex = Math.max(nx * cell - x - 0.5, 0, x + 0.5 - (nx + 1) * cell);
+                const ez = Math.max(nz * cell - z - 0.5, 0, z + 0.5 - (nz + 1) * cell);
+                const gap = ex * ex + ez * ez;
+                if (gap < best) {
+                  best = gap;
+                  d = nd;
+                }
+              }
+            }
+          }
+          if (d !== NO_DISTRICT) areas[k] = d + 1;
         }
-      });
-      this.scene.remove(this.lots);
-    }
-    const half = WORLD_SIZE / 2;
-    const position: number[] = [];
-    const color: number[] = [];
-    // Each lot is also filled, translucent, so the lots read at a glance.
-    const fill: number[] = [];
-    const fillColor: number[] = [];
-    const tint = new THREE.Color();
-    for (const lot of districts.lots) {
-      tint.set(DISTRICTS[lot.district].color);
-      const middle = { x: (lot.corners[0].x + lot.corners[2].x) / 2, z: (lot.corners[0].z + lot.corners[2].z) / 2 };
-      const y = heightAt(middle.x, middle.z) + 2;
-      const segment = (a: { x: number; z: number }, b: { x: number; z: number }) => {
-        position.push(a.x - half, y, a.z - half, b.x - half, y, b.z - half);
-        color.push(tint.r, tint.g, tint.b, tint.r, tint.g, tint.b);
-      };
-      for (let i = 0; i < 4; i++) segment(lot.corners[i], lot.corners[(i + 1) % 4]);
-      for (const i of [0, 1, 2, 0, 2, 3]) {
-        fill.push(lot.corners[i].x - half, y - 0.5, lot.corners[i].z - half);
-        fillColor.push(tint.r, tint.g, tint.b);
+        const id = lotId[k];
+        if (!id) continue;
+        const edge = x === 0 || z === 0 || x === n - 1 || z === n - 1 || lotId[k - 1] !== id || lotId[k + 1] !== id || lotId[k - n] !== id || lotId[k + n] !== id;
+        marks[k] = lots[id - 1].district + 1 + (edge ? 64 : 0);
       }
-      // The tick: from the middle of the front edge, a little way in.
-      const front = { x: (lot.corners[0].x + lot.corners[1].x) / 2, z: (lot.corners[0].z + lot.corners[1].z) / 2 };
-      segment(front, { x: front.x + (middle.x - front.x) * 0.3, z: front.z + (middle.z - front.z) * 0.3 });
     }
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute("position", new THREE.Float32BufferAttribute(position, 3));
-    geometry.setAttribute("color", new THREE.Float32BufferAttribute(color, 3));
-    const fillGeometry = new THREE.BufferGeometry();
-    fillGeometry.setAttribute("position", new THREE.Float32BufferAttribute(fill, 3));
-    fillGeometry.setAttribute("color", new THREE.Float32BufferAttribute(fillColor, 3));
-    this.lots = new THREE.Group();
-    this.lots.add(new THREE.Mesh(fillGeometry, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.45, depthTest: false, side: THREE.DoubleSide })));
-    this.lots.add(new THREE.LineSegments(geometry, new THREE.LineBasicMaterial({ vertexColors: true, depthTest: false })));
-    this.lots.traverse((o) => (o.renderOrder = 10));
-    this.lots.visible = this.lotsVisible;
-    this.scene.add(this.lots);
+    const upload = (data: Uint8Array<ArrayBuffer>, old: THREE.Texture | null) => {
+      old?.dispose();
+      const texture = new THREE.DataTexture(data, n, n, THREE.RedFormat, THREE.UnsignedByteType);
+      texture.magFilter = THREE.NearestFilter;
+      texture.minFilter = THREE.NearestFilter;
+      texture.unpackAlignment = 1;
+      texture.needsUpdate = true;
+      return texture;
+    };
+    this.look.uDistricts.value = upload(areas, this.look.uDistricts.value);
+    this.look.uLots.value = upload(marks, this.look.uLots.value);
+    this.look.uParks.value = upload(parks, this.look.uParks.value);
+  }
+
+  setShowParks(on: boolean) {
+    this.look.uShowParks.value = on ? 1 : 0;
   }
 
   setShowDistricts(on: boolean) {
@@ -355,8 +374,7 @@ export class WorldView {
   }
 
   setShowLots(on: boolean) {
-    this.lotsVisible = on;
-    if (this.lots) this.lots.visible = on;
+    this.look.uShowLots.value = on ? 1 : 0;
   }
 
   setNetworkVisible(visible: boolean) {

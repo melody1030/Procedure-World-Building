@@ -45,17 +45,26 @@ export interface LookUniforms {
   uSuit: { value: THREE.Texture | null };
   /** 1 tints the ground by suitability (Show network), 0 off. */
   uShowSuit: { value: number };
-  /** District per 2 m cell (district + 1 in the red channel, 0 for none). */
+  /** District per column (district + 1 in the red channel, 0 for paving, water or none). */
   uDistricts: { value: THREE.Texture | null };
   /** 1 tints the ground by district (Show districts), 0 off. */
   uShowDistricts: { value: number };
   /** Tint per district. */
   uDistrictColors: { value: THREE.Color[] };
+  /** The lots, one texel per column: district + 1, plus 64 on a lot's edge. */
+  uLots: { value: THREE.Texture | null };
+  /** 1 tints the ground by lot (Show lots), 0 off. */
+  uShowLots: { value: number };
+  /** The parks, one texel per column: 1 inside a park, 2 on its edge, 0 elsewhere. */
+  uParks: { value: THREE.Texture | null };
+  /** 1 tints the parks (Show parks), 0 off. */
+  uShowParks: { value: number };
+  uParkColor: { value: THREE.Color };
 }
 
 export function createLookUniforms(): LookUniforms {
   const colors = [0, ...Object.values(CLAIM_COLORS)].map((c) => new THREE.Color(c));
-  return { uLookGrid: { value: 0.35 }, uLookStrata: { value: 7 }, uClaims: { value: null }, uClaimSize: { value: 1 }, uShowClaims: { value: 0 }, uClaimColors: { value: colors }, uSuit: { value: null }, uShowSuit: { value: 0 }, uDistricts: { value: null }, uShowDistricts: { value: 0 }, uDistrictColors: { value: DISTRICTS.map((d) => new THREE.Color(d.color)) } };
+  return { uLookGrid: { value: 0.35 }, uLookStrata: { value: 7 }, uClaims: { value: null }, uClaimSize: { value: 1 }, uShowClaims: { value: 0 }, uClaimColors: { value: colors }, uSuit: { value: null }, uShowSuit: { value: 0 }, uDistricts: { value: null }, uShowDistricts: { value: 0 }, uDistrictColors: { value: DISTRICTS.map((d) => new THREE.Color(d.color)) }, uLots: { value: null }, uShowLots: { value: 0 }, uParks: { value: null }, uShowParks: { value: 0 }, uParkColor: { value: new THREE.Color(CLAIM_COLORS.park) } };
 }
 
 const LOOK_FRAGMENT = /* glsl */ `
@@ -75,6 +84,10 @@ const LOOK_FRAGMENT = /* glsl */ `
     diffuseColor.rgb *= (1.0 - uLookGrid * 0.35 * line * fade) * (1.0 + uLookGrid * 0.12 * (h - 0.5) * fade);
     // Strata: alternate bands down cliff sides, like the plinth's cut edge.
     if (an.y < 0.5) diffuseColor.rgb *= mix(1.0, 0.86, mod(floor(p.y / uLookStrata), 2.0));
+    // The debug tints below skip the diorama's outer walls: those faces would read the edge
+    // column and paint it all the way down to the plinth.
+    bool outerWall = an.y < 0.5 && max(abs(p.x), abs(p.z)) > uClaimSize * 0.5 - 0.01;
+    if (!outerWall) {
     // Show network: dark where nothing can be built; elsewhere a heat map of suitability for the
     // city center, from violet (0) to amber (1). The texture holds 0 for unbuildable, 1–255 otherwise.
     if (uShowSuit > 0.5) {
@@ -84,9 +97,10 @@ const LOOK_FRAGMENT = /* glsl */ `
       vec3 heat = mix(diffuseColor.rgb, mix(vec3(0.2, 0.16, 0.42), vec3(1.0, 0.72, 0.18), s), 0.35 + 0.45 * s);
       diffuseColor.rgb = mix(diffuseColor.rgb * 0.35, heat, built);
     }
-    // Show districts: tint each 2 m cell by its district.
+    // Show districts: tint each column by its district (paving and water stay clear).
     if (uShowDistricts > 0.5) {
-      float v = floor(texture2D(uDistricts, (p.xz - vLookNormal.xz * 0.5 + uClaimSize * 0.5) / uClaimSize).r * 255.0 + 0.5);
+      vec2 column = floor(p.xz - vLookNormal.xz * 0.5 + uClaimSize * 0.5);
+      float v = floor(texture2D(uDistricts, (column + 0.5) / uClaimSize).r * 255.0 + 0.5);
       if (v > 0.5) {
         vec3 tint = uDistrictColors[0];
         for (int i = 1; i < DISTRICT_COUNT; i++) if (abs(v - 1.0 - float(i)) < 0.5) tint = uDistrictColors[i];
@@ -103,6 +117,25 @@ const LOOK_FRAGMENT = /* glsl */ `
         for (int i = 1; i < CLAIM_COUNT; i++) if (abs(claim - float(i)) < 0.5) tint = uClaimColors[i];
         diffuseColor.rgb = mix(diffuseColor.rgb, tint, 0.7);
       }
+    }
+    // Show lots: each lot filled in its district's color, its edge stronger.
+    if (uShowLots > 0.5) {
+      vec2 column = floor(p.xz - vLookNormal.xz * 0.5 + uClaimSize * 0.5);
+      float v = floor(texture2D(uLots, (column + 0.5) / uClaimSize).r * 255.0 + 0.5);
+      if (v > 0.5) {
+        float d = mod(v, 64.0) - 1.0;
+        vec3 tint = uDistrictColors[0];
+        for (int i = 1; i < DISTRICT_COUNT; i++) if (abs(d - float(i)) < 0.5) tint = uDistrictColors[i];
+        float edge = step(64.0, v);
+        diffuseColor.rgb = mix(diffuseColor.rgb, tint, mix(0.5, 0.9, edge));
+      }
+    }
+    // Show parks: a layer of its own, drawn over everything else, its edge stronger.
+    if (uShowParks > 0.5) {
+      vec2 column = floor(p.xz - vLookNormal.xz * 0.5 + uClaimSize * 0.5);
+      float v = floor(texture2D(uParks, (column + 0.5) / uClaimSize).r * 255.0 + 0.5);
+      if (v > 0.5) diffuseColor.rgb = mix(diffuseColor.rgb, uParkColor, v > 1.5 ? 0.9 : 0.55);
+    }
     }
   }
 `;
@@ -138,7 +171,7 @@ export function printMaterial(uniforms: PrintUniforms, options: THREE.MeshStanda
           "#include <project_vertex>\nvLookPos = (modelMatrix * vec4(transformed, 1.0)).xyz;\nvLookNormal = normalize((modelMatrix * vec4(objectNormal, 0.0)).xyz);",
         );
       shader.fragmentShader = shader.fragmentShader
-        .replace("#include <common>", `#include <common>\nuniform float uLookGrid;\nuniform float uLookStrata;\nuniform sampler2D uClaims;\nuniform float uClaimSize;\nuniform float uShowClaims;\nuniform sampler2D uSuit;\nuniform float uShowSuit;\nuniform sampler2D uDistricts;\nuniform float uShowDistricts;\n#define DISTRICT_COUNT ${look.uDistrictColors.value.length}\nuniform vec3 uDistrictColors[DISTRICT_COUNT];\n#define CLAIM_COUNT ${look.uClaimColors.value.length}\nuniform vec3 uClaimColors[CLAIM_COUNT];\nvarying vec3 vLookPos;\nvarying vec3 vLookNormal;`)
+        .replace("#include <common>", `#include <common>\nuniform float uLookGrid;\nuniform float uLookStrata;\nuniform sampler2D uClaims;\nuniform float uClaimSize;\nuniform float uShowClaims;\nuniform sampler2D uSuit;\nuniform float uShowSuit;\nuniform sampler2D uDistricts;\nuniform float uShowDistricts;\nuniform sampler2D uLots;\nuniform float uShowLots;\nuniform sampler2D uParks;\nuniform float uShowParks;\nuniform vec3 uParkColor;\n#define DISTRICT_COUNT ${look.uDistrictColors.value.length}\nuniform vec3 uDistrictColors[DISTRICT_COUNT];\n#define CLAIM_COUNT ${look.uClaimColors.value.length}\nuniform vec3 uClaimColors[CLAIM_COUNT];\nvarying vec3 vLookPos;\nvarying vec3 vLookNormal;`)
         .replace("#include <color_fragment>", "#include <color_fragment>\n" + LOOK_FRAGMENT);
     }
     shader.fragmentShader = shader.fragmentShader

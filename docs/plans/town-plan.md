@@ -111,7 +111,10 @@ web. Blocks are small downtown and grow toward the edge. Every number is a const
 Each cell's height and slope come from its mean height on the river-carved ground, so a flat
 valley floor counts as flat and single terrace steps average out.
 
-**1. The center:** the cell with the best suitability (Emilien's interest map):
+**0. The side (2026-10-12):** the river splits the land; the city takes the side with the most land
+(a flood fill per side that never enters the channel).
+
+**1. The center:** the cell on that side with the best suitability (Emilien's interest map):
 
 ```text
 flat  = 1 − smoothstep(0, 8°, slope)
@@ -126,7 +129,7 @@ Without a river, `river` = 1 and the city starts on the flattest low ground.
 - slope under 15°;
 - at least 3 m from the channel;
 - away from the map edge;
-- on the center's side of the river, until bridges exist (step 8).
+- on the city's side of the river (the side with the most land), until bridges exist (step 8).
 
 **3. Junction sites, growing outwards like a city:**
 - **Visiting order:** buildable cells are visited by
@@ -753,8 +756,23 @@ block edges.
    it takes the district of its front.
 4. **Record:** each lot stores its id, corners, front direction, district, density, area and ground
    range. Its columns are claimed `lot`, with a lot-id map per column.
-5. **Leftover land** inside blocks stays free: courtyards and back lots. Alleys and stair streets
-   through large blocks (4R.7) are left for later.
+5. **Back lots (2026-10-12):** the free district land the street lots leave (block interiors,
+   corners, land behind the outer streets) is packed with grid-aligned rectangles reached by
+   alleys:
+   - each is the district's lot size, either way round or 60% wide, at least 6 m a side;
+   - every lot, street or back, keeps a 1 m alley from every other lot;
+   - the same ground-step limit applies;
+   - **access (2026-10-12):** a 1 m alley must run straight over free ground, within 30 m, to a
+     road, verge, plaza or an earlier alley. Each way out is tried from the middle of that side
+     and along both flanks of the lot (inside the 1 m gap it keeps anyway). An alley never steps
+     more than 0.5 m (along it, across it, or onto the way it meets) or rises more than 0.75 m in
+     2 m. Of the alleys that work, the one using the least buildable ground wins, then the
+     shortest. It is claimed `alley` (so no later lot blocks it, and later back lots branch off
+     it), and the lot faces it. A lot with no way out is not placed, and the scan skips 2 m on. This follows alley-served blocks in
+     procedural favela generators and the access rule in Vanegas et al. 2012 (every parcel
+     needs street access) and CityEngine's `forceStreetAccess`.
+   - Street lots must touch their verge (on curves, rounding could leave a sliver).
+   Stair streets through large blocks (4R.7) are left for later.
 
 **Debug views:** Show lots draws each lot's outline in its district's color, with a tick on its
 front edge.
@@ -844,6 +862,107 @@ A note shows each district's share of the buildable land and the number of lots.
   - **Wealthy** is 0–8% (target 5–15%), with few lots.
   - **Lot cover** is 13–25% of district land (target 20–35%).
   - **Speed:** the stage takes 120–300 ms (target 100 ms); lot placement is most of it.
+
+**Denser lots (2026-10-12).** Street lots alone covered 13–25% of district land: each is one
+fixed-depth row behind its street, and lots fail where the streets turn. A first try deepened each
+street lot toward the middle of its block, which barely helped (14–27%): the tile streets are 20 m
+apart, so most blocks are only about 13 m deep between verges. Back lots (6.3, item 5) replaced it,
+and street lots now keep a 1 m alley from each other too (before, lots from crossing streets
+touched at block corners).
+
+| Seed | Street lots | Back lots | Lot cover (non-park district land) | Stage |
+|---|---|---|---|---|
+| blueprint | 69 | 126 | 50% | 139 ms |
+| harbor | 14 | 45 | 52% | 72 ms |
+| myg654 | 24 | 103 | 48% | 89 ms |
+| u2uyer | 41 | 133 | 55% | 109 ms |
+| 8ahsrz | 45 | 89 | 54% | 105 ms |
+| neon | 39 | 81 | 55% | 85 ms |
+| kowloon | 22 | 107 | 50% | 75 ms |
+
+- no lot touches another lot, a road, a verge, the plaza or the river;
+- the same seed gives the same lots;
+- the stage got faster (it was 120–300 ms): a summed-area table tests each back lot at once.
+
+**Access for every lot (2026-10-12).** Back lots had no way to the street. With the alley rule,
+every lot on the 7 seeds now reaches a street, directly or through alleys (checked by a flood fill
+from the paving through the alleys). Cover dropped to 39–52%, since lots with no way out are not
+placed; alleys take 400–1,100 m² per seed. The stage takes 111–256 ms (over the 100 ms target).
+
+**Alleys that fit the ground (2026-10-12).** The first alleys ran straight up cliffs, took long
+ways when a shorter one existed, and cut through land a lot could use. With the grade limit, the
+flank routes and the cost rule above, on the 7 seeds: every lot still has access; no two
+neighboring alley columns differ by more than 0.5 m; alleys take 104–507 m²; cover is 34–50%; the
+stage takes 113–234 ms.
+
+**Cities: Skylines lots and painted districts (2026-10-12, the user's call).** Alleys doubled up
+beside each other, and districts came in many small pieces. Following Cities: Skylines, where
+buildings spawn only on zone cells (8 m, up to 4 deep) that reach a road, and districts are painted
+areas:
+- **Back lots and alleys are gone.** Every lot fronts a street. The street walk cuts each side into
+  lots of whole 8 m zone cells (the district's width, give or take one; fewer where a full one
+  doesn't fit). A lot starts 6 m deep and deepens a meter at a time to the district's depth (3–4
+  cells) while the street straight behind the block is farther than the lot is deep, so facing
+  lots meet halfway; cross streets at a block's ends don't stop it.
+- **Corner lots:** a second pass packs the frontage the walk leaves (rounded corners, short runs)
+  with grid-aligned rectangles, at least 6 m a side, each fronting a verge along at least half its
+  narrower side.
+- **Lots may use any district ground that isn't park;** the ground-step limit keeps them off steep
+  land. Before, a district patch merged over steep ground looked built up but could take no lots.
+- **Districts as areas:** three majority passes within 8 m over the buildable cells, then regions
+  under 1,500 m² join a neighbor; a region reaches across a street, so a district on both sides of
+  one counts as one area.
+
+| Seed | Lots | Cover | District areas (smallest) | Shares (core/neon/mega/ind/wealthy/parks) | Stage |
+|---|---|---|---|---|---|
+| blueprint | 110 | 33% | 3 (1,868 m²) | 16/6/59/0/0/19 | 247 ms |
+| harbor | 19 | 26% | 2 (1,808 m²) | 0/19/44/0/0/37 | 158 ms |
+| myg654 | 36 | 20% | 3 (292 m²) | 15/0/65/0/0/20 | 106 ms |
+| u2uyer | 92 | 34% | 5 (1,788 m²) | 15/11/53/7/9/6 | 185 ms |
+| 8ahsrz | 80 | 41% | 3 (1,668 m²) | 16/9/64/0/0/11 | 173 ms |
+| neon | 85 | 39% | 4 (1,740 m²) | 15/11/57/10/0/7 | 166 ms |
+| kowloon | 45 | 26% | 3 (2,548 m²) | 14/16/58/0/0/11 | 111 ms |
+
+- every lot touches its verge or street; no two lots touch;
+- **the cost:** cover is lower than with back lots (34–50%): block interiors past half a street's
+  reach and the outskirts stay empty, as in Cities: Skylines; industrial and wealthy are absorbed
+  on most seeds by the smoothing.
+
+**Whole districts, counted parks, a central core (2026-10-12, the user's call).**
+- **Parks:** each seed picks 2 to 6 parks (was 8% of the land), each 1,500–3,000 m². Each grows
+  from the best-scoring spot (steep or hilly ground plus slow noise) outside the core, starts at
+  least 40 m from the others and keeps 4 m from them; a pocket too small for half its size is
+  skipped for the next spot. Parks never merge with anything.
+- **Core:** the 15% of land nearest the plaza in a straight line, but never past 50 m, so it is
+  one compact disc on the plaza even when the plaza sits by the river. Smoothing and merging
+  leave it alone.
+- **Neon:** street frontage in a 20 m ring around the core, plus the avenue strips; it no longer
+  appears as scattered inner-ring patches. Smoothing leaves it alone; only specks under 400 m²
+  merge.
+- **Smoothing** now only settles megablocks, industrial and wealthy; pieces under 2,000 m² merge.
+- **Checked on 8 seeds:** the number of parks equals the number picked on every seed (2–6, about
+  900–3,000 m² each); one core disc per seed; neon is one band around it. Industrial and wealthy
+  still appear only on some seeds.
+
+**Parks out of the districts (2026-10-12, the user's call).** Parks are no longer a district: the
+district map holds only the five urban kinds and covers the parks' ground too. Parks are a layer
+of their own, claimed `park` in the claim map (so lots keep off them), with their own **Show
+parks** switch (fill, stronger edge); Show districts ignores them. Show claims lists them too.
+- **The rule:** each seed picks 3 to 6 parks; each grows to 1,500–3,000 m² from the best-scoring
+  spot (steep or hilly ground plus slow noise) outside the core; every park keeps at least 25 m of
+  ground from every other; a pocket that can't fit half a park is skipped.
+- **Checked on 8 seeds:** parks placed equal parks picked on 6 seeds; harbor and 8ahsrz picked 6
+  and fit 3 (the 25 m spacing leaves no room for more). The closest two parks are 27–31 m apart;
+  no lot is on a park.
+- **Smaller and round (same day):** 700–1,400 m² (was 1,500–3,000). A park grows outward from its
+  spot, nearest cell first, never past 1.1× the radius of a circle of its size, so a street
+  cutting it can't make it wrap around; a spot where less than 80% of the park fits is skipped.
+  On 8 seeds: 7 placed every park picked (8ahsrz 4 of 6), 490–1,330 m² each, at least 26 m apart.
+
+**Neon strip → Commercial (2026-10-12, the user's call).** Renamed in the code and the legend
+(`DISTRICT.commercial`, the `COMMERCIAL_*` constants), and widened 2×: 28 m back from the street
+(was 14 m), in a 40 m ring around the core (was 20 m), plus the avenue strips. On 8 seeds it now
+covers 14–42% of the land (was 5–13%); its lots stay 1 cell (8 m) wide, as shopfronts.
 
 ### 6.6 Risks
 

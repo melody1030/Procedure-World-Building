@@ -70,17 +70,14 @@ export default function WorldPage() {
 
   useEffect(() => viewRef.current?.setPathVisible(state.showPath), [state.showPath]);
   useEffect(() => viewRef.current?.setClaims(terrain.districts.claims.claim, terrain.districts.claims.n), [terrain.districts]);
-  useEffect(() => {
-    const { n, height } = terrain.columns;
-    viewRef.current?.setDistricts(terrain.districts, (x, z) => height[Math.min(n - 1, Math.max(0, Math.round(z))) * n + Math.min(n - 1, Math.max(0, Math.round(x)))]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [terrain.districts]);
+  useEffect(() => viewRef.current?.setDistricts(terrain.districts), [terrain.districts]);
   useEffect(() => viewRef.current?.setShowDistricts(state.showDistricts), [state.showDistricts]);
   useEffect(() => viewRef.current?.setShowLots(state.showLots), [state.showLots]);
+  useEffect(() => viewRef.current?.setShowParks(state.showParks), [state.showParks]);
   useEffect(() => viewRef.current?.setShowClaims(state.showClaims), [state.showClaims]);
   useEffect(() => {
     const { n, height } = terrain.columns;
-    viewRef.current?.setNetwork(terrain.hubs, terrain.streets, (x, z) => height[Math.min(n - 1, Math.round(z)) * n + Math.min(n - 1, Math.round(x))]);
+    viewRef.current?.setNetwork(terrain.hubs, terrain.streets, (x, z) => height[Math.min(n - 1, Math.max(0, Math.round(z))) * n + Math.min(n - 1, Math.max(0, Math.round(x)))]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [terrain.hubs, terrain.streets, terrain.columns]);
   useEffect(() => viewRef.current?.setNetworkVisible(state.showNetwork), [state.showNetwork]);

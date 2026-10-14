@@ -11,7 +11,9 @@ import type { HeightMap } from "./heights";
  * Each cell's height and slope come from its mean height on the finished, river-carved ground, so
  * a flat valley floor counts as flat and single terrace steps average out.
  *
- * 1. The center: the cell with the best suitability (an "interest map", as in Emilien et al. 2012):
+ * 0. The side: the river splits the land; the city takes the side with the most land (until
+ *    bridges exist). Without a river, all the land is one side.
+ * 1. The center: the cell on that side with the best suitability (an "interest map", as in Emilien et al. 2012):
  *
  *      flat  = 1 − smoothstep(0, CENTER_SLOPE, slope)
  *      river = exp(−((d − RIVER_DISTANCE) / RIVER_BAND)²)      d = distance to the river channel
@@ -20,7 +22,7 @@ import type { HeightMap } from "./heights";
  *
  *    S is 0 within 1 m of the channel and in the outer EDGE cells. Without a river, `river` is 1.
  * 2. Buildable cells: slope under BUILD_SLOPE, at least RIVER_CLEARANCE from the channel, away from
- *    the edge, and on the center's side of the river (until bridges exist). `span` is how far
+ *    the edge, and on the city's side of the river. `span` is how far
  *    the buildable land reaches from the center.
  */
 
@@ -58,7 +60,7 @@ export interface Hubs {
   suitability: Float32Array;
   /** 1 for cells a junction (and later a building) may sit on. */
   buildable: Uint8Array;
-  /** 1 for cells on the center's side of the river. */
+  /** 1 for cells on the city's side of the river (the side with the most land). */
   side: Uint8Array;
   /** Distance from the center to the furthest buildable cell, in meters. */
   span: number;
@@ -102,13 +104,44 @@ export function buildHubs(map: HeightMap, claims: Claims): Hubs {
   }
   const inside = (cx: number, cz: number) => cx >= EDGE && cz >= EDGE && cx < cells - EDGE && cz < cells - EDGE;
 
+  // 0. The side: label the land the river splits (flood fills that never enter a wet cell) and
+  // keep the largest piece.
+  const label = new Int32Array(cells * cells).fill(-1);
+  const sizes: number[] = [];
+  for (let start = 0; start < cells * cells; start++) {
+    if (wet[start] || label[start] >= 0) continue;
+    const id = sizes.length;
+    let size = 0;
+    const queue = [start];
+    label[start] = id;
+    while (queue.length) {
+      const c = queue.pop()!;
+      size++;
+      const cx = c % cells;
+      const cz = (c - cx) / cells;
+      for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const x = cx + dx;
+        const z = cz + dz;
+        if (x < 0 || z < 0 || x >= cells || z >= cells) continue;
+        const nc = z * cells + x;
+        if (wet[nc] || label[nc] >= 0) continue;
+        label[nc] = id;
+        queue.push(nc);
+      }
+    }
+    sizes.push(size);
+  }
+  const largest = sizes.indexOf(Math.max(...sizes));
+  const side = new Uint8Array(cells * cells);
+  for (let c = 0; c < side.length; c++) if (label[c] === largest) side[c] = 1;
+
   // 1. The center.
   const suitability = new Float32Array(cells * cells);
   let best = -1;
   for (let cz = EDGE; cz < cells - EDGE; cz++) {
     for (let cx = EDGE; cx < cells - EDGE; cx++) {
       const c = cz * cells + cx;
-      if (riverD[c] < 1) continue;
+      if (!side[c] || riverD[c] < 1) continue;
       const flat = 1 - smoothstep(0, CENTER_SLOPE, slope[c]);
       const river = hasRiver ? Math.exp(-(((riverD[c] - RIVER_DISTANCE) / RIVER_BAND) ** 2)) : 1;
       const low = 1 - (0.5 * mean[c]) / top;
@@ -116,29 +149,12 @@ export function buildHubs(map: HeightMap, claims: Claims): Hubs {
       if (best < 0 || suitability[c] > suitability[best]) best = c;
     }
   }
-  if (best < 0 || suitability[best] <= 0) return { cells, suitability, buildable: new Uint8Array(cells * cells), side: new Uint8Array(cells * cells), span: 0, mean, riverD, hubs: [] };
+  if (best < 0 || suitability[best] <= 0) return { cells, suitability, buildable: new Uint8Array(cells * cells), side, span: 0, mean, riverD, hubs: [] };
   const ccx = best % cells;
   const ccz = (best - ccx) / cells;
 
-  // 2. Buildable cells on the center's side of the river: a flood fill that never enters a wet cell.
+  // 2. Buildable cells on the city's side.
   const buildable = new Uint8Array(cells * cells);
-  const side = new Uint8Array(cells * cells);
-  const queue = [best];
-  side[best] = 1;
-  while (queue.length) {
-    const c = queue.pop()!;
-    const cx = c % cells;
-    const cz = (c - cx) / cells;
-    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-      const x = cx + dx;
-      const z = cz + dz;
-      if (x < 0 || z < 0 || x >= cells || z >= cells) continue;
-      const nc = z * cells + x;
-      if (side[nc] || wet[nc]) continue;
-      side[nc] = 1;
-      queue.push(nc);
-    }
-  }
   const meters = (cx: number, cz: number) => Math.hypot(cx - ccx, cz - ccz) * CELL * VOXEL_M;
   let span = 0;
   for (let cz = 0; cz < cells; cz++) {

@@ -8,10 +8,10 @@ import type { River } from "./river";
  *
  * This stage (after the river) claims the channel and the bank, one column either side of it (the
  * same columns the Bank surface uses), and measures every column's distance to the channel.
- * Roads, verges, plazas and lots are claimed by the stages that make them.
+ * Roads, verges, plazas, parks and lots are claimed by the stages that make them.
  */
 
-export const CLAIM = { free: 0, river: 1, bank: 2, road: 3, verge: 4, plaza: 5, lot: 6 } as const;
+export const CLAIM = { free: 0, river: 1, bank: 2, road: 3, verge: 4, plaza: 5, lot: 6, park: 7 } as const;
 export type Claim = (typeof CLAIM)[keyof typeof CLAIM];
 
 /** Debug colors for Show claims, indexed by claim. Free ground is left untinted. */
@@ -22,6 +22,7 @@ export const CLAIM_COLORS: Record<Exclude<keyof typeof CLAIM, "free">, number> =
   verge: 0xfde047,
   plaza: 0xe879f9,
   lot: 0xfb7185,
+  park: 0x4ade80,
 };
 
 export interface Claims {
