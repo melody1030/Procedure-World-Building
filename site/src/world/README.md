@@ -2,6 +2,8 @@
 
 [← Back to the main README](../../../README.md) · [Concept](../../../docs/concept.md) · [Terrain plan](../../../docs/plans/terrain-plan.md) · [Town plan](../../../docs/plans/town-plan.md)
 
+> **From empty ground to a working city: built layer by layer, then brought to life by people and traffic.**
+
 Route: `/world` (seed in the URL, e.g. `/world?seed=blueprint`).
 
 A voxel diorama generated from a seed: terrain first, then a river, a street network, districts

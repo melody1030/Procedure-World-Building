@@ -168,6 +168,8 @@ folder numbers track the syllabus, not build order.
 
 ## Final Project: Blueprint City
 
+> **From empty ground to a working city: built layer by layer, then brought to life by people and traffic.**
+
 The weeks come together in one procedural world at **`/world`**
 ([concept](docs/concept.md)): a voxel diorama that grows from a seed into a terraced cyberpunk
 city. Each stage has its own settings, and each one reuses a week's technique: Week 2's noise
