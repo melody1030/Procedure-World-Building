@@ -6,10 +6,13 @@ import type { VehicleKind } from "../life/traffic";
 /**
  * Draws the inhabitants (life/agents.ts) with instanced meshes: a few draw calls for the whole
  * crowd. Each body part is one mesh with an instance per person (or bird, or cat), colored per
- * instance; the parts' matrices are set from the agent's place and pose every frame. Sizes are
- * true to the voxel (0.25 m): a person is 1.7 m, a pigeon 30 cm, a cat 45 cm long.
+ * instance; the parts' matrices are set from the agent's place and pose every frame. People are
+ * drawn to the scale of the streets and vehicles, not to life: those are small (3.5 m streets,
+ * 1.4 m-wide cars), so a person is about 1.3 m, a little chunky, with a big head and arms, so they
+ * read as people from far off. A pigeon is 30 cm, a cat 45 cm long.
  *
- * - People: legs swing as they walk; sitting, they bend at the hip with their feet on the ground.
+ * - People: legs and arms swing as they walk; sitting, they bend at the hip with their feet on the
+ *   ground and their hands on their knees; hailing a taxi, they hold a glowing phone up.
  * - Pigeons: they bob as they peck; flying, they beat their wings and pitch with the climb.
  * - Cats: they crouch to stalk, stretch out to sprint, and sit up to rest.
  * - Vehicles (life/traffic.ts): kei cars, vans, taxis and community buses, pitched with the street.
@@ -115,9 +118,11 @@ class Part {
   }
 }
 
-/** Hip height, torso and head (voxels). */
-const HIP = 3.2;
-const TORSO = 2.4;
+/** A person (voxels): hip height, torso height, the shoulders' half width and the arm's length. */
+const HIP = 2.3;
+const TORSO = 1.9;
+const SHOULDER = 0.86;
+const ARM = 1.7;
 
 export class LifeView {
   readonly group = new THREE.Group();
@@ -125,6 +130,7 @@ export class LifeView {
   private readonly head: Part;
   private readonly hair: Part;
   private readonly leg: Part;
+  private readonly arm: Part;
   private readonly seatedLeg: Part;
   private readonly pigeon: Part;
   private readonly wing: Part;
@@ -150,12 +156,15 @@ export class LifeView {
     private readonly half: number,
   ) {
     const people = life.people.length;
-    this.torso = new Part(box(1.5, TORSO, 0.9, 0, 0, 0), people);
-    this.head = new Part(box(1, 1, 1), people);
-    this.hair = new Part(mergeGeometries([box(1.1, 0.35, 1.1, 0, 0.85, -0.02), box(1.1, 0.7, 0.3, 0, 0.3, -0.42)]), people);
-    this.leg = new Part(box(0.66, HIP, 0.8, 0, 0, 0, true), people * 2);
-    // Seated: the thigh forward along the seat, the shin down to the ground clear of the seat's front edge.
-    this.seatedLeg = new Part(mergeGeometries([box(0.66, 0.8, 2.3, 0, 0, 0.85), box(0.64, 2.7, 0.7, 0, 0.78, 1.65, true)]), people * 2);
+    this.torso = new Part(box(1.3, TORSO, 0.8, 0, 0, 0), people);
+    this.head = new Part(box(0.95, 0.95, 0.95), people);
+    this.hair = new Part(mergeGeometries([box(1.05, 0.3, 1.05, 0, 0.8, -0.02), box(1.05, 0.65, 0.28, 0, 0.3, -0.4)]), people);
+    this.leg = new Part(box(0.58, HIP, 0.68, 0, 0, 0, true), people * 2);
+    // An arm hangs from the shoulder (its top at the origin).
+    this.arm = new Part(box(0.42, ARM, 0.48, 0, 0, 0, true), people * 2);
+    // Seated: the thigh forward along the seat, the shin down to the ground (a seat is about 1.9
+    // voxels up) clear of the seat's front edge.
+    this.seatedLeg = new Part(mergeGeometries([box(0.58, 0.6, 1.7, 0, 0, 0.6), box(0.56, 2.5, 0.6, 0, 0.6, 1.2, true)]), people * 2);
     const birds = life.pigeons.length;
     // Body, head and tail; and a wing, out from the shoulder along +x.
     this.pigeon = new Part(mergeGeometries([box(0.55, 0.5, 1, 0, 0.25, 0), box(0.38, 0.4, 0.4, 0, 0.6, 0.55), box(0.4, 0.12, 0.5, 0, 0.45, -0.7)]), birds);
@@ -190,7 +199,7 @@ export class LifeView {
     this.door = new Part(box(0.12, 7.4, 3.4, -3.32, 1.4, 7.6), buses, false, glow());
     this.destination = new Part(box(4.4, 1, 0.15, 0, 8.4, 12.05), buses, false, glow());
     this.buildShelters(life);
-    for (const p of [this.torso, this.head, this.hair, this.leg, this.seatedLeg, this.pigeon, this.wing, this.cat, ...this.vehicleParts()]) this.group.add(p.mesh);
+    for (const p of [this.torso, this.head, this.hair, this.leg, this.arm, this.seatedLeg, this.pigeon, this.wing, this.cat, ...this.vehicleParts()]) this.group.add(p.mesh);
     this.group.add(this.shelters);
   }
 
@@ -222,31 +231,41 @@ export class LifeView {
   update(dt: number) {
     this.life.step(dt);
     const { m, base, t, r, half } = this;
-    const parts = [this.torso, this.head, this.hair, this.leg, this.seatedLeg, this.pigeon, this.wing, this.cat, ...this.vehicleParts()];
+    const parts = [this.torso, this.head, this.hair, this.leg, this.arm, this.seatedLeg, this.pigeon, this.wing, this.cat, ...this.vehicleParts()];
     for (const p of parts) p.begin();
 
     for (const p of this.life.people) {
       if (p.state === "gone" || p.state === "ride") continue;
       const seated = p.state === "sit";
-      const bob = p.moving ? Math.abs(Math.sin(p.phase)) * 0.25 : 0;
+      const bob = p.moving ? Math.abs(Math.sin(p.phase)) * 0.18 : 0;
       base.makeRotationY(p.heading).setPosition(p.x - half, p.y + bob, p.z - half);
       if (seated) {
-        // On the seat: the body from the seat up, a little back; legs bent forward and down.
-        this.torso.add(m.multiplyMatrices(base, t.makeTranslation(0, 0, -0.35)), p.shirt);
-        this.head.add(m.multiplyMatrices(base, t.makeTranslation(0, TORSO + 0.05, -0.35)), p.skin);
-        this.hair.add(m.multiplyMatrices(base, t.makeTranslation(0, TORSO + 0.05, -0.35)), p.hair);
-        for (const s of [-1, 1]) this.seatedLeg.add(m.multiplyMatrices(base, t.makeTranslation(s * 0.37, 0, -0.35)), p.pants);
+        // On the seat: the body from the seat up, a little back; legs bent forward and down, hands
+        // on the knees.
+        this.torso.add(m.multiplyMatrices(base, t.makeTranslation(0, 0, -0.3)), p.shirt);
+        this.head.add(m.multiplyMatrices(base, t.makeTranslation(0, TORSO + 0.05, -0.3)), p.skin);
+        this.hair.add(m.multiplyMatrices(base, t.makeTranslation(0, TORSO + 0.05, -0.3)), p.hair);
+        for (const s of [-1, 1]) {
+          this.seatedLeg.add(m.multiplyMatrices(base, t.makeTranslation(s * 0.33, 0, -0.3)), p.pants);
+          m.multiplyMatrices(base, t.makeTranslation(s * SHOULDER, TORSO - 0.1, -0.3)).multiply(r.makeRotationX(-0.75));
+          this.arm.add(m, p.shirt);
+        }
         continue;
       }
       this.torso.add(m.multiplyMatrices(base, t.makeTranslation(0, HIP, 0)), p.shirt);
-      // Hailing a taxi: a phone held up, glowing.
-      if (p.state === "hail") this.phone.add(m.multiplyMatrices(base, t.makeTranslation(0.45, HIP + TORSO + 0.6, 0.75)), PHONE);
       this.head.add(m.multiplyMatrices(base, t.makeTranslation(0, HIP + TORSO + 0.05, 0)), p.skin);
       this.hair.add(m.multiplyMatrices(base, t.makeTranslation(0, HIP + TORSO + 0.05, 0)), p.hair);
+      // Legs swing as they walk, arms the other way; hailing a taxi, the right arm holds a glowing
+      // phone up (the right is -x).
       const swing = p.moving ? Math.sin(p.phase) * 0.55 : 0;
+      const hailing = p.state === "hail";
       for (const s of [-1, 1]) {
-        m.multiplyMatrices(base, t.makeTranslation(s * 0.37, HIP, 0)).multiply(r.makeRotationX(swing * s));
+        m.multiplyMatrices(base, t.makeTranslation(s * 0.33, HIP, 0)).multiply(r.makeRotationX(swing * s));
         this.leg.add(m, p.pants);
+        const raised = hailing && s < 0;
+        m.multiplyMatrices(base, t.makeTranslation(s * SHOULDER, HIP + TORSO - 0.1, 0)).multiply(r.makeRotationX(raised ? -2.5 : -swing * s * 0.8));
+        this.arm.add(m, p.shirt);
+        if (raised) this.phone.add(m.multiply(t.makeTranslation(0, -ARM - 0.6, 0.05)), PHONE);
       }
     }
 
@@ -300,7 +319,7 @@ export class LifeView {
   }
 
   dispose() {
-    for (const p of [this.torso, this.head, this.hair, this.leg, this.seatedLeg, this.pigeon, this.wing, this.cat]) p.dispose();
+    for (const p of [this.torso, this.head, this.hair, this.leg, this.arm, this.seatedLeg, this.pigeon, this.wing, this.cat]) p.dispose();
     // (Car and taxi share a model.)
     const seen = new Set<THREE.BufferGeometry>();
     for (const p of this.vehicleParts()) {

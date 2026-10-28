@@ -791,3 +791,20 @@ Vehicle-seconds spent crawling (under 5 m in 40 s):
 - the route cost on top of them, over ten minutes: blueprint 634 → 309, neon7 1105 → 542 (of
   16,800). Harbor, whose network is three streets between the same two junctions, got worse
   (1004 → 1417 of 9,520): without turning round, it has to go through its one busy junction.
+
+## 2026-10-29: People to the city's scale
+
+People were drawn to life (1.66 m, a 1.5 × 0.9-voxel torso on two thin legs, no arms), but the
+streets and vehicles are not: streets are 3.5 m with 1.75 m lanes, cars are 1.4 m-wide kei cars and
+buses 1.65 m-wide community buses. Beside them people looked too big, and from any distance like
+sticks. They are now drawn to the scale of the streets and vehicles (render/life.ts):
+
+- **About 1.3 m tall**: hips at 2.3 voxels, a 1.3 × 1.9 × 0.8 torso and a 0.95 head, so a head
+  reaches a car's roof and the middle of a bus's windows.
+- **A little chunky, with a big head**, so they read as people from far off, in the voxels' style.
+- **Arms**: they swing against the legs as people walk; sitting, the hands rest on the knees (the
+  seated legs are shorter, so the feet still reach the ground from a bench); hailing a taxi, the
+  right arm holds the glowing phone up.
+
+Only the drawing changed: people keep the same paths, bodies (0.75-voxel radius) and speeds.
+
