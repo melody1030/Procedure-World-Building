@@ -9,8 +9,10 @@ island is grown from a seed by rules, not by hand: the ground is printed, the st
 outward from a plaza, the buildings rise storey by storey, and then people, pigeons, cats and
 traffic move in.
 
-**Live site:** [procedural-worlds-d79be.web.app/world](https://procedural-worlds-d79be.web.app/world)
-(try `/world?seed=blueprint`) · **Development log:** [site/src/world/README.md](site/src/world/README.md)
+- **Live site:** [procedural-worlds-d79be.web.app/world](https://procedural-worlds-d79be.web.app/world)
+(try `/world?seed=blueprint`) 
+
+- **Development log:** [site/src/world/README.md](site/src/world/README.md)
 
 ## Outline
 
@@ -46,6 +48,7 @@ Full concept, references and the growth idea: **[docs/concept.md](docs/concept.m
 | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
 | [Town to City: building & terrain mechanics](<docs/analysis/Town to City — Building & Terrain Mechanics Breakdown.md>) | How the reference game handles terraforming, roads, placement and props                    |
 | [Cozy "off-grid" builders](docs/analysis/cozy-builders-research.md)                                                    | Townscaper, Town to City and Tiny Glade compared                                           |
+| [Week 9 feedback](docs/analysis/week09-feedback.md)                                                                    | Inspecting agents and buildings (state, trajectory), camera presets, and this README's structure |
 
 
 ---
@@ -96,17 +99,17 @@ flowchart TB
 The full dated log with every screenshot is in
 **[site/src/world/README.md](site/src/world/README.md)**. The milestones:
 
-| Date | Milestone |
-|---|---|
-| 2026-10-07 | **Version 1, then a restart.** A complete 14-stage pipeline (`bd582ca`), taken back to an empty diorama and rebuilt on 0.25 m voxels |
-| 2026-10-08 | **River and claims.** A river valley from Week 5's splines, and a claim map so each stage keeps off land earlier stages use |
-| 2026-10-09 | **Streets by wave function collapse**, districts and lots |
-| 2026-10-12 | **Districts like Cities: Skylines**, parks on their own layer |
-| 2026-10-12/13 | **The building library**: eleven archetypes, four redesigned from real references |
-| 2026-10-14 | **The build timeline** replays the city in the order it is made; buildings placed on the lots |
-| 2026-10-26 | **Buildings are built storey by storey**, under scaffolding |
-| 2026-10-27 | **Landscaped parks**; **inhabitants** (people, pigeons, cats); one concrete city |
-| 2026-10-28 | **Traffic** (cars, vans, taxis, buses); **smoothed blocks** and graded lots; small lots merged and gaps filled |
+| Date          | Milestone                                                                                                                            |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| 2026-10-07    | **Version 1, then a restart.** A complete 14-stage pipeline (`bd582ca`), taken back to an empty diorama and rebuilt on 0.25 m voxels |
+| 2026-10-08    | **River and claims.** A river valley from Week 5's splines, and a claim map so each stage keeps off land earlier stages use          |
+| 2026-10-09    | **Streets by wave function collapse**, districts and lots                                                                            |
+| 2026-10-12    | **Districts like Cities: Skylines**, parks on their own layer                                                                        |
+| 2026-10-12/13 | **The building library**: eleven archetypes, four redesigned from real references                                                    |
+| 2026-10-14    | **The build timeline** replays the city in the order it is made; buildings placed on the lots                                        |
+| 2026-10-26    | **Buildings are built storey by storey**, under scaffolding                                                                          |
+| 2026-10-27    | **Landscaped parks**; **inhabitants** (people, pigeons, cats); one concrete city                                                     |
+| 2026-10-28    | **Traffic** (cars, vans, taxis, buses); **smoothed blocks** and graded lots; small lots merged and gaps filled                       |
 
 | Version 1, rainy night (Oct 7) | Districts and parks (Oct 12) |
 |---|---|
