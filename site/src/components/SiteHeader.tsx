@@ -4,9 +4,12 @@ import { linkProps } from "../router";
 import { weeks } from "../weeks/registry";
 import { AccountMenu } from "./AccountMenu";
 
-// `short` ("Week 5") is shown in the top bar until there is room for the full title.
+// `short` ("Week 5") is shown in the top bar until there is room for the full title. The homepage's
+// three tabs come first; the weeks are the studios of its Technique tab.
 const NAV_ITEMS = [
-  { path: "/", label: "Home", short: "Home" },
+  { path: "/concept", label: "Concept", short: "Concept" },
+  { path: "/technique", label: "Technique", short: "Technique" },
+  { path: "/city", label: "City", short: "City" },
   ...weeks.map((week) => ({ path: `/${week.id}`, label: week.title, short: week.title.split(" — ")[0] })),
 ];
 
@@ -37,7 +40,7 @@ function NavLink({ path, active, title, children }: { path: string; active: bool
   );
 }
 
-/** App-wide top bar: title, Home and week links, and sign-in. Collapses to a menu below `lg`. */
+/** App-wide top bar: title, the homepage's tabs and the week links, and sign-in. Collapses to a menu below `lg`. */
 export function SiteHeader({ path, configHandle, weekTitle }: { path: string; configHandle: WeekConfigHandle | null; weekTitle: string }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
