@@ -1,230 +1,202 @@
-# Procedure World Building
+![Blueprint City: from empty ground to streets and lots, to the finished city, to people and traffic](docs/images/banner.webp)
 
-_A working repository for the Procedure World Building project (2026 Fall)._
+# Blueprint City
 
-**Live site:** [procedural-worlds-d79be.web.app](https://procedural-worlds-d79be.web.app), hosted on Firebase ([how it was set up](docs/tutorial/firebase-tutorial.md)).
+> **From empty ground to a working city: built layer by layer, then brought to life by people and traffic.**
 
-## Table of Contents
+A procedural voxel city for **Procedural World Building** at Cornell Tech (Fall 2026). Every
+island is grown from a seed by rules, not by hand: the ground is printed, the streets are paved
+outward from a plaza, the buildings rise storey by storey, and then people, pigeons, cats and
+traffic move in.
 
-- [Overview](#overview)
-- [Project Concept: Blueprint City](docs/concept.md)
-- [Repository Structure](#repository-structure)
-- [Documentation](#documentation)
-- [Final Project: Blueprint City (procedural world)](#final-project-blueprint-city)
-  ([development log](site/src/world/README.md)): terrain, river, street network, districts and lots
-- [Weekly Progress](#weekly-progress)
-  - [Week 1 — Three.js Basics](site/src/weeks/week01-threejs-basics/README.md): geometry, materials, lighting
-  - [Week 2 — Noise Grid & Hydraulic Erosion](site/src/weeks/week02-noise-grid/README.md): noise stacks, shaping, droplet erosion
-    ([presentation feedback](docs/analysis/week02-noise-grid-feedback.md))
-  - [Week 3 — Voxels & Volumes](site/src/weeks/week03-voxels-volumes/README.md): voxel resolution, implicit surfaces, CSG, mesh generation
-  - [Week 4 — Shader Studio](site/src/weeks/week04-shaders/README.md): pick a shader technique from a dropdown, tune it and see the value it computes
-  - [Week 5 — Scatter & Paths](site/src/weeks/week05-scatter-paths/README.md): scatter layers with rules, spline roads and rivers, particles in a wind field
-- [Firebase: Accounts & Saved Configurations](#firebase-accounts--saved-configurations)
-- [Getting Started](#getting-started)
+**Live site:** [procedural-worlds-d79be.web.app/world](https://procedural-worlds-d79be.web.app/world)
+(try `/world?seed=blueprint`) · **Development log:** [site/src/world/README.md](site/src/world/README.md)
 
-## Overview
+## Outline
 
-This repository tracks my coursework for **Procedural World Building** at
-Cornell Tech (Fall 2026). The class is built around a single idea: instead
-of placing every rock, river, and tree by hand, you write rules and
-numbers that generate a world from parameters. You turn
-a slider, an algorithm runs, and a planet (or a map of it) updates in
-front of you.
+1. [Concept](#1-concept)
+2. [Technique](#2-technique): [Terrain](docs/techniques/terrain.md) · [Shader](docs/techniques/shader.md) · [Agents](docs/techniques/agents.md) · [Building morphology](docs/techniques/building-morphology.md) · [Network](docs/techniques/network.md)
+3. [Process log](#3-process-log)
+4. [Class notes and studios](#4-class-notes-and-studios)
 
-Over the semester the class climbs a sequence of generation problems,
-starting from the web stack itself and moving through:
+Also: [Repository structure](#repository-structure) · [Firebase](#firebase-accounts-and-saved-configurations) · [Getting started](#getting-started)
 
-- **Terrain** — noise fields (Perlin-style, layered/ridged/warped), heightmaps
-- **Planets** — mapping a 2D map onto a sphere, sphere geometry
-- **Structure** — voxel terrain, equirectangular maps, hydraulic (droplet) erosion, biomes, flood-fill
-- **Flows** — vector fields, atmosphere (wind/clouds), oceans and currents
-- **Populations** — scattering objects by biome/slope/soil, foliage, simple characters
-- **Networks** — roads and a small simulated town graph
-- **Performance** — level of detail, streaming, line of sight
+---
 
-The course's shared studio (a React + TypeScript + Three.js planet
-builder) and reference materials live in the instructor's repository:
-[jomasan/Procedural-World-Building](https://github.com/jomasan/Procedural-World-Building).
-This repo is where I track my own planning, tutorial notes, and analysis
-as I work through the material.
+## 1. Concept
 
-## Repository Structure
+Blueprint City takes the miniature voxel-diorama look of *Town to City* and turns it toward a
+neon cyberpunk night. It is a compact, terraced island city of dark concrete, lit windows and
+signs, where the interest is in **watching the rules work**: the timeline replays the whole city
+being made, and once it is finished, it is lived in.
 
-```
-Procedure-World-Building/
-├── README.md                  ← you are here: entry point and table of contents
-├── docs/
-│   ├── concept.md             ← the project concept (Blueprint City)
-│   ├── analysis/              ← feedback and reflection notes from class presentations
-│   ├── plans/                 ← build plans (shader studio, terrain, town)
-│   ├── notes/                 ← class notes from lectures (noise, shaders, distributions & paths)
-│   └── tutorial/              ← setup guides (React, Three.js, Git, Firebase)
-└── site/                      ← the React + TypeScript + Three.js workshop site
-    ├── STYLE_GUIDE.md         ← shared visual style for every week
-    └── src/
-        ├── components/        ← UI shared by all weeks (side panel, controls)
-        ├── world/             ← the final project, Blueprint City (route /world)
-        │   ├── README.md      ← its development log
-        │   ├── terrain/       ← one file per pipeline stage
-        │   └── screenshots/
-        └── weeks/
-            ├── week01-threejs-basics/
-            ├── week02-noise-grid/
-            ├── week03-voxels-volumes/
-            ├── week04-shaders/
-            └── week05-scatter-paths/
-                ├── README.md      ← the study notes for that week
-                ├── screenshots/   ← images referenced by that README
-                └── *.ts / *.tsx   ← the week's code
+```mermaid
+flowchart LR
+  A([Seed]) --> B[Empty ground<br/>noise · terraces · river]
+  B --> C[Streets and lots<br/>WFC network · districts · zoning]
+  C --> D[Buildings<br/>archetypes sized to their lots]
+  D --> E[Life<br/>people · animals · traffic]
 ```
 
-Every week follows the same pattern: its code, a `README.md` study notebook, and a
-`screenshots/` folder live together in one folder under `site/src/weeks/`.
+Full concept, references and the growth idea: **[docs/concept.md](docs/concept.md)**.
 
-## Documentation
+### Related analysis
 
-- [`docs/concept.md`](docs/concept.md) — the project concept: a procedural voxel diorama that grows from a cliffside settlement into a neon cyberpunk megacity
-- [`site/src/world/README.md`](site/src/world/README.md) — the development log of the procedural city (live at `/world`)
-- [`docs/plans/terrain-plan.md`](docs/plans/terrain-plan.md) — the build plan for the city's terrain: noise, shaping, terraces, river, surfaces
-- [`docs/plans/town-plan.md`](docs/plans/town-plan.md) — the build plan for the town: street network, districts and lots, scatter
-- [`docs/analysis/Week06-feedback.md`](docs/analysis/Week06-feedback.md) — teacher feedback on the project direction (Week 6)
-- [`docs/analysis/week02-noise-grid-feedback.md`](docs/analysis/week02-noise-grid-feedback.md) — teacher feedback from the Week 2 presentation, and ideas for future work
-- [`site/STYLE_GUIDE.md`](site/STYLE_GUIDE.md) — the shared visual style for every page of the site (colours, fonts, panels, controls)
+| Document                                                                                                               | What it covers                                                                             |
+| ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| [Town to City: building & terrain mechanics](<docs/analysis/Town to City — Building & Terrain Mechanics Breakdown.md>) | How the reference game handles terraforming, roads, placement and props                    |
+| [Cozy "off-grid" builders](docs/analysis/cozy-builders-research.md)                                                    | Townscaper, Town to City and Tiny Glade compared                                           |
 
-**Class notes** ([`docs/notes/`](docs/notes)):
+
+---
+
+## 2. Technique
+
+Five kinds of technique make the city. Each has its own page with a diagram, screenshots, the
+code it lives in and the log entries behind it.
+
+| | Technique | What it does |
+|---|---|---|
+| <img src="site/src/world/screenshots/2026-10-28-smoothed-blocks.webp" alt="Terrain" width="220"> | **[Terrain](docs/techniques/terrain.md)** | Noise, slope-scaled terraces and a river on 0.25 m voxels (928 × 928 columns); streets cut and fill, blocks are smoothed between them, lots are graded flat |
+| <img src="site/src/world/screenshots/2026-10-27-concrete-build.webp" alt="Shader" width="220"> | **[Shader](docs/techniques/shader.md)** | The voxel look on merged faces, data-texture overlays, and the build timeline: terrain printed, streets paved, buildings raised storey by storey, with nothing rebuilt per frame |
+| <img src="site/src/world/screenshots/2026-10-27-inhabitants.webp" alt="Agents" width="220"> | **[Agents](docs/techniques/agents.md)** | People driven by needs on flow fields, boid pigeons, cats with a cone of vision, and traffic that yields to people, stops at bus shelters and picks up fares |
+| <img src="site/src/world/screenshots/2026-10-13-building-library.webp" alt="Building library" width="220"> | **[Building morphology](docs/techniques/building-morphology.md)** | Eleven cyberpunk archetypes built from reusable parts, picked by district and sized to their lots |
+| <img src="site/src/world/screenshots/2026-10-09-wfc-streets-districts.webp" alt="Street network" width="220"> | **[Network](docs/techniques/network.md)** | A street network by wave function collapse, districts and lots zoned along it, and the walking and lane graphs the agents move on |
+
+How they fit together, in the order the city is made:
+
+```mermaid
+flowchart TB
+  subgraph Terrain
+    t1[Noise · terraces] --> t2[River]
+  end
+  subgraph Network
+    n1[Plaza] --> n2[WFC streets] --> n3[Districts · lots]
+  end
+  subgraph Morphology[Building morphology]
+    b1[Archetype by district] --> b2[Fit to the lot]
+  end
+  subgraph Agents
+    a1[People · animals] <--> a2[Traffic]
+  end
+  t2 --> n1
+  n2 -->|cut, fill, smooth| g[Graded ground]
+  n3 --> g
+  n3 --> b1
+  b2 --> a1
+  n2 --> a2
+  Shader{{Shader: voxel look and build timeline}} -.-> g
+  Shader -.-> b2
+```
+
+---
+
+## 3. Process log
+
+The full dated log with every screenshot is in
+**[site/src/world/README.md](site/src/world/README.md)**. The milestones:
+
+| Date | Milestone |
+|---|---|
+| 2026-10-07 | **Version 1, then a restart.** A complete 14-stage pipeline (`bd582ca`), taken back to an empty diorama and rebuilt on 0.25 m voxels |
+| 2026-10-08 | **River and claims.** A river valley from Week 5's splines, and a claim map so each stage keeps off land earlier stages use |
+| 2026-10-09 | **Streets by wave function collapse**, districts and lots |
+| 2026-10-12 | **Districts like Cities: Skylines**, parks on their own layer |
+| 2026-10-12/13 | **The building library**: eleven archetypes, four redesigned from real references |
+| 2026-10-14 | **The build timeline** replays the city in the order it is made; buildings placed on the lots |
+| 2026-10-26 | **Buildings are built storey by storey**, under scaffolding |
+| 2026-10-27 | **Landscaped parks**; **inhabitants** (people, pigeons, cats); one concrete city |
+| 2026-10-28 | **Traffic** (cars, vans, taxis, buses); **smoothed blocks** and graded lots; small lots merged and gaps filled |
+
+| Version 1, rainy night (Oct 7) | Districts and parks (Oct 12) |
+|---|---|
+| ![Version 1](site/src/world/screenshots/2026-10-07-v1-rainy-night.webp) | ![Districts and parks](site/src/world/screenshots/2026-10-12-districts-parks.webp) |
+
+| The city with its buildings (Oct 28) | People and traffic (Oct 28) |
+|---|---|
+| ![The city](site/src/world/screenshots/2026-10-28-city-after-grading.webp) | ![A bus at its shelter](site/src/world/screenshots/2026-10-28-bus-stop.webp) |
+
+Plans: [terrain plan](docs/plans/terrain-plan.md) · [town plan](docs/plans/town-plan.md) · [shader studio plan](docs/plans/shader-studio-plan.md)
+
+---
+
+## 4. Class notes and studios
+
+### Studios
+
+Each week's in-class workshop is its own tab on the site, with a README study notebook and
+screenshots in its folder. (Week 2 was built first, on 2026-09-10; folder numbers follow the
+syllabus.)
+
+| Week | Studio | |
+|---|---|---|
+| 1 | **[Three.js Basics](site/src/weeks/week01-threejs-basics/README.md)**: primitive geometries, materials and light types with shadows | <img src="site/src/weeks/week01-threejs-basics/screenshots/2026-09-14-torus-knot-directional-shadows.jpg" alt="Week 1" width="220"> |
+| 2 | **[Noise Grid & Hydraulic Erosion](site/src/weeks/week02-noise-grid/README.md)**: a noise stack and shaping curves on a 2D/3D terrain, with seeded droplet erosion on a timeline | <img src="site/src/weeks/week02-noise-grid/screenshots/2026-09-10-perlin-heightmap.jpg" alt="Week 2" width="220"> |
+| 3 | **[Voxels & Volumes](site/src/weeks/week03-voxels-volumes/README.md)**: voxel resolution, implicit surfaces, CSG with SDF booleans, and five mesh-generation methods compared | <img src="site/src/weeks/week03-voxels-volumes/screenshots/mesh-final-ui.webp" alt="Week 3" width="220"> |
+| 4 | **[Shader Studio](site/src/weeks/week04-shaders/README.md)**: one technique at a time (ripple with contact foam, matcap, cel, fresnel, fog and more) on a calm scene | <img src="site/src/weeks/week04-shaders/screenshots/截圖%202026-09-30%2008.35.24.png" alt="Week 4" width="220"> |
+| 5 | **[Scatter & Paths](site/src/weeks/week05-scatter-paths/README.md)**: scatter layers with rules, spline roads and rivers, rain and wind on a curl-noise field | <img src="site/src/weeks/week05-scatter-paths/screenshots/2026-10-06-scatter-rain.jpg" alt="Week 5" width="220"> |
+
+### Class notes
 
 - [Noise & Maps](docs/notes/noise-and-maps-notes.md)
-- [Shaders](docs/notes/shaders-notes.md): the graphics pipeline, shader languages, and techniques (gradients, fog, fresnel, matcap, cel, contact, vertex displacement)
+- [Shaders](docs/notes/shaders-notes.md): the graphics pipeline, shader languages and techniques
+- [Distributions, Paths & Vector Fields](docs/notes/distribution-and-paths-notes.md)
 
-**Tutorials** ([`docs/tutorial/`](docs/tutorial)):
+### Tutorials
 
 - [Installing React (with terminal basics)](docs/tutorial/react-install-tutorial.md)
 - [Installing Three.js](docs/tutorial/threejs-install-tutorial.md)
 - [Git & GitHub](docs/tutorial/git-github-tutorial.md)
 - [Firebase: Hosting and Firestore](docs/tutorial/firebase-tutorial.md)
 
-## Weekly Progress
+The course's shared studio and reference materials live in the instructor's repository:
+[jomasan/Procedural-World-Building](https://github.com/jomasan/Procedural-World-Building).
 
-Each week's in-class workshop lives as its own tab in [`site/`](site).
-Short summary below, in syllabus order; each week's folder has its own
-detailed README with a dated development log of screenshots. Note the
-noise grid (now Week 2) was actually built first (2026-09-10) and
-Three.js Basics was split out as its own Week 1 afterward (2026-09-14) —
-folder numbers track the syllabus, not build order.
+---
 
-- **2026-09-14 — [Week 1 — Three.js Basics](site/src/weeks/week01-threejs-basics/README.md)** —
-  a playground for core Three.js building blocks: swap between primitive
-  geometries (box, sphere, icosahedron, torus, torus knot, cone,
-  cylinder), materials (Standard/Physical PBR, Phong, Toon, unlit Basic),
-  and light types (directional, point, spot) with intensity and shadow
-  controls, plus wireframe and auto-rotate. Goal: build intuition for how
-  geometry, material, and lighting interact before moving into procedural
-  generation.
+## Repository structure
 
-  ![Torus knot with directional light and shadows](site/src/weeks/week01-threejs-basics/screenshots/2026-09-14-torus-knot-directional-shadows.jpg)
+```text
+Procedure-World-Building/
+├── README.md                ← you are here
+├── docs/
+│   ├── concept.md           ← the project concept
+│   ├── techniques/          ← one page per technique (terrain, shader, agents, buildings, network)
+│   ├── analysis/            ← feedback and research notes
+│   ├── plans/               ← build plans
+│   ├── notes/               ← class notes
+│   ├── tutorial/            ← setup guides
+│   └── images/              ← banner and reference images
+└── site/                    ← the React + TypeScript + Three.js site
+    ├── STYLE_GUIDE.md       ← shared visual style
+    └── src/
+        ├── components/      ← UI shared by all pages
+        ├── world/           ← Blueprint City (route /world) and its development log
+        │   ├── terrain/     ← one file per pipeline stage
+        │   ├── buildings/   ← the building library (route /buildings)
+        │   ├── city/        ← parks and building placement
+        │   ├── life/        ← people, animals and traffic
+        │   ├── render/      ← three.js view and shaders
+        │   └── screenshots/
+        └── weeks/           ← one folder per weekly studio
+```
 
-- **2026-09-10 — [Week 2 — Noise Grid & Hydraulic Erosion](site/src/weeks/week02-noise-grid/README.md)** —
-  a 2D/3D terrain viewer driven by a noise stack (White/Perlin/Cellular
-  noise, shaping curves, adjustable grid resolution, linked 2D map ↔ 3D
-  terrain selection), extended into a full Assignment 2 submission with a
-  deterministic, seeded hydraulic (droplet) erosion simulation and a
-  scrubbable timeline player (play/pause, speed control, seek, reset)
-  that reshapes the height field in real time.
+## Firebase: accounts and saved configurations
 
-  ![Perlin noise heightmap terrain](site/src/weeks/week02-noise-grid/screenshots/2026-09-10-perlin-heightmap.jpg)
-
-- **2026-09-23 — [Week 3 — Voxels & Volumes](site/src/weeks/week03-voxels-volumes/README.md)** —
-  four tabs built around sampling shapes into a voxel grid: Resolution (a
-  fixed shape voxelized at an adjustable grid density), Implicit Surfaces
-  (a procedural noise field turned into a solid/empty test, e.g. terraced
-  terrain), a CSG "Voxel Techniques Lab" where primitives are combined
-  via SDF boolean formulas (union/difference/intersection) and manipulated
-  with a Move/Rotate/Scale gizmo, and Mesh Generation, which compares five
-  surface-extraction methods (culled faces, greedy, marching cubes, surface
-  nets, dual contouring) with per-method controls and a step-by-step mode.
-
-  ![CSG boolean difference result](site/src/weeks/week03-voxels-volumes/screenshots/csg-difference-result.webp)
-
-  ![Mesh generation, Marching Cubes on a cube and ball](site/src/weeks/week03-voxels-volumes/screenshots/mesh-final-ui.webp)
-
-- **2026-09-29 — [Week 4 — Shader Studio](site/src/weeks/week04-shaders/README.md)** —
-  the Assignment 2 shader study. A dropdown picks one technique at a time (ripple, which turns
-  the floor into water with contact-shader foam, flat, position gradient, slope, matcap, Lambert, cel with
-  outlines, fake AO, fresnel rim and distance fog) on a calm scene of simple architectural and
-  rounded forms. It replaces an earlier voxel-city version that was too
-  busy to show the techniques. Lecture notes:
-  [Shaders — class notes](docs/notes/shaders-notes.md).
-  ![Shader Studio](<site/src/weeks/week04-shaders/screenshots/截圖 2026-09-30 08.35.24.png>)
-
-- **2026-10-06 — [Week 5 — Scatter & Paths](site/src/weeks/week05-scatter-paths/README.md)** —
-  the three parts of Class 06 on one terrain. **Scatter:** four asset layers (trees, bushes,
-  rocks, windmills), each with its own distribution (random, noise, Poisson disk), height and
-  slope rules, surface alignment and terrain tint. **Paths:** a road and a river laid along
-  Catmull-Rom splines that read the terrain, flatten or carve it, keep scatter away and place
-  lamp posts. **Particles:** rain, wind and clouds driven by a curl-noise vector field, with
-  trails. Lecture notes:
-  [Distributions, Paths & Vector Fields — class notes](docs/notes/distribution-and-paths-notes.md).
-  ![Scatter & Paths](site/src/weeks/week05-scatter-paths/screenshots/2026-10-06-scatter-rain.jpg)
-
-## Final Project: Blueprint City
-
-> **From empty ground to a working city: built layer by layer, then brought to life by people and traffic.**
-
-The weeks come together in one procedural world at **`/world`**
-([concept](docs/concept.md)): a voxel diorama that grows from a seed into a terraced cyberpunk
-city. Each stage has its own settings, and each one reuses a week's technique: Week 2's noise
-for the terrain, Week 3's voxels and greedy meshing, Week 4's shaders for the voxel ground, and
-Week 5's paths for the river. Full dated log with screenshots:
-**[Blueprint City development log](site/src/world/README.md)**.
-
-- **2026-10-07 — Version 1, then a restart.** A complete 14-stage city pipeline was built and
-  committed (`bd582ca`), then taken back to an empty diorama to rebuild step by step. The terrain
-  was rebuilt on 0.25 m voxels: noise, shaping, slope-scaled terraces, surfaces and a voxel-grid
-  shader.
-- **2026-10-08 — River and claims.** A river valley laid with Week 5's spline technique; the ocean
-  removed so the river is the waterfront; a claim map so each stage keeps off the land earlier
-  stages use; a center plaza by the river and the first switchback street.
-- **2026-10-09 — Streets, districts and lots.** The street network went through three designs
-  and ended as wave function collapse on a tile grid, solved outward from the plaza: one
-  connected network with right-angle junctions. A district map (corporate core, neon strip,
-  megablocks, industrial, wealthy, parks) and building lots along the streets.
-- **2026-10-12 — Districts like Cities: Skylines, and parks.** The city always takes the larger
-  side of the river. Districts became a few whole areas (a compact corporate core, a commercial
-  ring, megablocks, industrial, wealthy), every lot fronts a street, and 3 to 6 round parks sit
-  on their own layer.
-- **2026-10-12/13 — The building library.** Eleven cyberpunk voxel buildings for the lots,
-  previewed at `/buildings`. Four were redesigned from real references: the Corporate Megatower
-  (SUMMIT and Edge), the Neon Commercial Tower, a Research Lab Tower (Kahn's Richards Labs) and a
-  TV-tower Landmark (CN Tower). Every building has a street entrance (five styles) and shop fronts
-  of mixed units, checked automatically for clashes and flicker.
-- **Next:** place the buildings on the lots by district, then scatter and bridges.
-
-| Districts and parks | The building library |
-|---|---|
-| ![Blueprint City: districts and round parks over the street network](site/src/world/screenshots/2026-10-12-districts-parks.webp) | ![The eleven buildings in the /buildings preview](site/src/world/screenshots/2026-10-13-building-library.webp) |
-
-## Firebase: Accounts & Saved Configurations
-
-The live site uses Firebase for sign-in and per-user saved settings. Full walkthrough, including
-the problems I hit along the way: **[Firebase tutorial](docs/tutorial/firebase-tutorial.md)**.
+The live site uses Firebase for sign-in and per-user saved settings
+([walkthrough](docs/tutorial/firebase-tutorial.md)):
 
 - **Authentication:** "Sign in with Google" in the top bar.
-- **Firestore:** once signed in, **Configurations** saves the current week's settings to your
-  account (`users/{uid}/configs`) and loads them back later, on any device. Week 3 saves all four
-  tabs, including the CSG shape tree. Security rules ([`site/firestore.rules`](site/firestore.rules))
-  let each user reach only their own data.
-- **Hosting:** the site is deployed to [procedural-worlds-d79be.web.app](https://procedural-worlds-d79be.web.app).
-- **Storage:** not used. The project stays on the free Spark plan, where new projects can't create
-  a Storage bucket, so each save's thumbnail is a small JPEG kept in its Firestore document. The
-  tutorial explains the Storage version (Part D).
+- **Firestore:** **Configurations** saves the current page's settings to your account
+  (`users/{uid}/configs`) and loads them back on any device; security rules
+  ([`site/firestore.rules`](site/firestore.rules)) let each user reach only their own data.
+- **Hosting:** deployed to [procedural-worlds-d79be.web.app](https://procedural-worlds-d79be.web.app).
+- **Storage:** not used (the free Spark plan can't create a bucket), so each save's thumbnail is a
+  small JPEG in its Firestore document.
 
-Code: [`site/src/firebase/`](site/src/firebase) (connection, sign-in, save/load) and
-[`site/src/components/AccountMenu.tsx`](site/src/components/AccountMenu.tsx) (the top-bar menu).
+Code: [`site/src/firebase/`](site/src/firebase) and [`site/src/components/AccountMenu.tsx`](site/src/components/AccountMenu.tsx).
 
-## Getting Started
-
-Each week's in-class workshop lives as its own tab in a small React +
-TypeScript + Vite site under [`site/`](site). To run it locally:
+## Getting started
 
 ```bash
 cd site
@@ -232,6 +204,5 @@ npm install
 npm run dev
 ```
 
-Then open the printed `localhost` URL. New weeks are added by dropping a
-folder under `site/src/weeks/` and registering it in
-[`site/src/weeks/registry.ts`](site/src/weeks/registry.ts).
+Then open the printed `localhost` URL and go to `/world`. New weekly studios are added as a folder
+under `site/src/weeks/` registered in [`site/src/weeks/registry.ts`](site/src/weeks/registry.ts).
