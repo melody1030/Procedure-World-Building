@@ -37,7 +37,10 @@ import { MODULES, solve, type EdgeKind } from "./wfc";
  *    Embankments widen with the depth of the cut or fill. The river, its bank and the plaza are
  *    never touched. Streets claim `road`, and VERGE beyond their edges `verge`. Small unpaved
  *    pockets enclosed by paving are paved as small squares.
- * 5. Curbs: paving that borders unpaved ground is raised one voxel, open wherever paving meets paving.
+ * 5. The blocks: the ground between the streets is smoothed (smoothBlocks), so blocks slope evenly
+ *    from one street's level to the next instead of keeping the hill's terraces, and the lots on
+ *    them need less cut and fill.
+ * 6. Curbs: paving that borders unpaved ground is raised one voxel, open wherever paving meets paving.
  */
 
 /** Width of every street, avenues included, in meters. */
@@ -68,6 +71,10 @@ const MAX_EMBANKMENT = 10;
 const CURB = 1;
 /** The strip beyond each street edge kept for lamps and street trees, in meters. */
 const VERGE = 1.5;
+/** Block smoothing: within BLOCK_REACH meters of paving the ground is free to take the smoothest
+ * shape between the streets' levels; by WILD_REACH it keeps its own (the hills beyond the city). */
+const BLOCK_REACH = 20;
+const WILD_REACH = 40;
 /** Side of the square center plaza, in meters. */
 const PLAZA_SIZE = 24;
 /** The plaza keeps this far from the river channel, in meters. */
@@ -558,7 +565,10 @@ export function buildStreets(seed: number, map: { n: number; h: Float32Array }, 
     }
   }
 
-  // 7. Curbs: paving (street or plaza) that borders unpaved ground is raised one voxel, so streets
+  // 7. The blocks between the streets, smoothed.
+  smoothBlocks(h, claim, n);
+
+  // 8. Curbs: paving (street or plaza) that borders unpaved ground is raised one voxel, so streets
   // and the plaza are edged by a curb, open wherever paving meets paving.
   const paved = (k: number) => claim[k] === CLAIM.road || claim[k] === CLAIM.plaza;
   const curb = new Uint8Array(n * n);
@@ -582,6 +592,117 @@ export function buildStreets(seed: number, map: { n: number; h: Float32Array }, 
  * (x, z), and of a band `rim` wide around it; `d` is 0 inside and the distance to the square
  * outside.
  */
+/**
+ * Smooths the ground between the streets: the smoothest surface (a membrane, Laplace's equation)
+ * held at the paving's levels (streets, sidewalks, plaza) and the river's, and, away from the
+ * paving, pulled back toward the ground as it was, fully so by WILD_REACH. Solved coarse to fine
+ * (Gauss-Seidel on a pyramid of grids), then rounded to whole voxels.
+ */
+function smoothBlocks(h: Float32Array, claim: Uint8Array, n: number) {
+  const WILD = 1000;
+  const paved = (c: number) => c === CLAIM.road || c === CLAIM.verge || c === CLAIM.plaza;
+  const held = (c: number) => paved(c) || c === CLAIM.river || c === CLAIM.bank;
+  // Distance (columns) from the paving: a two-pass chamfer.
+  const dist = new Float32Array(n * n).fill(1e9);
+  for (let k = 0; k < n * n; k++) if (paved(claim[k])) dist[k] = 0;
+  const D = Math.SQRT2;
+  for (let z = 0; z < n; z++) {
+    for (let x = 0; x < n; x++) {
+      const k = z * n + x;
+      let d = dist[k];
+      if (x > 0 && dist[k - 1] + 1 < d) d = dist[k - 1] + 1;
+      if (z > 0) {
+        if (dist[k - n] + 1 < d) d = dist[k - n] + 1;
+        if (x > 0 && dist[k - n - 1] + D < d) d = dist[k - n - 1] + D;
+        if (x < n - 1 && dist[k - n + 1] + D < d) d = dist[k - n + 1] + D;
+      }
+      dist[k] = d;
+    }
+  }
+  for (let z = n - 1; z >= 0; z--) {
+    for (let x = n - 1; x >= 0; x--) {
+      const k = z * n + x;
+      let d = dist[k];
+      if (x < n - 1 && dist[k + 1] + 1 < d) d = dist[k + 1] + 1;
+      if (z < n - 1) {
+        if (dist[k + n] + 1 < d) d = dist[k + n] + 1;
+        if (x < n - 1 && dist[k + n + 1] + D < d) d = dist[k + n + 1] + D;
+        if (x > 0 && dist[k + n - 1] + D < d) d = dist[k + n - 1] + D;
+      }
+      dist[k] = d;
+    }
+  }
+  // How strongly each column keeps its own height (Infinity: held).
+  const keep = new Float32Array(n * n);
+  const r0 = voxels(BLOCK_REACH);
+  const r1 = voxels(WILD_REACH);
+  for (let k = 0; k < n * n; k++) keep[k] = held(claim[k]) ? Infinity : WILD * smoothstep(r0, r1, dist[k]);
+
+  // The pyramid: each level half the last; a cell is held if any column in it is (at their mean).
+  const levels: { m: number; target: Float32Array; keep: Float32Array }[] = [{ m: n, target: h, keep }];
+  while (levels[levels.length - 1].m > 64) {
+    const f = levels[levels.length - 1];
+    const m = Math.ceil(f.m / 2);
+    const target = new Float32Array(m * m);
+    const kp = new Float32Array(m * m);
+    for (let z = 0; z < m; z++) {
+      for (let x = 0; x < m; x++) {
+        let sum = 0;
+        let weight = 0;
+        let count = 0;
+        let fixedSum = 0;
+        let fixed = 0;
+        for (let j = 0; j < 4; j++) {
+          const X = x * 2 + (j & 1);
+          const Z = z * 2 + (j >> 1);
+          if (X >= f.m || Z >= f.m) continue;
+          const i = Z * f.m + X;
+          if (f.keep[i] === Infinity) {
+            fixedSum += f.target[i];
+            fixed++;
+          } else {
+            sum += f.target[i];
+            weight += f.keep[i];
+            count++;
+          }
+        }
+        target[z * m + x] = fixed ? fixedSum / fixed : sum / count;
+        kp[z * m + x] = fixed ? Infinity : weight / count;
+      }
+    }
+    levels.push({ m, target, keep: kp });
+  }
+  // Coarsest first; each finer level starts from the one below and is relaxed a little (over-relaxed
+  // Gauss-Seidel), only where the ground is free to move.
+  let value: Float32Array | null = null;
+  for (let l = levels.length - 1; l >= 0; l--) {
+    const { m, target, keep: kp } = levels[l];
+    const v = target.slice();
+    const free: number[] = [];
+    for (let k = 0; k < m * m; k++) if (kp[k] < WILD) free.push(k);
+    if (value) {
+      const c = levels[l + 1].m;
+      for (const k of free) v[k] = value[Math.min(c - 1, ((k / m) | 0) >> 1) * c + Math.min(c - 1, (k % m) >> 1)];
+    }
+    const passes = l === levels.length - 1 ? 300 : 24;
+    for (let pass = 0; pass < passes; pass++) {
+      for (const k of free) {
+        const x = k % m;
+        let sum = 0;
+        let count = 0;
+        if (x > 0) (sum += v[k - 1]), count++;
+        if (x < m - 1) (sum += v[k + 1]), count++;
+        if (k >= m) (sum += v[k - m]), count++;
+        if (k < m * (m - 1)) (sum += v[k + m]), count++;
+        const w = kp[k];
+        v[k] += ((sum + w * target[k]) / (count + w) - v[k]) * 1.6;
+      }
+    }
+    value = v;
+  }
+  for (let k = 0; k < n * n; k++) if (keep[k] < WILD) h[k] = Math.round(value![k]);
+}
+
 function forSquare(x: number, z: number, half: number, rim: number, n: number, visit: (k: number, d: number) => void) {
   const r = Math.ceil(half + rim);
   for (let dz = -r; dz <= r; dz++) {

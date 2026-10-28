@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { BLUEPRINT, TERRAIN } from "../palette";
+import { BLUEPRINT, URBAN_GROUND } from "../palette";
 import { CLAIM_COLORS } from "../terrain/claims";
 import { DISTRICTS } from "../terrain/districts";
 
@@ -61,13 +61,13 @@ export interface LookUniforms {
   uShowParks: { value: number };
   uParkColor: { value: THREE.Color };
   /** The build animation: when each paved column is built (0–1, 0 for unpaved), and how far the
-   * paving has got (below 0 nothing paved, above 1 all). Unbuilt paving shows as the grass around
+   * paving has got (below 0 nothing paved, above 1 all). Unbuilt paving shows as the concrete around
    * it, so the streets appear only as they grow; the columns just built glow. */
   uBuild: { value: THREE.Texture | null };
   uBuildT: { value: number };
   uUnbuilt: { value: THREE.Color };
-  /** Unbuilt paving takes the grass's own gradient: grassLow (uUnbuilt) at the plinth to this at
-   * uGroundTop, as the mesh colors grass. */
+  /** Unbuilt paving's color from the plinth (uUnbuilt) to this at uGroundTop: both the ground's
+   * concrete, so it shows as the ground around it. */
   uGrassHigh: { value: THREE.Color };
   uGroundTop: { value: number };
   uBuildGlow: { value: THREE.Color };
@@ -75,7 +75,7 @@ export interface LookUniforms {
 
 export function createLookUniforms(): LookUniforms {
   const colors = [0, ...Object.values(CLAIM_COLORS)].map((c) => new THREE.Color(c));
-  return { uLookGrid: { value: 0.35 }, uLookStrata: { value: 7 }, uClaims: { value: null }, uClaimSize: { value: 1 }, uShowClaims: { value: 0 }, uClaimColors: { value: colors }, uSuit: { value: null }, uShowSuit: { value: 0 }, uDistricts: { value: null }, uShowDistricts: { value: 0 }, uDistrictColors: { value: DISTRICTS.map((d) => new THREE.Color(d.color)) }, uLots: { value: null }, uShowLots: { value: 0 }, uParks: { value: null }, uShowParks: { value: 0 }, uParkColor: { value: new THREE.Color(CLAIM_COLORS.park) }, uBuild: { value: null }, uBuildT: { value: 2 }, uUnbuilt: { value: new THREE.Color(TERRAIN.grassLow) }, uGrassHigh: { value: new THREE.Color(TERRAIN.grassHigh) }, uGroundTop: { value: 1 }, uBuildGlow: { value: new THREE.Color(BLUEPRINT.cyan) } };
+  return { uLookGrid: { value: 0.35 }, uLookStrata: { value: 7 }, uClaims: { value: null }, uClaimSize: { value: 1 }, uShowClaims: { value: 0 }, uClaimColors: { value: colors }, uSuit: { value: null }, uShowSuit: { value: 0 }, uDistricts: { value: null }, uShowDistricts: { value: 0 }, uDistrictColors: { value: DISTRICTS.map((d) => new THREE.Color(d.color)) }, uLots: { value: null }, uShowLots: { value: 0 }, uParks: { value: null }, uShowParks: { value: 0 }, uParkColor: { value: new THREE.Color(CLAIM_COLORS.park) }, uBuild: { value: null }, uBuildT: { value: 2 }, uUnbuilt: { value: new THREE.Color(URBAN_GROUND.concrete) }, uGrassHigh: { value: new THREE.Color(URBAN_GROUND.concrete) }, uGroundTop: { value: 1 }, uBuildGlow: { value: new THREE.Color(BLUEPRINT.cyan) } };
 }
 
 const LOOK_FRAGMENT = /* glsl */ `
@@ -100,17 +100,17 @@ const LOOK_FRAGMENT = /* glsl */ `
     // column and paint it all the way down to the plinth.
     bool outerWall = an.y < 0.5 && max(abs(p.x), abs(p.z)) > uClaimSize * 0.5 - 0.01;
     if (!outerWall) {
-    // The build animation: paving not yet built looks like grass; the newest paving glows.
+    // The build animation: paving not yet built looks like the concrete around it; the newest paving glows.
     if (uBuildT < 1.5) {
       vec2 column = floor(p.xz - vLookNormal.xz * 0.5 + uClaimSize * 0.5);
       float o = texture2D(uBuild, (column + 0.5) / uClaimSize).r;
       if (o > 0.0) {
         // (Ground not printed yet keeps its blueprint tint.)
-        vec3 grass = mix(uUnbuilt, uGrassHigh, clamp(p.y / uGroundTop, 0.0, 1.0)) * lookShade;
-        // Not built yet: its top is grass, its sides keep their own color. Only paving the front
+        vec3 ground = mix(uUnbuilt, uGrassHigh, clamp(p.y / uGroundTop, 0.0, 1.0)) * lookShade;
+        // Not built yet: its top is the ground's concrete, its sides keep their own color. Only paving the front
         // has just reached glows (an unbuilt side must not fall through to the glow).
         if (o > uBuildT) {
-          if (an.y > 0.5) diffuseColor.rgb = mix(diffuseColor.rgb, grass, 1.0 - vPrinting);
+          if (an.y > 0.5) diffuseColor.rgb = mix(diffuseColor.rgb, ground, 1.0 - vPrinting);
         } else if (o > uBuildT - 0.03) diffuseColor.rgb = mix(diffuseColor.rgb, uBuildGlow, 0.65 * (1.0 - vPrinting));
       }
     }
@@ -192,16 +192,27 @@ export interface PrintExtras {
   /** Lift what is flattened onto the print layer a little, so a mesh drawn over the ground (the
    * cut-away ground) never shares that plane with it. */
   lift?: boolean;
+  /**
+   * Per-lot ceilings (voxels) for the lots' dig: texel i of the texture is the ceiling for the
+   * vertices whose `aLot` attribute is i, lowered to dig that lot away from the top down.
+   */
+  lotCaps?: { value: THREE.Texture | null };
 }
 
 const NO_CAP = { value: 1e5 };
 
-function patchVertex(shader: THREE.WebGLProgramParametersWithUniforms, uniforms: PrintUniforms, cap: { value: number } = NO_CAP, lift = false) {
+function patchVertex(shader: THREE.WebGLProgramParametersWithUniforms, uniforms: PrintUniforms, cap: { value: number } = NO_CAP, lift = false, lotCaps?: { value: THREE.Texture | null }) {
   shader.uniforms.uPrintY = uniforms.uPrintY;
   shader.uniforms.uCapY = cap;
   shader.vertexShader = shader.vertexShader
     .replace("#include <common>", `#include <common>\nuniform float uPrintY;\nuniform float uCapY;\nvarying float vPrinting;\n#define PRINT_LIFT ${lift ? "0.15" : "0.0"}`)
     .replace("#include <begin_vertex>", VERTEX);
+  if (lotCaps) {
+    shader.uniforms.uLotCaps = lotCaps;
+    shader.vertexShader = shader.vertexShader
+      .replace("#include <common>", "#include <common>\nuniform sampler2D uLotCaps;\nattribute float aLot;")
+      .replace("#include <begin_vertex>", "#include <begin_vertex>\ntransformed.y = min(transformed.y, texelFetch(uLotCaps, ivec2(int(aLot + 0.5), 0), 0).r);");
+  }
 }
 
 /**
@@ -211,7 +222,7 @@ function patchVertex(shader: THREE.WebGLProgramParametersWithUniforms, uniforms:
 export function printMaterial(uniforms: PrintUniforms, options: THREE.MeshStandardMaterialParameters = {}, look?: LookUniforms, extras: PrintExtras = {}): THREE.MeshStandardMaterial {
   const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, ...options });
   material.onBeforeCompile = (shader) => {
-    patchVertex(shader, uniforms, extras.cap, extras.lift);
+    patchVertex(shader, uniforms, extras.cap, extras.lift, extras.lotCaps);
     if (extras.reveal) {
       Object.assign(shader.uniforms, extras.reveal);
       shader.vertexShader = shader.vertexShader
@@ -247,7 +258,7 @@ export function printMaterial(uniforms: PrintUniforms, options: THREE.MeshStanda
       .replace("#include <color_fragment>", "#include <color_fragment>\ndiffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.012, 0.03, 0.06), vPrinting * 0.85);")
       .replace("#include <emissivemap_fragment>", "#include <emissivemap_fragment>\ntotalEmissiveRadiance += uPrintColor * vPrinting * 0.12;");
   };
-  material.customProgramCacheKey = () => (look ? "print-look" : "print") + (extras.cap ? "-cap" : "") + (extras.reveal ? "-reveal" : "") + (extras.plain ? "-plain" : "") + (extras.arriving ? "-arriving" : "") + (extras.part ? "-" + extras.part : "") + (extras.lift ? "-lift" : "");
+  material.customProgramCacheKey = () => (look ? "print-look" : "print") + (extras.cap ? "-cap" : "") + (extras.reveal ? "-reveal" : "") + (extras.plain ? "-plain" : "") + (extras.arriving ? "-arriving" : "") + (extras.part ? "-" + extras.part : "") + (extras.lift ? "-lift" : "") + (extras.lotCaps ? "-lots" : "");
   return material;
 }
 

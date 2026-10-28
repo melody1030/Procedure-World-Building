@@ -40,23 +40,30 @@ import type { Columns } from "./voxelize";
  *    Parks are not a district: see 3b.
  * 3. Density per cell: the district's base density · (1 − 0.5 · access / span).
  *    3b. Parks, a layer of their own over the districts: PARKS_MIN to PARKS_MAX of them (the seed
- *    picks), each PARK_SIZE_MIN to PARK_SIZE_MAX, a round patch grown outward from a spot on
- *    steep or hilly ground (plus slow noise) outside the core. Every park keeps at least PARK_APART of ground from every other;
- *    a spot that can't fit half a park is skipped for the next. Their free columns are claimed
+ *    picks), each PARK_SIZE_MIN to PARK_SIZE_MAX, a whole rectangle (PARK_ASPECT_MIN to
+ *    PARK_ASPECT_MAX long) at a spot on steep or hilly ground (plus slow noise) outside the core.
+ *    Every park keeps at least PARK_APART of ground from every other; a spot that can't fit one,
+ *    even shrunk to PARK_FILL of its size, is skipped for the next. Their free columns are claimed
  *    `park`, so no lot goes there. If the land runs out, there are fewer.
  * 4. Lots, as in Cities: Skylines' zoning: only along the streets, so every lot fronts one. Each
  *    street side (avenues first) is cut behind the verge into lots ZONE meters a cell: the
- *    district's width in cells (± one, seeded; fewer where a full one doesn't fit). A lot starts
+ *    district's width in cells or one more (seeded; fewer where a full one doesn't fit). A second
+ *    walk fills the gaps the first left with lots of any width from MIN_PLOT up. A lot starts
  *    MIN_DEPTH deep and deepens a meter at a time to the district's depth (up to 4 cells), while
  *    the street straight behind the block is still farther than the lot is deep: lots from
- *    facing streets meet half an ALLEY short of halfway. A lot is kept only if it touches the
+ *    facing streets meet half an ALLEY short of halfway. A block shallower than THROUGH_BLOCK
+ *    (parallel streets a tile apart) is not split: its lots run through it, fronting both streets. A lot is kept only if it touches the
  *    verge, every column is free (so not a park), no column is within an
  *    ALLEY of another lot, and its ground spans at most MAX_LOT_STEP (megablocks MAX_STACK_STEP:
  *    they stack down slopes). Its columns are claimed `lot`.
  * 5. Corner lots: the frontage the walk leaves (rounded corners, short runs, odd pockets) is
- *    packed with grid-aligned rectangles, the district's size or smaller down to MIN_DEPTH a
- *    side, each fronting a verge or street along at least half its narrower side, with the same
+ *    packed with grid-aligned rectangles, the district's size or smaller down to MIN_PLOT a
+ *    side (in CORNER_STEP steps), each fronting a verge or street along at least a quarter of its
+ *    narrower side, with the same
  *    alley and ground rules. So every lot still fronts a street.
+ * 6. Small lots: a lot narrower than MERGE_BELOW is merged with the neighbor beside it on the same
+ *    frontage (across their alley); one still narrower than MIN_PLOT is given up, its ground left
+ *    free (see mergeSmallLots).
  */
 
 export const DISTRICT = { core: 0, commercial: 1, megablock: 2, industrial: 3, wealthy: 4 } as const;
@@ -68,7 +75,7 @@ export const NO_DISTRICT = 255;
  * base density, by district. */
 export const DISTRICTS: { name: string; color: number; width: number; depth: number; density: number }[] = [
   { name: "Corporate core", color: 0x22d3ee, width: 2, depth: 4, density: 1 },
-  { name: "Commercial", color: 0xe879f9, width: 1, depth: 3, density: 0.75 },
+  { name: "Commercial", color: 0xe879f9, width: 2, depth: 3, density: 0.75 },
   { name: "Megablocks", color: 0x8b5cf6, width: 2, depth: 4, density: 0.6 },
   { name: "Industrial", color: 0xf59e0b, width: 3, depth: 4, density: 0.35 },
   { name: "Wealthy", color: 0xfde68a, width: 2, depth: 3, density: 0.3 },
@@ -83,9 +90,10 @@ const PARKS_MAX = 6;
 const PARK_SIZE_MIN = 700;
 const PARK_SIZE_MAX = 1400;
 const PARK_APART = 25;
-/** A park never reaches past this times the radius of a circle of its size. */
-const PARK_ROUND = 1.1;
-/** The least share of its size a park must reach within that radius, or the spot is skipped. */
+/** A park is a rectangle, its long side this many times its short one (the seed picks). */
+const PARK_ASPECT_MIN = 1;
+const PARK_ASPECT_MAX = 2;
+/** The smallest share of its size a park may shrink to where a whole one doesn't fit; below it the spot is skipped. */
 const PARK_FILL = 0.8;
 const PARK_FREQ = 3;
 /** Cells either side over which slope is averaged when choosing parks. */
@@ -122,6 +130,17 @@ const MIN_DEPTH = 6;
 const ALLEY = 1;
 const MAX_LOT_STEP = 6;
 const MAX_STACK_STEP = 10;
+/** Small lots: narrower than MERGE_BELOW (meters) either way, a lot is merged with a neighbor
+ * (into one no wider than MERGE_WIDEST); still narrower than MIN_PLOT, it is given up. */
+const MERGE_BELOW = 10;
+const MERGE_WIDEST = 24;
+const MIN_PLOT = 8;
+/** Corner lots are tried in sizes this many meters apart, and may stand this far (meters) back from the paving. */
+const FORECOURT = 1;
+/** Corner lots are tried in sizes this many meters apart. */
+const CORNER_STEP = 2;
+/** Blocks shallower than this (meters, sidewalk to sidewalk) get lots running through them. */
+const THROUGH_BLOCK = 20;
 /** The strip between a street's edge and its lots (the verge), in meters. */
 const VERGE = 1.5;
 
@@ -138,6 +157,8 @@ export interface Lot {
   /** Lowest and highest ground under the lot, in voxels. */
   low: number;
   high: number;
+  /** The level its site is graded to (the median of its ground: as much cut as fill), its building's floor. */
+  floor: number;
 }
 
 export interface Districts {
@@ -158,6 +179,8 @@ export interface Districts {
   shares: number[];
   /** How many parks were placed (their columns are claimed `park`). */
   parks: number;
+  /** Each park's rectangle, in columns: x0 ≤ x < x1, z0 ≤ z < z1. */
+  parkRects: { x0: number; z0: number; x1: number; z1: number }[];
 }
 
 const N8: [number, number, number][] = [
@@ -182,7 +205,7 @@ export function buildDistricts(seed: number, cols: Columns, streets: Streets, hu
   const access = new Float32Array(total).fill(Infinity);
   const density = new Float32Array(total);
   const lotId = new Int32Array(n * n);
-  const empty: Districts = { cells, district, access, density, lots: [], lotId, claims, shares: DISTRICTS.map(() => 0), parks: 0 };
+  const empty: Districts = { cells, district, access, density, lots: [], lotId, claims, shares: DISTRICTS.map(() => 0), parks: 0, parkRects: [] };
   const plaza = streets.plazas[0];
   if (!plaza) return empty;
 
@@ -344,9 +367,8 @@ export function buildDistricts(seed: number, cols: Columns, streets: Streets, hu
     outside.push(c);
   }
   outside.sort((a, b) => parkScore[b] - parkScore[a]);
-  // Each park starts at the best-scoring spot at least PARK_APART from every other park and grows
-  // outward, nearest cell first, so it comes out round, to its size, never coming within PARK_APART
-  // of another park.
+  // Each park is a rectangle at the best-scoring spot at least PARK_APART from every other park,
+  // whole (no street or edge cutting it), never coming within PARK_APART of another park.
   const parkRng = new Rng(seed ^ 0x51ed270b);
   let parksLeft = PARKS_MIN + Math.floor(parkRng.next() * (PARKS_MAX - PARKS_MIN + 1));
   const isPark = new Uint8Array(total);
@@ -369,50 +391,60 @@ export function buildDistricts(seed: number, cols: Columns, streets: Streets, hu
     return false;
   };
   const starts: P2[] = [];
-  for (const start of outside) {
-    if (parksLeft <= 0) break;
-    const q = cellCenter(start);
-    if (isPark[start] || nearOther(start, -1)) continue;
-    const frontier = new MinHeap();
-    const seen = new Set([start]);
-    const sx = start % cells;
-    const sz = (start - sx) / cells;
-    frontier.push(start, 0);
-    let grown = 0;
-    const target = Math.round((PARK_SIZE_MIN + parkRng.next() * (PARK_SIZE_MAX - PARK_SIZE_MIN)) / (cellM * cellM));
-    const radius = PARK_ROUND * Math.sqrt(target / Math.PI);
-    const id = starts.length;
-    const cellsOf: number[] = [];
-    while (frontier.size && grown < target) {
-      const c = frontier.pop();
-      isPark[c] = 1;
-      parkOf[c] = id + 1;
-      cellsOf.push(c);
-      grown++;
-      const cx = c % cells;
-      const cz = (c - cx) / cells;
-      for (const [dx, dz] of N8.slice(0, 4)) {
-        const x = cx + dx;
-        const z = cz + dz;
-        if (x < 0 || z < 0 || x >= cells || z >= cells) continue;
-        const nc = z * cells + x;
-        if (seen.has(nc) || isPark[nc] || !land[nc] || fromPlaza(nc) <= CORE_RADIUS || nearOther(nc, id)) continue;
-        seen.add(nc);
-        // Round: the nearest cell to the park's center grows first, and nothing past the radius of
-        // a circle a little larger than its size, so a park cut by a street stays a disc and doesn't
-        // wrap around the street's end.
-        const r = Math.hypot(x - sx, z - sz);
-        if (r > radius) continue;
-        frontier.push(nc, r);
+  const parkRects: Districts["parkRects"] = [];
+  // A rectangle of cells with its corner at (x0, z0), if every cell is land outside the core, no
+  // park yet, and clear of the other parks.
+  const fits = (x0: number, z0: number, w: number, h: number, id: number) => {
+    if (x0 < 0 || z0 < 0 || x0 + w > cells || z0 + h > cells) return false;
+    for (let z = z0; z < z0 + h; z++) {
+      for (let x = x0; x < x0 + w; x++) {
+        const c = z * cells + x;
+        if (isPark[c] || !land[c] || fromPlaza(c) <= CORE_RADIUS || nearOther(c, id)) return false;
       }
     }
-    // A spot where too little of the disc fits (a street or the edge cuts it): undo it and try the
-    // next spot, so every park is a whole round patch.
-    if (grown < PARK_FILL * target) {
-      for (const c of cellsOf) isPark[c] = parkOf[c] = 0;
-      continue;
+    return true;
+  };
+  for (const start of outside) {
+    if (parksLeft <= 0) break;
+    if (isPark[start] || nearOther(start, -1)) continue;
+    const sx = start % cells;
+    const sz = (start - sx) / cells;
+    const target = (PARK_SIZE_MIN + parkRng.next() * (PARK_SIZE_MAX - PARK_SIZE_MIN)) / (cellM * cellM);
+    const aspect = PARK_ASPECT_MIN + parkRng.next() * (PARK_ASPECT_MAX - PARK_ASPECT_MIN);
+    const id = starts.length;
+    // A rectangle of the park's size around the spot, either way round, shifted up to a quarter
+    // of its sides; where none fits whole (a street or the edge cuts it), a smaller one, down to
+    // PARK_FILL of the size; else the next spot.
+    let found: [number, number, number, number] | null = null;
+    search: for (const scale of [1, 0.9, PARK_FILL]) {
+      const long = Math.max(2, Math.round(Math.sqrt(target * scale * aspect)));
+      const short = Math.max(2, Math.round((target * scale) / long));
+      for (const [w, h] of [
+        [long, short],
+        [short, long],
+      ]) {
+        for (const fz of [0.5, 0.25, 0.75]) {
+          for (const fx of [0.5, 0.25, 0.75]) {
+            const x0 = sx - Math.round(w * fx);
+            const z0 = sz - Math.round(h * fz);
+            if (fits(x0, z0, w, h, id)) {
+              found = [x0, z0, w, h];
+              break search;
+            }
+          }
+        }
+      }
     }
-    starts.push(q);
+    if (!found) continue;
+    const [x0, z0, w, h] = found;
+    for (let z = z0; z < z0 + h; z++) {
+      for (let x = x0; x < x0 + w; x++) {
+        isPark[z * cells + x] = 1;
+        parkOf[z * cells + x] = id + 1;
+      }
+    }
+    starts.push({ x: (x0 + w / 2) * CELL, z: (z0 + h / 2) * CELL });
+    parkRects.push({ x0: x0 * CELL, z0: z0 * CELL, x1: (x0 + w) * CELL, z1: (z0 + h) * CELL });
     parksLeft--;
   }
   // 2. Districts.
@@ -541,6 +573,9 @@ export function buildDistricts(seed: number, cols: Columns, streets: Streets, hu
   // lot's ground-step limit keeps lots off ground too steep to build on.)
   const usable = (k: number) => claim[k] === CLAIM.free && !gap[k] && district[cellOf(k % n, Math.floor(k / n))] !== NO_DISTRICT;
   const ordered = [...streets.streets].sort((a, b) => (a.kind === b.kind ? 0 : a.kind === "main" ? -1 : 1));
+  // Two walks: whole zone cells, then (`fill`) whatever width from MIN_PLOT up fits the gaps the
+  // first left (short straight runs between bends, ends of blocks).
+  for (const fill of [false, true])
   for (const st of ordered) {
     const curve = st.curve;
     if (curve.length < 4) continue;
@@ -579,11 +614,15 @@ export function buildDistricts(seed: number, cols: Columns, streets: Streets, hu
         }
         const spec = DISTRICTS[d];
         const maxStep = voxels(d === DISTRICT.megablock ? MAX_STACK_STEP : MAX_LOT_STEP);
-        // Width in zone cells: the district's, give or take one, then fewer where it doesn't fit.
-        const want = Math.max(1, spec.width + Math.floor(rng.next() * 3) - 1);
+        // Width in zone cells: the district's or one more, then fewer where it doesn't fit.
+        const want = spec.width + Math.floor(rng.next() * 2);
         let placed = 0;
-        for (let wc = want; wc >= 1 && !placed; wc--) {
-          const w = voxels(wc * ZONE);
+        const widths: number[] = [];
+        if (fill) for (let m = want * ZONE; m >= MIN_PLOT; m--) widths.push(m);
+        else for (let wc = want; wc >= 1; wc--) widths.push(wc * ZONE);
+        for (const meters of widths) {
+          if (placed) break;
+          const w = voxels(meters);
           const depth = voxels(MIN_DEPTH);
           if (s + w > length) continue;
           // The lot's axis follows the street at its middle; the street must be nearly straight along it.
@@ -635,6 +674,16 @@ export function buildDistricts(seed: number, cols: Columns, streets: Streets, hu
           // the ground stays within the step, and the paving straight ahead (the street behind the
           // block) is still farther than the lot is deep: lots from facing streets meet halfway.
           // Cross streets at the block's ends don't stop it. Then back off half an alley.
+          // A thin block (parallel streets one tile apart): too shallow to split between its two
+          // streets, so the lot runs through it, fronting both, short of the far sidewalk by an alley.
+          const block = Math.min(
+            ...[corners[0], corners[1], fc].map((q, i) => {
+              const inX = i === 0 ? tx * 0.5 : i === 1 ? -tx * 0.5 : 0;
+              const inZ = i === 0 ? tz * 0.5 : i === 1 ? -tz * 0.5 : 0;
+              return ahead(q.x + inX + mx, q.z + inZ + mz, mx, mz, voxels(THROUGH_BLOCK));
+            }),
+          );
+          const through = block < voxels(THROUGH_BLOCK);
           const grow = voxels(1);
           let deep = depth;
           let stopped = false;
@@ -648,7 +697,7 @@ export function buildDistricts(seed: number, cols: Columns, streets: Streets, hu
               // From the strip's far edge, pulled half a column in from the lot's sides.
               const inX = q === corners[3] ? tx * 0.5 : q === corners[2] ? -tx * 0.5 : 0;
               const inZ = q === corners[3] ? tz * 0.5 : q === corners[2] ? -tz * 0.5 : 0;
-              if (ahead(q.x + inX + mx * grow, q.z + inZ + mz * grow, mx, mz, Math.ceil(t)) < t - 0.5) fits = false;
+              if (ahead(q.x + inX + mx * grow, q.z + inZ + mz * grow, mx, mz, Math.ceil(t)) < (through ? voxels(ALLEY) : t - 0.5)) fits = false;
             }
             for (const k of strip) {
               if (!fits) break;
@@ -692,7 +741,7 @@ export function buildDistricts(seed: number, cols: Columns, streets: Streets, hu
           ];
           for (const k of rasterize(ring, n, false)) gap[k] = 1;
           const centerCell = cellOf((corners[0].x + corners[2].x) / 2, (corners[0].z + corners[2].z) / 2);
-          lots.push({ id, corners, facing: Math.atan2(-mz, -mx), district: d as District, density: density[centerCell], area: columns.length * VOXEL_M * VOXEL_M, low, high });
+          lots.push({ id, corners, facing: Math.atan2(-mz, -mx), district: d as District, density: density[centerCell], area: columns.length * VOXEL_M * VOXEL_M, low, high, floor: low });
           placed = w;
         }
         s += placed ? placed + voxels(ALLEY) : voxels(1);
@@ -700,9 +749,24 @@ export function buildDistricts(seed: number, cols: Columns, streets: Streets, hu
     }
   }
 
+  // The street walk's small lots merged or given up first (see 6), so what they leave is packed
+  // with corner lots too; the alleys round the lots kept are marked again.
+  {
+    const kept = mergeSmallLots(lots, lotId, claim, height, n);
+    lots.length = 0;
+    lots.push(...kept);
+    gap.fill(0);
+    const a = voxels(ALLEY);
+    for (const lot of lots) {
+      const f = frame(lot);
+      const at = (u: number, v: number) => ({ x: f.a.x + f.t.x * u + f.m.x * v, z: f.a.z + f.t.z * u + f.m.z * v });
+      for (const k of rasterize([at(-a, -a), at(f.width + a, -a), at(f.width + a, f.depth + a), at(-a, f.depth + a)], n, false)) gap[k] = 1;
+    }
+  }
+
   // 5. Corner lots: the frontage the street walk leaves (rounded corners, short runs, odd
   // pockets) is packed with grid-aligned rectangles, the district's size or smaller down to
-  // MIN_DEPTH a side, each touching a verge or street, an alley from every other lot. A summed-area
+  // MIN_PLOT a side, each touching a verge or street, an alley from every other lot. A summed-area
   // table of usable columns tests a rectangle at once; `taken` holds those placed so far.
   const alley = voxels(ALLEY);
   const sat = new Int32Array((n + 1) * (n + 1));
@@ -720,25 +784,31 @@ export function buildDistricts(seed: number, cols: Columns, streets: Streets, hu
     const what = claim[z * n + x];
     return what === CLAIM.verge || what === CLAIM.road || what === CLAIM.plaza;
   };
-  // Columns of a side of the rectangle that touch paving just outside it.
+  // Columns of a side of the rectangle with paving just outside it, within FORECOURT (beside a
+  // bend the verge curves away from a grid-aligned side; the strip between is the lot's forecourt).
+  const reach = voxels(FORECOURT);
+  const near = (x: number, z: number, dx: number, dz: number) => {
+    for (let d = 0; d < reach; d++) if (isFront(x + dx * d, z + dz * d)) return true;
+    return false;
+  };
   const touching = (x0: number, z0: number, x1: number, z1: number) => {
     let north = 0;
     let south = 0;
     let west = 0;
     let east = 0;
     for (let x = x0; x < x1; x++) {
-      if (isFront(x, z0 - 1)) north++;
-      if (isFront(x, z1)) south++;
+      if (near(x, z0 - 1, 0, -1)) north++;
+      if (near(x, z1, 0, 1)) south++;
     }
     for (let z = z0; z < z1; z++) {
-      if (isFront(x0 - 1, z)) west++;
-      if (isFront(x1, z)) east++;
+      if (near(x0 - 1, z, -1, 0)) west++;
+      if (near(x1, z, 1, 0)) east++;
     }
     return [north, east, south, west];
   };
   const taken = new Uint8Array(n * n);
   const stride = voxels(0.5);
-  const minSide = voxels(MIN_DEPTH);
+  const minSide = voxels(MIN_PLOT);
   for (let z0 = 0; z0 + minSide <= n; z0 += stride) {
     for (let x0 = 0; x0 + minSide <= n; x0 += stride) {
       if (taken[z0 * n + x0] || !openIn(x0, z0, 1, 1)) continue;
@@ -747,7 +817,10 @@ export function buildDistricts(seed: number, cols: Columns, streets: Streets, hu
       const maxStep = voxels(d === DISTRICT.megablock ? MAX_STACK_STEP : MAX_LOT_STEP);
       const wide = Math.max(minSide, voxels(spec.width * ZONE));
       const deepest = Math.max(minSide, voxels(Math.min(spec.depth * ZONE, 2 * ZONE)));
-      for (const [w, dd] of [[wide, deepest], [deepest, wide], [wide, minSide], [minSide, wide], [minSide, minSide]]) {
+      // Every size from the district's down to MIN_PLOT a side, in steps of CORNER_STEP, roomiest first.
+      const lengths = [...new Set([wide, deepest, ...Array.from({ length: 8 }, (_, i) => voxels(MIN_PLOT + i * CORNER_STEP))])].filter((v) => v >= minSide && v <= Math.max(wide, deepest));
+      const sizes = lengths.flatMap((a) => lengths.map((b) => [a, b])).sort((p, q) => Math.min(q[0], q[1]) - Math.min(p[0], p[1]) || q[0] * q[1] - p[0] * p[1]);
+      for (const [w, dd] of sizes) {
         if (x0 + w > n || z0 + dd > n || !openIn(x0, z0, w, dd)) continue;
         // Every earlier corner lot starts before this one in scan order, so one that overlaps it
         // crosses its top row or its left column.
@@ -759,8 +832,9 @@ export function buildDistricts(seed: number, cols: Columns, streets: Streets, hu
         const z1 = z0 + dd;
         const sides = touching(x0, z0, x1, z1);
         const front = sides.indexOf(Math.max(...sides));
-        // It must front a street along at least half its narrower side.
-        if (sides[front] < Math.min(w, dd) / 2) continue;
+        // It must front a street along at least a quarter of its narrower side (beside a bend, less
+        // of it touches the rounded verge).
+        if (sides[front] < Math.min(w, dd) / 4) continue;
         let low = Infinity;
         let high = -Infinity;
         for (let z = z0; z < z1; z++) {
@@ -786,11 +860,14 @@ export function buildDistricts(seed: number, cols: Columns, streets: Streets, hu
         }
         for (let z = Math.max(0, z0 - alley); z < Math.min(n, z1 + alley); z++) taken.fill(1, z * n + Math.max(0, x0 - alley), z * n + Math.min(n, x1 + alley));
         const center = cellOf((x0 + x1) / 2, (z0 + z1) / 2);
-        lots.push({ id, corners, facing, district: d, density: density[center], area: w * dd * VOXEL_M * VOXEL_M, low, high });
+        lots.push({ id, corners, facing, district: d, density: density[center], area: w * dd * VOXEL_M * VOXEL_M, low, high, floor: low });
         break;
       }
     }
   }
+
+  // 6. Small lots: merged with a neighbor, else given up.
+  const kept = mergeSmallLots(lots, lotId, claim, height, n);
 
   // Shares of the land.
   const counts = DISTRICTS.map(() => 0);
@@ -800,7 +877,121 @@ export function buildDistricts(seed: number, cols: Columns, streets: Streets, hu
     counts[district[c]]++;
     any++;
   }
-  return { cells, district, access, density, lots, lotId, claims, shares: counts.map((k) => (any ? k / any : 0)), parks: starts.length };
+  // Each lot's floor: the median of its ground.
+  const under: number[][] = kept.map(() => []);
+  for (let k = 0; k < n * n; k++) if (lotId[k]) under[lotId[k] - 1].push(height[k]);
+  kept.forEach((lot, i) => {
+    const hs = under[i].sort((a, b) => a - b);
+    if (hs.length) lot.floor = hs[hs.length >> 1];
+  });
+  return { cells, district, access, density, lots: kept, lotId, claims, shares: counts.map((k) => (any ? k / any : 0)), parks: starts.length, parkRects };
+}
+
+/** A lot's frame: its front-left corner, unit vectors along its front (t) and toward its back (m), and its width and depth (columns). */
+function frame(lot: Lot) {
+  const [a, b, , d] = lot.corners;
+  const width = Math.hypot(b.x - a.x, b.z - a.z);
+  const depth = Math.hypot(d.x - a.x, d.z - a.z);
+  return { a, t: { x: (b.x - a.x) / width, z: (b.z - a.z) / width }, m: { x: (d.x - a.x) / depth, z: (d.z - a.z) / depth }, width, depth };
+}
+
+/**
+ * Small lots (6 in the list above). A lot narrower than MERGE_BELOW either way is merged with a
+ * neighbor of its district facing the same way along the same frontage (across the alley between
+ * them), as deep as the shallower of the two and no wider than MERGE_WIDEST, if the ground under it
+ * stays within the district's step; of its neighbors, the one giving the roomiest lot. Lots still
+ * narrower than MIN_PLOT are given up (their ground is left free). Lots are renumbered, and
+ * `lotId` and `claim` rewritten to match; returns the lots kept.
+ */
+function mergeSmallLots(lots: Lot[], lotId: Int32Array, claim: Uint8Array, height: ArrayLike<number>, n: number): Lot[] {
+  const live = lots.map(() => true);
+  const narrow = (lot: Lot) => Math.min(frame(lot).width, frame(lot).depth);
+  const columns: number[][] = lots.map(() => []);
+  for (let k = 0; k < n * n; k++) if (lotId[k]) columns[lotId[k] - 1].push(k);
+  const release = (id: number) => {
+    for (const k of columns[id]) {
+      lotId[k] = 0;
+      claim[k] = CLAIM.free;
+    }
+    columns[id] = [];
+  };
+  // The two lots as one, or null if they can't be.
+  const merged = (p: Lot, q: Lot): { corners: P2[]; columns: number[]; low: number; high: number } | null => {
+    if (p.district !== q.district || Math.abs(Math.atan2(Math.sin(p.facing - q.facing), Math.cos(p.facing - q.facing))) > 0.05) return null;
+    const f = frame(p);
+    const g = frame(q);
+    const local = (c: P2) => ({ u: (c.x - f.a.x) * f.t.x + (c.z - f.a.z) * f.t.z, v: (c.x - f.a.x) * f.m.x + (c.z - f.a.z) * f.m.z });
+    const qs = q.corners.map(local);
+    // Same frontage: its front edge on p's.
+    if (Math.abs(qs[0].v) > 1.5 || Math.abs(qs[1].v) > 1.5) return null;
+    const u0 = Math.min(qs[0].u, qs[1].u);
+    const u1 = Math.max(qs[0].u, qs[1].u);
+    const gap = Math.max(u0 - f.width, -u1);
+    if (gap < -0.5 || gap > voxels(ALLEY) + 1.5) return null;
+    const lo = Math.min(0, u0);
+    const hi = Math.max(f.width, u1);
+    const deep = Math.min(f.depth, g.depth);
+    if (hi - lo > voxels(MERGE_WIDEST)) return null;
+    const at = (u: number, v: number) => ({ x: f.a.x + f.t.x * u + f.m.x * v, z: f.a.z + f.t.z * u + f.m.z * v });
+    const corners = [at(lo, 0), at(hi, 0), at(hi, deep), at(lo, deep)];
+    const columns = rasterize(corners, n);
+    let low = Infinity;
+    let high = -Infinity;
+    for (const k of columns) {
+      const id = lotId[k];
+      if (id !== 0 ? id !== p.id + 1 && id !== q.id + 1 : claim[k] !== CLAIM.free) return null;
+      low = Math.min(low, height[k]);
+      high = Math.max(high, height[k]);
+    }
+    if (high - low > voxels(p.district === DISTRICT.megablock ? MAX_STACK_STEP : MAX_LOT_STEP)) return null;
+    return { corners, columns, low, high };
+  };
+  for (let changed = true; changed; ) {
+    changed = false;
+    const order = lots.map((_, i) => i).filter((i) => live[i] && narrow(lots[i]) < voxels(MERGE_BELOW));
+    order.sort((i, j) => narrow(lots[i]) - narrow(lots[j]));
+    for (const i of order) {
+      if (!live[i]) continue;
+      const p = lots[i];
+      let best: { j: number; m: NonNullable<ReturnType<typeof merged>>; side: number } | null = null;
+      for (let j = 0; j < lots.length; j++) {
+        if (j === i || !live[j]) continue;
+        const q = lots[j];
+        if (Math.hypot(q.corners[0].x - p.corners[0].x, q.corners[0].z - p.corners[0].z) > voxels(MERGE_WIDEST) + 8) continue;
+        const m = merged(p, q);
+        if (!m) continue;
+        const side = Math.min(Math.hypot(m.corners[1].x - m.corners[0].x, m.corners[1].z - m.corners[0].z), Math.hypot(m.corners[3].x - m.corners[0].x, m.corners[3].z - m.corners[0].z));
+        if (side > narrow(p) + 0.5 && (!best || side > best.side)) best = { j, m, side };
+      }
+      if (!best) continue;
+      const q = lots[best.j];
+      release(i);
+      release(best.j);
+      live[best.j] = false;
+      for (const k of best.m.columns) {
+        lotId[k] = p.id + 1;
+        claim[k] = CLAIM.lot;
+      }
+      columns[i] = best.m.columns;
+      Object.assign(p, { corners: best.m.corners, low: best.m.low, high: best.m.high, area: best.m.columns.length * VOXEL_M * VOXEL_M, density: Math.max(p.density, q.density) });
+      changed = true;
+    }
+  }
+  for (let i = 0; i < lots.length; i++) {
+    if (live[i] && narrow(lots[i]) < voxels(MIN_PLOT) - 0.25) {
+      release(i);
+      live[i] = false;
+    }
+  }
+  // Renumbered.
+  const kept = lots.filter((_, i) => live[i]);
+  const renumber = new Int32Array(lots.length + 1);
+  kept.forEach((lot, i) => {
+    renumber[lot.id + 1] = i + 1;
+    lot.id = i;
+  });
+  for (let k = 0; k < n * n; k++) if (lotId[k]) lotId[k] = renumber[lotId[k]];
+  return kept;
 }
 
 /** Column indices inside a convex quadrilateral (corners in order), clipped to the map; with

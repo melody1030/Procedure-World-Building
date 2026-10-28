@@ -9,13 +9,27 @@ import type { Streets } from "../terrain/streets";
 import type { RiverPath } from "../terrain/river";
 import { BASE, WORLD_SIZE, voxels } from "../scale";
 import { buildPlinth } from "./base";
-import { BUILD_PHASES, PAVING_FROM, type BuildUp } from "../terrain/buildup";
+import { makePrintable, type PrintableBuilding } from "../buildings/print";
+import { buildingMaterials, buildingObject, disposeBuilding } from "../buildings/render";
+import { fitBuilding, type BuildingPlan } from "../city/placement";
+import type { Parks } from "../city/parks";
+import { buildParkModel } from "../city/parkModels";
+import { BUILD_PHASES, PAVING_FROM, PAVING_TO, type BuildUp } from "../terrain/buildup";
 import { createLookUniforms, createPrintUniforms, printDepthMaterial, printMaterial } from "./print";
+import { LifeView } from "./life";
+import type { Life } from "../life/agents";
 
 /** Diorama framing: looking down on the whole table-top from a raised corner. */
 const VIEW_AZIMUTH = THREE.MathUtils.degToRad(38);
 const VIEW_ELEVATION = THREE.MathUtils.degToRad(38);
 const FOV = 32;
+/** How much of the buildings' phase goes to staggering them, Landmark first, outward from the plaza. */
+const RAISE_SPREAD = 0.6;
+/** The share of a building's time spent digging its lot level before it starts going up. */
+const DIG_SHARE = 0.2;
+/** Park props: how much of the buildings' phase one park's props are staggered over (middle first), and how long each takes to grow. */
+const PARK_SPREAD = 0.25;
+const PARK_GROW = 0.15;
 
 
 function toGeometry(data: GeometryData): THREE.BufferGeometry {
@@ -30,6 +44,8 @@ function toGeometry(data: GeometryData): THREE.BufferGeometry {
 
 /** Half the diorama's width, in voxels: everything about the camera and light scales from it. */
 const EXTENT = WORLD_SIZE / 2;
+/** Everything there is to see: the plinth and terrain, and the tallest building (the Landmark, under 200 m, on high ground). */
+const NEAR_BOX = new THREE.Box3(new THREE.Vector3(-EXTENT, -EXTENT, -EXTENT), new THREE.Vector3(EXTENT, 1200, EXTENT));
 
 /**
  * The diorama: renderer, camera, sunlight, the plinth, and the terrain React hands it (ground,
@@ -67,14 +83,37 @@ export class WorldView {
   private riverCut: THREE.Mesh | null = null;
   private beforeStreets: THREE.Mesh | null = null;
   private streetCut: THREE.Mesh | null = null;
+  /** The ground the site grading digs out of the lots, and its per-lot ceilings (see `applyRaise`). */
+  private dig: THREE.Mesh | null = null;
+  private readonly lotCaps = { value: null as THREE.DataTexture | null };
+  private lotCapData = new Float32Array(0);
+  /** When each lot's building starts (its `delay`), by lot id. */
+  private lotDelay = new Map<number, number>();
   private readonly carve = { value: 1e5 };
   private readonly fill = createPrintUniforms();
   private readonly flow = { uBuild: { value: null as THREE.Texture | null }, uBuildT: { value: 2 }, uClaimSize: { value: 1 } };
   private build: BuildUp | null = null;
+  /** The buildings on the lots: built a few per frame, each raised in turn in the timeline's last
+   * phase (`delay` 0–RAISE_SPREAD, the Landmark first, then outward from the plaza). */
+  private readonly city = new THREE.Group();
+  private cityItems: { group: THREE.Group; delay: number; print: PrintableBuilding }[] = [];
+  private cityQueue: { plan: BuildingPlan; delay: number }[] = [];
+  private cityFrame = 0;
+  /** The parks' props, grown out of the ground in turn as `raise` passes each one's start (see setParks). */
+  private readonly parks = new THREE.Group();
+  private readonly parkRaise = { value: 1 };
+  private parkMaterials: { solid: THREE.Material; glow: THREE.Material } | null = null;
+  /** How far the buildings have risen, 0–1 (the timeline's last phase). */
+  private raise = 1;
   /** Makes the build animation's data for the current terrain; called the first time it plays. */
   private makeBuild: (() => BuildUp) | null = null;
   private groundTop = 0;
   private frame = 0;
+  /** The inhabitants: out once the city is built (the print at its end), while shown. */
+  private life: LifeView | null = null;
+  private lifeShown = true;
+  private built = true;
+  private readonly clock = new THREE.Clock();
 
   constructor(private readonly mount: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
@@ -107,7 +146,7 @@ export class WorldView {
     this.scene.add(hemi, sun, sun.target);
 
     const half = WORLD_SIZE / 2;
-    this.scene.add(buildPlinth(half));
+    this.scene.add(buildPlinth(half), this.city, this.parks);
 
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(mount);
@@ -126,16 +165,83 @@ export class WorldView {
 
     const loop = () => {
       this.frame = requestAnimationFrame(loop);
+      this.easeInset();
       this.controls.update();
+      this.fitNear();
+      const dt = this.clock.getDelta();
+      if (this.life) {
+        this.life.group.visible = this.lifeShown && this.built;
+        if (this.life.group.visible) this.life.update(dt);
+      }
       this.renderer.render(this.scene, this.camera);
     };
     loop();
   }
 
-  /** Default view: the whole diorama in frame, pulled back further on tall (portrait) screens. */
+  /**
+   * Pushes the near plane out to just short of the diorama (its box, up to the Landmark's top), so
+   * the depth buffer's precision is spent where things are: with it fixed at 1 voxel, details a
+   * tenth of a voxel apart (a billboard's pixels on its frame, sign glyphs) flickered from afar.
+   */
+  private fitNear() {
+    const near = Math.max(1, NEAR_BOX.distanceToPoint(this.camera.position) * 0.8);
+    if (Math.abs(near - this.camera.near) > this.camera.near * 0.05) {
+      this.camera.near = near;
+      this.camera.updateProjectionMatrix();
+    }
+  }
+
+  /** Pixels of the view's left side covered by the settings panel, as set and as currently drawn (eased). */
+  private insetTarget = 0;
+  private insetNow = 0;
+  private insetSet = false;
+
+  /**
+   * Tells the view how much of its left side a panel covers. The picture slides right by half of
+   * that (a view offset: the camera itself doesn't move), so the city sits in the middle of the
+   * part you can see; it eases there as the panel opens or closes.
+   */
+  setInsetLeft(px: number) {
+    this.insetTarget = px;
+    if (!this.insetSet) {
+      // The first time (at load), jump there and frame the camera for the space left.
+      this.insetSet = true;
+      this.insetNow = px;
+      this.applyInset();
+      this.frameCamera();
+    }
+  }
+
+  private easeInset() {
+    if (Math.abs(this.insetTarget - this.insetNow) < 0.5) {
+      if (this.insetNow !== this.insetTarget) {
+        this.insetNow = this.insetTarget;
+        this.applyInset();
+      }
+      return;
+    }
+    this.insetNow += (this.insetTarget - this.insetNow) * 0.15;
+    this.applyInset();
+  }
+
+  private applyInset() {
+    const width = this.mount.clientWidth;
+    const height = this.mount.clientHeight;
+    if (width === 0 || height === 0) return;
+    if (this.insetNow < 0.5) this.camera.clearViewOffset();
+    else this.camera.setViewOffset(width, height, -this.insetNow / 2, 0, width, height);
+  }
+
+  /**
+   * Default view: the whole diorama in frame, pulled back further on tall (portrait) screens. It
+   * fits the part of the view a panel doesn't cover.
+   */
   frameCamera() {
     const fit = EXTENT / Math.tan(THREE.MathUtils.degToRad(FOV / 2));
-    const distance = fit * (this.camera.aspect < 1.2 ? Math.min(2.0, 1.05 / this.camera.aspect) : 0.86);
+    const width = this.mount.clientWidth;
+    const height = this.mount.clientHeight;
+    const aspect = width && height ? Math.max(0.3, (width - this.insetTarget) / height) : this.camera.aspect;
+    const distance = fit * (aspect < 1.2 ? Math.min(2.0, 1.05 / aspect) : 0.86);
     this.controls.target.set(0, 0, 0);
     this.camera.position.set(
       distance * Math.cos(VIEW_ELEVATION) * Math.sin(VIEW_AZIMUTH),
@@ -164,6 +270,8 @@ export class WorldView {
     this.remove(this.riverCut);
     this.remove(this.streetCut);
     this.remove(this.beforeStreets);
+    this.remove(this.dig);
+    this.dig = null;
     this.riverCut = null;
     this.streetCut = null;
     this.beforeStreets = null;
@@ -182,6 +290,154 @@ export class WorldView {
       this.water = new THREE.Mesh(toGeometry(water), printMaterial(this.fill, { roughness: 0.15, metalness: 0.1, transparent: true, opacity: 0.85 }, undefined, { plain: true, reveal: this.flow, arriving: true }));
       this.water.receiveShadow = true;
       this.scene.add(this.water);
+    }
+  }
+
+  /**
+   * Replaces the buildings: one per plan, positioned on its lot (columns → world, base on the lot's
+   * lowest ground, entrance to the street).
+   * Models are built a few per frame so the page stays responsive.
+   */
+  setBuildings(plans: BuildingPlan[], n: number) {
+    cancelAnimationFrame(this.cityFrame);
+    for (const { group, print } of this.cityItems) {
+      print.dispose();
+      disposeBuilding(group);
+      this.city.remove(group);
+    }
+    this.cityItems = [];
+    const half = n / 2;
+    const plaza = plans.find((p) => p.archetype === "landmark-tower");
+    const far = Math.max(1, ...plans.map((p) => (plaza ? Math.hypot(p.x - plaza.x, p.z - plaza.z) : 0)));
+    this.cityQueue = plans
+      .map((plan) => ({ plan, delay: plan.archetype === "landmark-tower" || !plaza ? 0 : RAISE_SPREAD * (Math.hypot(plan.x - plaza.x, plan.z - plaza.z) / far) }))
+      .sort((a, b) => a.delay - b.delay);
+    this.lotDelay = new Map(this.cityQueue.map(({ plan, delay }) => [plan.lot, delay]));
+    const step = () => {
+      const start = performance.now();
+      while (this.cityQueue.length && performance.now() - start < 10) {
+        const { plan, delay } = this.cityQueue.shift()!;
+        // All of it within its lot, less a gap all round.
+        const group = buildingObject(fitBuilding(plan));
+        group.position.set(plan.x - half, plan.base, plan.z - half);
+        group.rotation.y = plan.rotation;
+        this.city.add(group);
+        this.cityItems.push({ group, delay, print: makePrintable(group) });
+      }
+      this.applyRaise();
+      if (this.cityQueue.length) this.cityFrame = requestAnimationFrame(step);
+    };
+    this.cityFrame = requestAnimationFrame(step);
+  }
+
+  /**
+   * Replaces the parks' props: per park, one solid and one glow mesh. Each prop grows out of its
+   * base in turn: the parks start outward from the plaza (as the buildings do), and within a park
+   * the middle first (the props' `delay`).
+   */
+  setParks(parks: Parks | null) {
+    for (const o of [...this.parks.children]) {
+      (o as THREE.Mesh).geometry.dispose();
+      this.parks.remove(o);
+    }
+    if (!parks) return;
+    const n = parks.ground.n;
+    const half = n / 2;
+    const far = Math.max(n * 0.5, ...parks.parks.map((p) => p.fromPlaza));
+    const { solid, glow } = this.parkMaterialsFor();
+    parks.parks.forEach((park, i) => {
+      const model = buildParkModel(park, i + 1);
+      const start = RAISE_SPREAD * (park.fromPlaza / far);
+      for (const [data, grow, material, shadow] of [
+        [model.solid, model.solidGrow, solid, true],
+        [model.glow, model.glowGrow, glow, false],
+      ] as const) {
+        if (!data.index.length) continue;
+        const geometry = toGeometry(data);
+        const g = grow.slice();
+        for (let v = 0; v < g.length; v += 4) {
+          g[v] -= half;
+          g[v + 2] -= half;
+          g[v + 3] = start + g[v + 3] * PARK_SPREAD;
+        }
+        geometry.setAttribute("aGrow", new THREE.BufferAttribute(g, 4));
+        geometry.translate(-half, 0, -half);
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.receiveShadow = shadow;
+        mesh.userData.shadow = shadow;
+        this.parks.add(mesh);
+      }
+    });
+    this.applyRaise();
+  }
+
+  /** The buildings' two materials, patched to grow each park prop out of its base (`aGrow`: base xyz, start). */
+  private parkMaterialsFor() {
+    if (this.parkMaterials) return this.parkMaterials;
+    const patch = (material: THREE.Material, key: string) => {
+      const m = material.clone();
+      m.onBeforeCompile = (shader) => {
+        shader.uniforms.uParkRaise = this.parkRaise;
+        shader.vertexShader = shader.vertexShader
+          .replace("#include <common>", "#include <common>\nuniform float uParkRaise;\nattribute vec4 aGrow;")
+          .replace(
+            "#include <begin_vertex>",
+            `#include <begin_vertex>
+float grow = clamp((uParkRaise - aGrow.w) / ${PARK_GROW.toFixed(3)}, 0.0, 1.0);
+// Ease out with a little overshoot, so each prop pops up.
+float popped = grow <= 0.0 ? 0.0 : 1.0 + 2.2 * pow(grow - 1.0, 3.0) + 1.2 * pow(grow - 1.0, 2.0);
+transformed = aGrow.xyz + (transformed - aGrow.xyz) * popped;`,
+          );
+      };
+      m.customProgramCacheKey = () => key;
+      return m;
+    };
+    const { solid, glow } = buildingMaterials();
+    this.parkMaterials = { solid: patch(solid, "park-solid"), glow: patch(glow, "park-glow") };
+    return this.parkMaterials;
+  }
+
+  /** Replaces the inhabitants. */
+  setLife(life: Life | null) {
+    if (this.life) {
+      this.scene.remove(this.life.group);
+      this.life.dispose();
+    }
+    this.life = life ? new LifeView(life, life.map.n / 2) : null;
+    if (this.life) this.scene.add(this.life.group);
+  }
+
+  setShowLife(on: boolean) {
+    this.lifeShown = on;
+  }
+
+  setShowBuildings(on: boolean) {
+    this.city.visible = on;
+  }
+
+  /**
+   * As `raise` passes a building's delay, its lot is first dug level (the graded ground sinks from
+   * its top down, DIG_SHARE of the building's time), then the building goes up out of it, storey
+   * by storey (frame, then cladding). A lot with no building is dug at the start.
+   */
+  private applyRaise() {
+    this.parkRaise.value = this.raise >= 1 ? 2 : this.raise;
+    for (const o of this.parks.children) o.castShadow = this.raise >= 1 && o.userData.shadow;
+    const progress = (delay: number) => Math.min(1, Math.max(0, (this.raise - delay) / (1 - RAISE_SPREAD)));
+    for (const { group, delay, print } of this.cityItems) {
+      const s = Math.max(0, (progress(delay) - DIG_SHARE) / (1 - DIG_SHARE));
+      group.visible = s > 0;
+      print.setProgress(s);
+    }
+    const caps = this.lotCaps.value;
+    const dig = this.build?.dig;
+    if (caps && dig) {
+      const data = this.lotCapData;
+      for (let i = 1; i < data.length; i++) {
+        const p = Math.min(1, progress(this.lotDelay.get(i - 1) ?? 0) / DIG_SHARE);
+        data[i] = p <= 0 ? 1e5 : Math.floor(dig.high[i] - p * (dig.high[i] - dig.low[i] + 1));
+      }
+      caps.needsUpdate = true;
     }
   }
 
@@ -209,6 +465,19 @@ export class WorldView {
       flow.needsUpdate = true;
       this.flow.uBuild.value = flow;
       this.flow.uClaimSize.value = build.n;
+      if (build.dig) {
+        const geometry = toGeometry(build.dig.geometry);
+        geometry.setAttribute("aLot", new THREE.BufferAttribute(build.dig.lots, 1));
+        this.lotCaps.value?.dispose();
+        this.lotCapData = new Float32Array(build.dig.high.length).fill(1e5);
+        const caps = new THREE.DataTexture(this.lotCapData, build.dig.high.length, 1, THREE.RedFormat, THREE.FloatType);
+        caps.needsUpdate = true;
+        this.lotCaps.value = caps;
+        this.dig = new THREE.Mesh(geometry, printMaterial(this.print, { polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 }, this.look, { lift: true, lotCaps: this.lotCaps }));
+        // A flat lot's old ground lies exactly on its new floor: drawn in front of it until dug.
+        this.dig.receiveShadow = true;
+        this.scene.add(this.dig);
+      }
       if (build.riverCut) {
         this.riverCut = new THREE.Mesh(toGeometry(build.riverCut), printMaterial(this.print, {}, this.look, { cap: this.carve, lift: true }));
         this.riverCut.receiveShadow = true;
@@ -544,6 +813,7 @@ export class WorldView {
     const [terrain, river, water] = BUILD_PHASES;
     const share = (from: number, to: number) => Math.min(1, Math.max(0, (t - from) / (to - from)));
     const done = t >= 1;
+    this.built = done;
     if (!done) this.ensureBuild();
     const b = this.build;
     // 1. The terrain, as it was before the river and the streets.
@@ -553,15 +823,19 @@ export class WorldView {
     const dug = share(terrain.end, river.end);
     this.carve.value = dug <= 0 || !b ? 1e5 : Math.floor(b.riverHigh - dug * (b.riverHigh - b.riverLow + 1));
     if (this.riverCut) this.riverCut.visible = !done && dug < 1;
+    if (this.dig) this.dig.visible = !done;
     // 3. The water, running down the channel from the source.
     const filled = share(river.end, water.end);
     if (this.water) this.water.visible = done || filled > 0 || !b;
     this.flow.uBuildT.value = done || !b ? 2 : filled;
     // 4–5. Paving, from the plaza out along the streets; the street cuts go as the paving reaches them.
-    const paving = done || !b ? 2 : t < PAVING_FROM ? -1 : (t - PAVING_FROM) / (1 - PAVING_FROM);
+    const paving = done || !b ? 2 : t < PAVING_FROM ? -1 : (t - PAVING_FROM) / (PAVING_TO - PAVING_FROM);
     this.look.uBuildT.value = paving;
     // Until the front reaches a changed column, it shows the ground before the streets.
     if (this.beforeStreets) this.beforeStreets.visible = !!b && !done;
+    // 6. The buildings rise.
+    this.raise = done ? 1 : share(PAVING_TO, 1);
+    this.applyRaise();
   }
 
   private resize() {
@@ -571,10 +845,13 @@ export class WorldView {
     this.renderer.setSize(width, height);
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
+    this.applyInset();
   }
 
   dispose() {
     cancelAnimationFrame(this.frame);
+    this.setLife(null);
+    cancelAnimationFrame(this.cityFrame);
     for (const [type, handler, capture] of this.pointerHandlers) this.renderer.domElement.removeEventListener(type, handler as EventListener, capture);
     this.resizeObserver.disconnect();
     this.controls.dispose();

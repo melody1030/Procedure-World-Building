@@ -90,6 +90,29 @@ export class GeometryBuilder {
     this.i += 6;
   }
 
+  /** Vertices so far. */
+  get count() {
+    return this.v;
+  }
+
+  /** Turns the vertices from `from` on by `angle` about y, then moves them by (x, y, z). */
+  place(from: number, angle: number, x: number, y: number, z: number) {
+    const c = Math.cos(angle);
+    const s = Math.sin(angle);
+    for (let v = from; v < this.v; v++) {
+      const o = v * 3;
+      const px = this.pos[o];
+      const pz = this.pos[o + 2];
+      this.pos[o] = px * c + pz * s + x;
+      this.pos[o + 1] += y;
+      this.pos[o + 2] = -px * s + pz * c + z;
+      const nx = this.nor[o];
+      const nz = this.nor[o + 2];
+      this.nor[o] = nx * c + nz * s;
+      this.nor[o + 2] = -nx * s + nz * c;
+    }
+  }
+
   finish(): GeometryData {
     return {
       position: this.pos.slice(0, this.v * 3),

@@ -19,6 +19,10 @@ export interface WorldState {
   /** Outline the lots. */
   showLots: boolean;
   showParks: boolean;
+  /** Stand the building library's models on the lots. */
+  showBuildings: boolean;
+  /** Let the people, pigeons and cats out. */
+  showLife: boolean;
 }
 
 type Action =
@@ -31,6 +35,8 @@ type Action =
   | { type: "setShowDistricts"; on: boolean }
   | { type: "setShowLots"; on: boolean }
   | { type: "setShowParks"; on: boolean }
+  | { type: "setShowBuildings"; on: boolean }
+  | { type: "setShowLife"; on: boolean }
   | { type: "setRiverControl"; control: TerrainParams["river"]["control"] };
 
 function reducer(state: WorldState, action: Action): WorldState {
@@ -61,6 +67,10 @@ function reducer(state: WorldState, action: Action): WorldState {
       return { ...state, showLots: action.on };
     case "setShowParks":
       return { ...state, showParks: action.on };
+    case "setShowBuildings":
+      return { ...state, showBuildings: action.on };
+    case "setShowLife":
+      return { ...state, showLife: action.on };
     case "setRiverControl":
       return { ...state, params: { ...state.params, river: { ...state.params.river, control: action.control } } };
   }
@@ -91,6 +101,8 @@ export function useWorldState() {
     showDistricts: shownFromUrl("districts"),
     showLots: shownFromUrl("lots"),
     showParks: shownFromUrl("parks"),
+    showBuildings: !(new URLSearchParams(window.location.search).get("hide") ?? "").split(",").includes("buildings"),
+    showLife: !(new URLSearchParams(window.location.search).get("hide") ?? "").split(",").includes("life"),
   }));
   return {
     state,
@@ -103,6 +115,8 @@ export function useWorldState() {
     setShowDistricts: (on: boolean) => dispatch({ type: "setShowDistricts", on }),
     setShowLots: (on: boolean) => dispatch({ type: "setShowLots", on }),
     setShowParks: (on: boolean) => dispatch({ type: "setShowParks", on }),
+    setShowBuildings: (on: boolean) => dispatch({ type: "setShowBuildings", on }),
+    setShowLife: (on: boolean) => dispatch({ type: "setShowLife", on }),
     setRiverControl: (control: TerrainParams["river"]["control"]) => dispatch({ type: "setRiverControl", control }),
   };
 }

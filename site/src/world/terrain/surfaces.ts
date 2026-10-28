@@ -7,26 +7,39 @@ import type { Columns } from "./voxelize";
 import { CLAIM, type Claims } from "./claims";
 
 /**
- * Stage 7, surfaces: every column gets a ground type by rule, in this order (first match wins):
+ * Stage 7, surfaces: the whole island is one city of poured concrete. Every column gets a ground
+ * type by rule, in this order (first match wins):
  *
  *   riverbed  inside the river channel
  *   plaza     a plaza (claimed by the streets)
  *   road      a street
  *   curb      the edge of a street or plaza: paving that borders anything that isn't paved, so
  *             each plaza is framed by a curb, open where streets come in
- *   bank      next to the channel
- *   rock      a cliff rim (a neighbor at least Rock cliff lower), or the highest land: Grass limit
- *             is the share of land (by area, lowest first) that may be grass
- *   dirt      ground steeper than Dirt slope: the voxel stairs on hillsides
- *   grass     everything else
+ *   bank      next to the channel: the quay
+ *   ledge     a rim with a neighbor at least Ledge drop lower: a pale coping along the drop
+ *   stairs    ground steeper than Stair slope: flights of concrete steps up the hillsides
+ *   concrete  everything else
  *
- * Each column also gets one of three tones from slow noise, so large areas vary without changing
- * type. Steepness is read from the height map from *before* terracing, across 3 m: terrace
- * edges are sudden steps that would read as near-vertical, and edges are the Rock cliff rule's job,
- * so dirt marks only hillsides that are steep as a whole.
+ * Each column also gets one of three tones from slow noise, so the concrete is grimed in large
+ * patches (Grime). Steepness is read from the height map from *before* terracing, across 3 m:
+ * terrace edges are sudden steps that would read as near-vertical, and edges are Ledge drop's job,
+ * so stairs mark only hillsides that are steep as a whole. Every step in the ground is faced with
+ * a concrete retaining wall.
  */
 
-export const SURFACE = { riverbed: 0, bank: 1, rock: 2, dirt: 3, grass: 4, road: 5, curb: 6, plaza: 7 } as const;
+export const SURFACE = { riverbed: 0, bank: 1, rock: 2, dirt: 3, grass: 4, road: 5, curb: 6, plaza: 7, sidewalk: 8, pavement: 9, concrete: 10, lawn: 11, paving: 12, planter: 13, path: 14, ledge: 15, stairs: 16 } as const;
+/** Ground with no retaining wall under its steps: cliff rock shows instead (park hills, the riverbed). */
+export const NATURAL_SIDES: ReadonlySet<number> = new Set([SURFACE.riverbed, SURFACE.lawn, SURFACE.grass, SURFACE.dirt, SURFACE.rock]);
+/**
+ * Laid in slabs: the size of each kind's square tiles in columns. `paintCity` gives alternate
+ * tiles the darker and lighter tone (0 and 2), and the mesh shades them apart whatever Ground tones is.
+ */
+export const TILES: ReadonlyMap<number, number> = new Map([
+  [SURFACE.plaza, 6],
+  [SURFACE.paving, 8],
+  [SURFACE.sidewalk, 4],
+  [SURFACE.path, 4],
+]);
 export type Surface = (typeof SURFACE)[keyof typeof SURFACE];
 
 export interface Surfaces {
@@ -49,9 +62,8 @@ const N4 = [
 
 export function buildSurfaces(seed: number, cols: Columns, river: River, claims: Claims, curb: Uint8Array, before: HeightMap, p: TerrainParams["surfaces"]): Surfaces {
   const { n, height } = cols;
-  const CLIFF = voxels(p.rockCliff);
-  const STEEP = Math.tan((p.dirtSlope * Math.PI) / 180);
-  const GRASS_TOP = grassTop(height, p.grassLimit);
+  const LEDGE = voxels(p.ledgeDrop);
+  const STEEP = Math.tan((p.stairSlope * Math.PI) / 180);
   const smooth = before.h;
   const channel = river.channel;
   const claim = claims.claim;
@@ -74,11 +86,11 @@ export function buildSurfaces(seed: number, cols: Columns, river: River, claims:
       else if (claim[k] === CLAIM.plaza) s = SURFACE.plaza;
       else if (claim[k] === CLAIM.road) s = SURFACE.road;
       else if (channel && N4.some(([dx, dz]) => channel[Math.min(n - 1, Math.max(0, z + dz)) * n + Math.min(n - 1, Math.max(0, x + dx))])) s = SURFACE.bank;
-      else if (h > GRASS_TOP || N4.some(([dx, dz]) => h - at(x + dx, z + dz) >= CLIFF)) s = SURFACE.rock;
+      else if (N4.some(([dx, dz]) => h - at(x + dx, z + dz) >= LEDGE)) s = SURFACE.ledge;
       else {
         const gx = (smoothAt(x + SLOPE_REACH, z) - smoothAt(x - SLOPE_REACH, z)) / (2 * SLOPE_REACH);
         const gz = (smoothAt(x, z + SLOPE_REACH) - smoothAt(x, z - SLOPE_REACH)) / (2 * SLOPE_REACH);
-        s = Math.sqrt(gx * gx + gz * gz) > STEEP ? SURFACE.dirt : SURFACE.grass;
+        s = Math.sqrt(gx * gx + gz * gz) > STEEP ? SURFACE.stairs : SURFACE.concrete;
       }
       kind[k] = s;
       // Paving has no tone patches, so its faces stay merged.
@@ -86,25 +98,4 @@ export function buildSurfaces(seed: number, cols: Columns, river: River, claims:
     }
   }
   return { kind, tone };
-}
-
-/**
- * The height below which `share` of the land lies (a percentile by area). Ground above it is bare
- * rock, so every terrain gets about the same amount of bare peak, however tall or flat it is.
- */
-function grassTop(height: Int16Array, share: number): number {
-  if (share >= 1) return Infinity;
-  const counts = new Map<number, number>();
-  let land = 0;
-  for (const h of height) {
-    counts.set(h, (counts.get(h) ?? 0) + 1);
-    land++;
-  }
-  const levels = [...counts.keys()].sort((a, b) => a - b);
-  let below = 0;
-  for (const h of levels) {
-    below += counts.get(h)!;
-    if (below >= share * land) return h;
-  }
-  return Infinity;
 }

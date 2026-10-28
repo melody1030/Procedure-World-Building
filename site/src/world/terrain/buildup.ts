@@ -1,6 +1,6 @@
 import type { GeometryData } from "../geometry";
 import { CLAIM } from "./claims";
-import { meshColumns, meshCut } from "./mesh";
+import { meshColumns, meshCut, meshDig } from "./mesh";
 import { SURFACE } from "./surfaces";
 import type { Terrain } from "./pipeline";
 import { NO_WATER } from "./voxelize";
@@ -16,23 +16,33 @@ import { NO_WATER } from "./voxelize";
  * 3. the river fills, its water running down the channel from the source to the mouth;
  * 4. the plaza is paved, from its center out;
  * 5. the streets grow from the plaza along the network: as the front reaches a column, its old
- *    ground gives way to the finished one, cut, filled and paved, embankments and all.
+ *    ground gives way to the finished one, cut, filled and paved, embankments and all;
+ * 6. the buildings rise on their lots, the Landmark first, then outward from the plaza (they are
+ *    the renderer's; see WorldView.setBuildings).
  *
  * Nothing here changes the terrain: it is drawn on top of it and cleared as the timeline passes.
  */
 
+/** How long each phase plays at 1×, in seconds; the buildings take 10% longer than they did (1.6 s). */
+const PHASE_SECONDS = { terrain: 2.8, river: 1.6, water: 0.9, plaza: 0.7, streets: 2.4, buildings: 1.76 };
+/** The whole build at 1×, in seconds. */
+export const BUILD_SECONDS = Object.values(PHASE_SECONDS).reduce((a, b) => a + b, 0);
+const until = (...ids: (keyof typeof PHASE_SECONDS)[]) => ids.reduce((sum, id) => sum + PHASE_SECONDS[id], 0) / BUILD_SECONDS;
+
 /** The timeline's phases, each ending at its share of the whole (0–1). */
 export const BUILD_PHASES = [
-  { id: "terrain", label: "Printing terrain", end: 0.32 },
-  { id: "river", label: "Carving the river", end: 0.5 },
-  { id: "water", label: "Filling the river", end: 0.6 },
-  { id: "plaza", label: "Building the plaza", end: 0.68 },
-  { id: "streets", label: "Growing streets", end: 1 },
+  { id: "terrain", label: "Printing terrain", end: until("terrain") },
+  { id: "river", label: "Carving the river", end: until("terrain", "river") },
+  { id: "water", label: "Filling the river", end: until("terrain", "river", "water") },
+  { id: "plaza", label: "Building the plaza", end: until("terrain", "river", "water", "plaza") },
+  { id: "streets", label: "Growing streets", end: until("terrain", "river", "water", "plaza", "streets") },
+  { id: "buildings", label: "Raising buildings", end: 1 },
 ] as const;
 
-/** Where paving starts on the timeline, and the plaza's share of the paving that follows. */
+/** Where paving starts and ends on the timeline, and the plaza's share of the paving. */
 export const PAVING_FROM = BUILD_PHASES[2].end;
-const PLAZA_SHARE = (BUILD_PHASES[3].end - PAVING_FROM) / (1 - PAVING_FROM);
+export const PAVING_TO = BUILD_PHASES[4].end;
+const PLAZA_SHARE = (BUILD_PHASES[3].end - PAVING_FROM) / (PAVING_TO - PAVING_FROM);
 
 export interface BuildUp {
   n: number;
@@ -47,6 +57,12 @@ export interface BuildUp {
   riverCut: GeometryData | null;
   streetCut: GeometryData | null;
   /**
+   * The ground the site grading digs out of the lots, dug lot by lot as each building starts:
+   * the mesh, each vertex's lot (from 1, 0 for none), and each lot's highest top and floor (index
+   * = lot id + 1). Null when no lot is dug.
+   */
+  dig: { geometry: GeometryData; lots: Float32Array; high: Float32Array; low: Float32Array } | null;
+  /**
    * When each column the plaza or the streets change is built, as a share of the paving (0–1]:
    * the plaza from its center out, then everything else they change (paving, cuts, fills,
    * embankments) by its distance along the changed land from the plaza. 0 elsewhere.
@@ -56,7 +72,7 @@ export interface BuildUp {
   flow: Float32Array<ArrayBuffer>;
   /** The highest ground at any point of the build, in voxels. */
   top: number;
-  /** The highest the ground may reach (Shaping's Height), which the grass's colors run up to. */
+  /** The highest the ground may reach (Shaping's Height). */
   groundTop: number;
   /** The river cut's highest top and lowest floor. */
   riverHigh: number;
@@ -94,10 +110,13 @@ export function buildUp(t: Terrain): BuildUp {
   // (paved, or cut or filled, embankments included) is rebuilt when the paving front reaches it.
   const early = new Int16Array(n * n);
   for (let k = 0; k < n * n; k++) early[k] = before(t.river.h[k]);
-  const changed = (k: number) => paved(k) || early[k] !== height[k];
+  // The city's paint changes columns too (dug lots excepted: their dig brings it); it comes with the paving.
+  const urban = t.urban?.kind;
+  const dug = t.grading?.dugBy;
+  const changed = (k: number) => paved(k) || early[k] !== height[k] || (!!urban && urban[k] !== t.surfaces.kind[k] && !dug?.[k]);
 
   // Paving order: the plaza by its distance from the center, then a walk outward from the plaza's
-  // edge over every changed column, so cuts, fills and embankments come with their street.
+  // edge over every changed column, so cuts, fills, embankments and the city's paint come with their street.
   const order = new Float32Array(n * n);
   const dist = new Int32Array(n * n).fill(-1);
   const queue = new Int32Array(n * n);
@@ -165,7 +184,7 @@ export function buildUp(t: Terrain): BuildUp {
     for (let k = 0; k < n * n; k++) if (water[k] !== NO_WATER) flow[k] = reach[k] < 0 ? 1 : Math.max(1e-3, reach[k] / longest);
   }
 
-  // Its mesh: the river-carved heights, with every paved kind turned back to grass (tone kept).
+  // Its mesh: the river-carved heights, with every paved kind turned back to concrete (tone kept).
   let earlyMin = Infinity;
   let earlyMax = -Infinity;
   for (let k = 0; k < n * n; k++) {
@@ -173,12 +192,35 @@ export function buildUp(t: Terrain): BuildUp {
     earlyMax = Math.max(earlyMax, early[k]);
   }
   const kind = t.surfaces.kind.slice();
-  for (let k = 0; k < n * n; k++) if (kind[k] === SURFACE.road || kind[k] === SURFACE.curb || kind[k] === SURFACE.plaza) kind[k] = SURFACE.grass;
+  for (let k = 0; k < n * n; k++) if (kind[k] === SURFACE.road || kind[k] === SURFACE.curb || kind[k] === SURFACE.plaza) kind[k] = SURFACE.concrete;
   const beforeStreets = meshColumns({ n, height: early, water: new Int16Array(n * n).fill(NO_WATER), min: earlyMin, max: earlyMax, top: t.columns.top }, { kind, tone: t.surfaces.tone }, t.params.surfaces.tones).geometry;
+
+  // The site grading's dig: the ground before it, over the graded ground.
+  let dig: BuildUp["dig"] = null;
+  if (t.grading) {
+    const { dugBy } = t.grading;
+    // (The finished ground: the parks regrade the odd column a lot's dig reached.)
+    const ground = t.parks?.ground ?? t.grading.ground;
+    const digTop = new Int16Array(n * n).fill(NO_WATER);
+    const count = t.districts.lots.length + 1;
+    const high = new Float32Array(count).fill(-Infinity);
+    const low = new Float32Array(count).fill(Infinity);
+    for (let k = 0; k < n * n; k++) {
+      const id = dugBy[k];
+      // (Only what is cut: filled ground is there from the start.)
+      if (id === 0 || height[k] <= ground.height[k]) continue;
+      digTop[k] = height[k];
+      high[id] = Math.max(high[id], height[k]);
+      low[id] = Math.min(low[id], ground.height[k]);
+    }
+    const mesh = meshDig(n, digTop, ground.height, dugBy, t.surfaces, t.params.surfaces.tones, t.columns.top);
+    if (mesh) dig = { ...mesh, high, low };
+  }
 
   return {
     n,
     beforeStreets,
+    dig,
     riverCut: meshCut(n, riverTop, height, t.columns.top),
     // (The street cuts need no mesh of their own: `beforeStreets` holds them until the front comes.)
     streetCut: null,

@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { RangeInput, glassCardClass, valueClass } from "../../components/controls";
-import { BUILD_PHASES } from "../terrain/buildup";
+import { GLASS, VALUE } from "./kit";
+import { BUILD_PHASES, BUILD_SECONDS } from "../terrain/buildup";
 
-/** Seconds for the whole build: terrain, river, water, plaza and streets. */
-const PRINT_SECONDS = 8;
+/** Seconds for the whole build: terrain, river, water, plaza, streets and buildings (see PHASE_SECONDS). */
+const PRINT_SECONDS = BUILD_SECONDS;
 /** Playback speeds offered by the speed menu; 1 is PRINT_SECONDS for the whole build. */
 const SPEEDS = [0.5, 1, 2, 4];
 
@@ -19,7 +19,7 @@ function PlayIcon() {
 
 function ChevronDown() {
   return (
-    <svg {...iconProps} className="pointer-events-none absolute right-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-cyan-300">
+    <svg {...iconProps} className="pointer-events-none absolute right-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-[#ffd27a]">
       <path d="M6 9l6 6 6-6" />
     </svg>
   );
@@ -75,10 +75,11 @@ export function PrintBar({ replayKey, onChange, busy = false }: { replayKey: str
     return () => cancelAnimationFrame(frame);
   }, [playing]);
 
-  const status = busy ? "Generating…" : t >= 1 ? "Built" : (BUILD_PHASES.find((p) => t < p.end) ?? BUILD_PHASES[0]).label;
+  const phase = t >= 1 ? BUILD_PHASES.length : BUILD_PHASES.findIndex((p) => t < p.end);
+  const status = busy ? "Generating…" : t >= 1 ? "Built" : `${BUILD_PHASES[phase].label} · ${phase + 1}/${BUILD_PHASES.length}`;
 
   return (
-    <div className={glassCardClass + " pointer-events-auto flex w-[34rem] max-w-full items-center gap-3 px-3.5 py-3"}>
+    <div className={"pointer-events-auto flex w-[38rem] max-w-full items-center gap-3 rounded-2xl border px-3 py-2.5 " + GLASS}>
       <button
         onClick={() => {
           if (playing) setPlaying(false);
@@ -89,20 +90,36 @@ export function PrintBar({ replayKey, onChange, busy = false }: { replayKey: str
         }}
         aria-label={playing ? "Pause printing" : "Play printing"}
         title={playing ? "Pause" : t >= 1 ? "Print again" : "Play"}
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-cyan-400/60 bg-cyan-500/20 text-cyan-200 transition-colors hover:bg-cyan-500/30"
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#5ad8ff]/60 bg-[#5ad8ff]/15 text-[#5ad8ff] transition-colors hover:bg-[#5ad8ff]/25"
       >
         {playing ? <PauseIcon /> : <PlayIcon />}
       </button>
-      <RangeInput
-        min={0}
-        max={1000}
-        value={Math.round(t * 1000)}
-        onChange={(e) => {
-          setPlaying(false);
-          setT(Number(e.target.value) / 1000);
-        }}
-        aria-label="Generation timeline"
-      />
+      {/* The scrubber's track is the build's six stages, each as long as its share of the timeline,
+          with small gaps between them: filled in cyan up to now, the current stage's remaining
+          part a shade lighter. The range input lies on top, transparent but for its thumb. */}
+      <div className="relative flex h-3 min-w-0 flex-1 items-center">
+        <div className="pointer-events-none absolute inset-x-[5px] flex gap-[3px]" aria-hidden>
+          {BUILD_PHASES.map((p, i) => {
+            const from = i === 0 ? 0 : BUILD_PHASES[i - 1].end;
+            const fill = Math.min(1, Math.max(0, (t - from) / (p.end - from))) * 100;
+            const rest = i === phase ? "#35506e" : "#24384f";
+            return <span key={p.id} className="h-[3px] rounded-full" style={{ flexGrow: p.end - from, background: `linear-gradient(to right, #5ad8ff ${fill}%, ${rest} ${fill}%)` }} />;
+          })}
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={1000}
+          value={Math.round(t * 1000)}
+          onChange={(e) => {
+            setPlaying(false);
+            setT(Number(e.target.value) / 1000);
+          }}
+          aria-label="Generation timeline"
+          title={t >= 1 ? "Built" : BUILD_PHASES[phase].label}
+          className="world-range relative h-3 w-full min-w-0 cursor-pointer appearance-none bg-transparent"
+        />
+      </div>
       {/* The browser's own arrow can't be moved, so it is hidden and a chevron drawn in from the edge. */}
       <span className="relative shrink-0">
         <select
@@ -110,7 +127,7 @@ export function PrintBar({ replayKey, onChange, busy = false }: { replayKey: str
           onChange={(e) => setSpeed(Number(e.target.value))}
           aria-label="Playback speed"
           title="Playback speed"
-          className={valueClass + " h-7 cursor-pointer appearance-none rounded-full border border-slate-600/60 bg-slate-800/60 pl-3 pr-8 outline-none transition-colors hover:border-cyan-400/60 focus:border-cyan-400/60"}
+          className={VALUE + " h-6 cursor-pointer appearance-none rounded-md border border-[#7db4e6]/20 bg-[#ffd27a]/10 pl-2 pr-7 outline-none transition-colors hover:border-[#5ad8ff]/50 focus:border-[#5ad8ff]/60 [&>option]:bg-[#0e1c30]"}
         >
           {SPEEDS.map((v) => (
             <option key={v} value={v}>
@@ -120,7 +137,7 @@ export function PrintBar({ replayKey, onChange, busy = false }: { replayKey: str
         </select>
         <ChevronDown />
       </span>
-      <span className={valueClass + " w-[9rem] shrink-0"}>{status}</span>
+      <span className={VALUE + " w-[11.5rem] shrink-0"}>{status}</span>
     </div>
   );
 }

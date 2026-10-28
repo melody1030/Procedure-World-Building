@@ -67,8 +67,8 @@ export function validate(defaults: BuildingConfig, overrides: Partial<BuildingCo
   const c = { ...defaults, ...overrides };
   return {
     ...c,
-    width: clamp(c.width, 6, 64, defaults.width),
-    depth: clamp(c.depth, 6, 64, defaults.depth),
+    width: clamp(c.width, 4, 64, defaults.width),
+    depth: clamp(c.depth, 4, 64, defaults.depth),
     height: clamp(c.height, 6, 200, defaults.height),
     floorHeight: clamp(c.floorHeight, 2.5, 5, defaults.floorHeight),
     windowDensity: clamp(c.windowDensity, 0, 1, defaults.windowDensity),

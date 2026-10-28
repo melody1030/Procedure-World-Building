@@ -53,14 +53,12 @@ export interface TerrainParams {
     control: { x: number; z: number }[] | null;
   };
   surfaces: {
-    /** Brightness spread between the ground's three noise tones (grass, dirt, rock…). */
+    /** Brightness spread between the concrete's three noise tones: grime in large patches. */
     tones: number;
-    /** A rim with a neighbor at least this much lower (meters) is rock. */
-    rockCliff: number;
-    /** Ground steeper than this (degrees) is dirt. */
-    dirtSlope: number;
-    /** Grass covers this share of the land, lowest first; the highest ground above it is rock. */
-    grassLimit: number;
+    /** A rim with a neighbor at least this much lower (meters) is a ledge. */
+    ledgeDrop: number;
+    /** Ground steeper than this (degrees) is stairs. */
+    stairSlope: number;
   };
   /** How the ground is drawn. Read by the renderer only: changing these never regenerates anything. */
   look: {
@@ -85,7 +83,7 @@ export const DEFAULT_PARAMS: TerrainParams = {
   shaping: { power: 1.3, ridge: 0.2, height: 24 },
   terraces: { strength: 0.3, height: 3, wander: 0.25, slope: 10 },
   river: { enabled: true, points: 8, width: 4, depth: 1, valleyWidth: 7, valleyShape: 0.4, water: true, control: null },
-  surfaces: { tones: 0.08, rockCliff: 0.75, dirtSlope: 30, grassLimit: 0.85 },
+  surfaces: { tones: 0.12, ledgeDrop: 0.75, stairSlope: 30 },
   look: { grid: 0.35 },
 };
 
@@ -112,7 +110,6 @@ export interface SwitchSpec extends SpecBase {
 export type ParamSpec = RangeSpec | SelectSpec | SwitchSpec;
 
 const fixed = (d: number) => (v: number) => v.toFixed(d);
-const pct = (v: number) => `${Math.round(v * 100)}%`;
 const meters = (v: number) => `${v} m`;
 
 export const NOISE_TYPES: SelectSpec["options"] = [
@@ -267,39 +264,30 @@ export const PARAM_SPECS: { [G in ParamGroup]: { [K in Exclude<keyof TerrainPara
   surfaces: {
     tones: {
       kind: "range",
-      label: "Ground tones",
-      description: "How much the ground's color varies in large patches. 0 is one flat color per surface.",
+      label: "Grime",
+      description: "How much the concrete is stained in large patches. 0 is clean concrete, one flat color.",
       min: 0,
       max: 0.3,
       step: 0.01,
       format: fixed(2),
     },
-    rockCliff: {
+    ledgeDrop: {
       kind: "range",
-      label: "Rock cliff",
-      description: "A rim with a neighbor at least this much lower turns to rock. Lower values make more rock.",
+      label: "Ledge drop",
+      description: "A rim with a neighbor at least this much lower gets a pale concrete coping along the drop. Lower values edge more steps.",
       min: 0.5,
       max: 6,
       step: 0.25,
       format: meters,
     },
-    dirtSlope: {
+    stairSlope: {
       kind: "range",
-      label: "Dirt slope",
-      description: "Ground steeper than this is dirt. Lower values make more dirt.",
+      label: "Stair slope",
+      description: "Hillsides steeper than this are flights of concrete steps. Lower values make more stairs.",
       min: 10,
       max: 60,
       step: 1,
       format: (v) => `${v}°`,
-    },
-    grassLimit: {
-      kind: "range",
-      label: "Grass limit",
-      description: "Grass covers this share of the land, lowest ground first; the highest ground above it is bare rock. 100% keeps grass everywhere.",
-      min: 0.3,
-      max: 1,
-      step: 0.05,
-      format: pct,
     },
   },
   look: {

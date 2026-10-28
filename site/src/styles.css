@@ -23,3 +23,15 @@
     @apply h-[12.8px] w-[12.8px] cursor-pointer rounded-full border-none bg-cyan-400;
   }
 }
+
+/* Blueprint City's sliders (world/ui/kit.tsx): a small pale thumb with a cyan ring on a thin
+   filled track. Scoped to .world-range, so the weeks keep their cyan dots. */
+@layer components {
+  .world-range::-webkit-slider-thumb {
+    @apply h-2.5 w-2.5 cursor-pointer appearance-none rounded-full border-2 border-solid border-[#5ad8ff] bg-[#f2f8ff] shadow-[0_0_0_3px_rgba(90,216,255,0.15)];
+  }
+
+  .world-range::-moz-range-thumb {
+    @apply h-2.5 w-2.5 cursor-pointer rounded-full border-2 border-solid border-[#5ad8ff] bg-[#f2f8ff];
+  }
+}

@@ -64,7 +64,7 @@ export function Section({
   );
 }
 
-const labelTextClass = "text-xs font-semibold uppercase tracking-wide text-slate-400";
+export const labelTextClass = "text-xs font-semibold uppercase tracking-wide text-slate-400";
 
 /** Mono cyan numeric readout that sits on the label row. */
 export const valueClass = "font-mono text-xs font-normal normal-case tracking-normal tabular-nums text-cyan-300";
@@ -77,9 +77,9 @@ export function Field({
   inline = false,
   children,
 }: {
-  label: string;
+  label: ReactNode;
   description: string;
-  valueLabel?: string;
+  valueLabel?: ReactNode;
   inline?: boolean;
   children: ReactNode;
 }) {

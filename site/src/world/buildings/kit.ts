@@ -84,6 +84,13 @@ export class Kit {
   /** While set, boxes skip their underside even off the ground (for masses standing on something). */
   grounded = false;
   /**
+   * While set, [x0, z0, x1, z1]: the room the building must keep within (its lot less a gap). Every
+   * box is cut at it, so nothing (an awning, a sign) reaches past; a cut side gets its face.
+   */
+  clip: [number, number, number, number] | null = null;
+  /** Cuts so far: each is pulled in by its own hair, so no two cut faces share a plane. */
+  private cuts = 0;
+  /**
    * Space taken by things fixed to facades, as world boxes [x0, y0, z0, x1, y1, z1] with what
    * they are, so signs and screens can find room that doesn't run into them.
    */
@@ -110,6 +117,7 @@ export class Kit {
 
   /** A box at (x, y, z) of size (w, h, d), into the solid bucket. */
   box(x: number, y: number, z: number, w: number, h: number, d: number, color: Hex | RGB, faces = this.grounded ? ALL_BUT_BOTTOM : facesFor(y)) {
+    if (this.clip) [x, z, w, d, faces] = this.cut(x, z, w, d, faces);
     if (w <= 0 || h <= 0 || d <= 0) return;
     put(this.solid, x, y, z, w, h, d, typeof color === "number" ? lin(color) : color, faces);
     this.top = Math.max(this.top, y + h);
@@ -117,9 +125,24 @@ export class Kit {
 
   /** A box into the glow bucket. `strength` dims it (0–1) without changing its hue. */
   light(x: number, y: number, z: number, w: number, h: number, d: number, color: Hex, strength = 1, faces = facesFor(y)) {
+    if (this.clip) [x, z, w, d, faces] = this.cut(x, z, w, d, faces);
     if (w <= 0 || h <= 0 || d <= 0) return;
     put(this.glow, x, y, z, w, h, d, shade(lin(color), strength), faces);
     this.top = Math.max(this.top, y + h);
+  }
+
+  /** A box's footprint cut to `clip`, with a face on each cut side. */
+  private cut(x: number, z: number, w: number, d: number, faces: number): [number, number, number, number, number] {
+    const [x0, z0, x1, z1] = this.clip!;
+    if (x >= x0 && z >= z0 && x + w <= x1 && z + d <= z1) return [x, z, w, d, faces];
+    const hair = 0.0015 * (1 + (this.cuts++ % 100));
+    let ex = x + w;
+    let ez = z + d;
+    if (x < x0) [x, faces] = [x0 + hair, faces | 2];
+    if (ex > x1) [ex, faces] = [x1 - hair, faces | 1];
+    if (z < z0) [z, faces] = [z0 + hair, faces | 32];
+    if (ez > z1) [ez, faces] = [z1 - hair, faces | 16];
+    return [x, z, ex - x, ez - z, faces];
   }
 
   /** A slight per-box variation of a color, so repeated modules don't look stamped. */

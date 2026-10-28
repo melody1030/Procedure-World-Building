@@ -1,6 +1,9 @@
 import { hashSeed } from "../rng";
 import { buildClaims, type Claims } from "./claims";
 import { buildDistricts, type Districts } from "./districts";
+import { gradeLots, type Grading } from "./grade";
+import { planParks, type Parks } from "../city/parks";
+import { paintCity } from "./urban";
 import { buildHubs, type Hubs } from "./hubs";
 import { buildStreets, type Streets } from "./streets";
 import { buildHeights, type HeightMap } from "./heights";
@@ -41,6 +44,12 @@ export interface Terrain {
   mesh: TerrainMesh;
   /** What cyberpunk district belongs where, per 2 m cell, and the lots along the streets. */
   districts: Districts;
+  /** The lots dug level (see `gradeLots`), which the mesh shows; null when no lot slopes. */
+  grading: Grading | null;
+  /** What stands in the parks (paths and props, see `planParks`); null until the districts are done. */
+  parks: Parks | null;
+  /** The surfaces with the city painted in (see `paintCity`), which the mesh shows; null until the districts are done. */
+  urban: Surfaces | null;
   /** How long each stage took; `cached` stages were reused from the previous terrain. */
   timings: { id: StageId; ms: number; cached: boolean }[];
   /** True while `districts` is still the previous terrain's: see `finishTerrain`. */
@@ -73,9 +82,28 @@ export const STAGES: Stage[] = [
   { id: "surfaces", params: "surfaces", run: (t, seed) => (t.surfaces = buildSurfaces(seed, t.columns!, t.river!, t.streets!.claims, t.streets!.curb, t.heights!, t.params.surfaces)) },
   // Also reads the surfaces group (ground tones); it runs after that stage, so a change reaches it.
   // The look group (voxel grid) is for the renderer only, so no stage reads it.
-  { id: "mesh", run: (t) => (t.mesh = meshColumns(t.columns!, t.surfaces!, t.params.surfaces.tones)) },
-  // Districts and lots change no ground, so they come after the mesh.
-  { id: "districts", run: (t, seed) => (t.districts = buildDistricts(seed, t.columns!, t.streets!, t.hubs!, t.streets!.claims)) },
+  {
+    id: "mesh",
+    run: (t) => {
+      t.mesh = meshColumns(t.columns!, t.surfaces!, t.params.surfaces.tones);
+      t.grading = null;
+      t.parks = null;
+      t.urban = null;
+    },
+  },
+  // Districts and lots come after the mesh, so the ground can be drawn first; then the lots are
+  // dug level (site grading), the parks laid out and regraded, the city's ground is painted, and the
+  // mesh is redone from all of it. `columns` stays ungraded, the ground the lots were laid out on.
+  {
+    id: "districts",
+    run: (t, seed) => {
+      t.districts = buildDistricts(seed, t.columns!, t.streets!, t.hubs!, t.streets!.claims);
+      t.grading = gradeLots(t.columns!, t.districts);
+      t.parks = planParks(t.districts, t.grading?.ground ?? t.columns!, t.streets!.plazas[0], seed, t.grading?.dugBy ?? null);
+      t.urban = paintCity(t.surfaces!, t.districts, t.grading, t.parks, t.columns!);
+      t.mesh = meshColumns(t.parks.ground, t.urban, t.params.surfaces.tones);
+    },
+  },
 ];
 
 const same = (a: TerrainParams, b: TerrainParams, group: ParamGroup) => JSON.stringify(a[group]) === JSON.stringify(b[group]);

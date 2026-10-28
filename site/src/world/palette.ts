@@ -51,6 +51,32 @@ export const TERRAIN = {
   plaza: 0x77736d,
 };
 
+/**
+ * The city's ground (see terrain/urban.ts), in the buildings' night palette: cool asphalt,
+ * concrete and paving-slab greys, a step lighter than the roads, so streets, sidewalks and lots
+ * read apart; dark stone slabs on the plaza; tended lawns in the parks; and concrete retaining
+ * walls where the ground steps.
+ */
+export const URBAN_GROUND = {
+  sidewalk: 0x7b808a,
+  pavement: 0x454a55,
+  concrete: 0x666b75,
+  lawn: 0x3f7656,
+  paving: 0x5b606a,
+  /** Planting strips on narrow terrace steps: shrubs, darker than the lawns. */
+  planter: 0x2f5a42,
+  /** The plaza: dark stone slabs. */
+  plaza: 0x353943,
+  /** Park paths: pale, warm stone setts. */
+  path: 0x8c8679,
+  wallTop: 0x6b707a,
+  wallBottom: 0x3a3e48,
+  /** A pale coping along a drop. */
+  ledge: 0x8e939c,
+  /** Concrete steps: treads alternately lighter and darker. */
+  stairs: 0x5c616b,
+};
+
 /** The blueprint cyan (the site's accent): the layer being printed glows in it. */
 export const BLUEPRINT = {
   cyan: 0x22d3ee,

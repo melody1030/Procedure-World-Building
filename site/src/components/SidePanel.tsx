@@ -91,6 +91,8 @@ export function SidePanel({
   widthRem,
   closedIcon = <SlidersIcon />,
   label,
+  glass,
+  bodyClassName,
   children,
 }: {
   side: "left" | "right";
@@ -100,6 +102,10 @@ export function SidePanel({
   /** Shown on the toggle while the panel is closed. Defaults to a sliders icon. */
   closedIcon?: ReactNode;
   label: string;
+  /** Replaces the panel's (and its button's) background, border and shadow classes, e.g. a lighter glass over a bright scene. */
+  glass?: string;
+  /** Replaces the panel body's layout classes (spacing and padding). */
+  bodyClassName?: string;
   children: ReactNode;
 }) {
   const isLeft = side === "left";
@@ -111,20 +117,22 @@ export function SidePanel({
         onClick={onToggle}
         aria-label={`${open ? "Close" : "Open"} ${label}`}
         title={`${open ? "Close" : "Open"} ${label} (E)`}
-        className="pointer-events-auto absolute top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full border border-slate-700/50 bg-slate-900/70 text-slate-300 shadow-lg shadow-black/30 backdrop-blur-md transition-[left,right,color] duration-300 ease-in-out hover:text-cyan-300"
+        className={"pointer-events-auto absolute top-4 z-10 flex h-10 w-10 items-center justify-center rounded-full border text-slate-300 backdrop-blur-md transition-[left,right,color] duration-300 ease-in-out hover:text-cyan-300 " + (glass ?? "border-slate-700/50 bg-slate-900/70 shadow-lg shadow-black/30")}
         style={{ [side]: open ? `${widthRem + 1.5}rem` : "1rem" }}
       >
         {open ? isLeft ? <ChevronLeft /> : <ChevronRight /> : closedIcon}
       </button>
       <div
         className={
-          "pointer-events-auto absolute top-4 flex max-h-[calc(100%-2rem)] max-w-[85vw] flex-col overflow-hidden rounded-2xl border border-slate-700/50 bg-slate-900/70 text-slate-200 shadow-2xl shadow-black/40 backdrop-blur-xl transition-transform duration-300 ease-in-out " +
+          "pointer-events-auto absolute top-4 flex max-h-[calc(100%-2rem)] max-w-[85vw] flex-col overflow-hidden rounded-2xl border text-slate-200 backdrop-blur-xl transition-transform duration-300 ease-in-out " +
+          (glass ?? "border-slate-700/50 bg-slate-900/70 shadow-2xl shadow-black/40") +
+          " " +
           (isLeft ? "left-4 " : "right-4 ") +
           (open ? "translate-x-0" : isLeft ? "-translate-x-[calc(100%+1.5rem)]" : "translate-x-[calc(100%+1.5rem)]")
         }
         style={{ width: `${widthRem}rem` }}
       >
-        <div className="flex flex-col gap-6 overflow-y-auto p-5">{children}</div>
+        <div className={"flex flex-col overflow-y-auto " + (bodyClassName ?? "gap-6 p-5")}>{children}</div>
       </div>
     </>
   );

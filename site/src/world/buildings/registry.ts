@@ -133,15 +133,23 @@ export function archetype(id: string): Archetype {
   return found;
 }
 
-/** Builds one building: the archetype's defaults with `overrides` on top, validated. */
-export function buildBuilding(id: string, overrides: Partial<BuildingConfig> = {}): BuildingModel {
+/**
+ * Builds one building: the archetype's defaults with `overrides` on top, validated. With `room`
+ * (meters, centered on the footprint), nothing of it reaches past that: see `Kit.clip`.
+ */
+export function buildBuilding(id: string, overrides: Partial<BuildingConfig> = {}, room?: { width: number; depth: number }): BuildingModel {
   const a = archetype(id);
   const c = validate(a.defaults, overrides);
   const k = new Kit(c.seed ^ hash(a.id));
   k.neon = c.neonIntensity;
-  a.build(k, c);
   const width = m(c.width);
   const depth = m(c.depth);
+  if (room) {
+    const rw = m(room.width);
+    const rd = m(room.depth);
+    k.clip = [(width - rw) / 2, (depth - rd) / 2, (width + rw) / 2, (depth + rd) / 2];
+  }
+  a.build(k, c);
   const height = k.top;
   if (c.base) base(k, width, depth);
   return { id: a.id, ...k.finish(), width, depth, height, fixtures: k.fixtures };
