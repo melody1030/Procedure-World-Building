@@ -32,6 +32,18 @@ import type { Person } from "./agents";
  */
 
 export type VehicleKind = "car" | "van" | "taxi" | "bus";
+/**
+ * A vehicle is layered as a person is (agents.ts):
+ * - the task, by kind: cars and vans roam; a bus keeps to its route; a taxi cruises, fetches a fare
+ *   and carries it;
+ * - the activity, the one state machine: driving, standing at its halt with the doors open, or off
+ *   the island (gone over the edge, towed, or waiting for room to come back on);
+ * - what holds its speed this step (reported only): nothing (free), a bend, the vehicle ahead,
+ *   people in the way, edging past them (creep), the stop line, or its halt.
+ */
+export type VehicleActivity = "drive" | "stand" | "off";
+export type Task = "roam" | "route" | "cruise" | "fetch" | "carry";
+export type Limit = "free" | "bend" | "lead" | "people" | "creep" | "line" | "halt";
 
 /** Sizes (voxels): small city cars (kei cars), vans, and community buses that fit the 3.5 m streets. */
 export const SIZE: Record<VehicleKind, { length: number; width: number }> = {
@@ -177,7 +189,13 @@ export interface Vehicle {
   heading: number;
   pitch: number;
   braking: boolean;
-  gone: boolean;
+  task: Task;
+  activity: VehicleActivity;
+  limit: Limit;
+  /** How long (s) in this activity (standing: at its halt), and why it began. */
+  since: number;
+  why: string;
+  /** Off: until it tries to come back on. */
   timer: number;
   /** The link granted at the next junction, and the junction it holds; the link it asked for, and when it got to the line. */
   granted: number;
@@ -186,9 +204,6 @@ export interface Vehicle {
   ready: number;
   still: number;
   halt: Halt | null;
-  /** Standing at a halt, for this long. */
-  dwell: number;
-  dwelling: boolean;
   riders: Person[];
   /** Bus: its route, where on it its plan has got to, and the next stop on it. */
   route: number;
@@ -259,7 +274,7 @@ export class Traffic {
     ];
     for (const kind of fleet) {
       const v = this.vehicle(kind);
-      if (!this.place(v, this.lanes())) v.gone = true;
+      if (!this.place(v, this.lanes())) into(v, "off", "no room on the lanes");
       this.vehicles.push(v);
     }
     // Buses: spread out round their routes.
@@ -269,7 +284,7 @@ export class Traffic {
         v.color = r.color;
         v.route = i;
         const at = Math.floor((b / count.buses) * r.segs.length);
-        if (!this.placeOnRoute(v, at)) v.gone = true;
+        if (!this.placeOnRoute(v, at)) into(v, "off", "no room on its route");
         this.vehicles.push(v);
       }
     });
@@ -547,7 +562,11 @@ export class Traffic {
       heading: 0,
       pitch: 0,
       braking: false,
-      gone: false,
+      task: kind === "bus" ? "route" : kind === "taxi" ? "cruise" : "roam",
+      activity: "drive",
+      limit: "free",
+      since: 0,
+      why: "out already",
       timer: 0,
       granted: -1,
       holds: -1,
@@ -555,8 +574,6 @@ export class Traffic {
       ready: -1,
       still: 0,
       halt: null,
-      dwell: 0,
-      dwelling: false,
       riders: [],
       route: -1,
       leg: 0,
@@ -568,7 +585,7 @@ export class Traffic {
   /** Room at distance `s` on segment `seg` for a vehicle `length` long (no one within `gap` of it, on any segment). */
   private clear(seg: number, s: number, length: number, gap: number) {
     const p = this.at(this.segs[seg], s);
-    return !this.vehicles.some((o) => !o.gone && Math.hypot(o.x - p.x, o.z - p.z) < (o.length + length) / 2 + gap);
+    return !this.vehicles.some((o) => o.activity !== "off" && Math.hypot(o.x - p.x, o.z - p.z) < (o.length + length) / 2 + gap);
   }
 
   /** Puts a vehicle somewhere free on one of `lanes`; false if there was nowhere. */
@@ -579,7 +596,7 @@ export class Traffic {
       if (S.len < v.length + 4) continue;
       const s = at >= 0 ? at : this.rng.range(v.length / 2 + 1, S.len - v.length / 2 - 1);
       if (!this.clear(seg, s, v.length, 8)) continue;
-      Object.assign(v, { seg, s, v: 0, plan: [], gone: false, granted: -1, holds: -1, asked: -1, still: 0, dwell: 0, dwelling: false });
+      Object.assign(v, { seg, s, v: 0, plan: [], activity: "drive", since: 0, granted: -1, holds: -1, asked: -1, still: 0 });
       this.pose(v);
       return true;
     }
@@ -594,7 +611,7 @@ export class Traffic {
       if (this.segs[seg].link || this.segs[seg].len < v.length + 4) continue;
       const s = this.segs[seg].len / 2;
       if (!this.clear(seg, s, v.length, 12)) continue;
-      Object.assign(v, { seg, s, v: 0, plan: [], leg: i, gone: false, granted: -1, holds: -1, asked: -1, still: 0, dwell: 0, dwelling: false });
+      Object.assign(v, { seg, s, v: 0, plan: [], leg: i, activity: "drive", since: 0, granted: -1, holds: -1, asked: -1, still: 0 });
       // The next stop along.
       for (let d = 1; d <= r.segs.length; d++) {
         const j = r.stops.findIndex((st) => st.seg === r.segs[(i + d) % r.segs.length]);
@@ -647,7 +664,7 @@ export class Traffic {
     dt = Math.min(dt, 0.1);
     this.time += dt;
     for (const s of this.segs) s.on.length = 0;
-    for (const v of this.vehicles) if (!v.gone) this.segs[v.seg].on.push(v);
+    for (const v of this.vehicles) if (v.activity !== "off") this.segs[v.seg].on.push(v);
     for (const s of this.segs) if (s.on.length > 1) s.on.sort((a, b) => a.s - b.s);
     this.grant();
     this.dispatch();
@@ -704,7 +721,7 @@ export class Traffic {
       let route: number[] | null = null;
       let bd = Infinity;
       for (const v of this.vehicles) {
-        if (v.kind !== "taxi" || v.gone || v.fare || v.dwelling || this.segs[v.seg].part !== this.segs[f.seg].part) continue;
+        if (v.task !== "cruise" || v.activity !== "drive" || this.segs[v.seg].part !== this.segs[f.seg].part) continue;
         const d = Math.hypot(v.x - f.person.x, v.z - f.person.z);
         if (d >= bd) continue;
         const p = this.path(v.seg, v.s, f.seg, f.s, true);
@@ -714,6 +731,7 @@ export class Traffic {
       if (!best || !route) continue;
       f.taxi = best;
       best.fare = f;
+      best.task = "fetch";
       this.reroute(best, route);
       best.halt = { seg: f.seg, s: f.s, kind: "pickup" };
     }
@@ -747,28 +765,32 @@ export class Traffic {
   }
 
   private drive(v: Vehicle, dt: number) {
-    if (v.gone) {
+    v.since += dt;
+    if (v.activity === "off") {
       if ((v.timer -= dt) <= 0) {
         if (!this.respawn(v)) v.timer = 2;
-        else if (v.kind === "taxi" && v.halt) {
-          // Towed with a fare aboard: on to where it was going.
-          const route = this.path(v.seg, v.s, v.halt.seg, v.halt.s, true);
-          if (route) this.reroute(v, route);
-          else v.halt = { ...v.halt, seg: v.seg, s: Math.min(this.segs[v.seg].len - 1, v.s + 20) };
+        else {
+          v.why = "back on the island";
+          if (v.kind === "taxi" && v.halt) {
+            // Towed with a fare aboard: on to where it was going.
+            const route = this.path(v.seg, v.s, v.halt.seg, v.halt.s, true);
+            if (route) this.reroute(v, route);
+            else v.halt = { ...v.halt, seg: v.seg, s: Math.min(this.segs[v.seg].len - 1, v.s + 20) };
+          }
         }
       }
       return;
     }
-    if (v.dwelling) {
+    if (v.activity === "stand") {
       v.v = 0;
       v.braking = true;
-      v.dwell += dt;
       this.atHalt(v);
       return;
     }
     this.extend(v);
     const S = this.segs[v.seg];
-    let v0 = Math.min(S.limit, TOP[v.kind]);
+    const top = Math.min(S.limit, TOP[v.kind]);
+    let v0 = top;
     // Slow for the bends ahead.
     let ahead = S.len - v.s;
     for (const j of v.plan.slice(0, 2)) {
@@ -819,7 +841,7 @@ export class Traffic {
     let people = false;
     const mid = poses[poses.length >> 1];
     for (const p of this.hooks.near(mid.x, mid.z, look / 2 + v.length / 2 + 3)) {
-      if (p.state === "ride" || p.state === "gone" || p.state === "board" || p.state === "wait" || p.state === "hail") continue;
+      if (p.activity === "ride" || p.activity === "away" || (p.activity === "use" ? p.use === "shelter" || p.use === "curb" : p.leg === "door")) continue;
       if (nudge && walk[Math.min(n - 1, Math.max(0, p.z | 0)) * n + Math.min(n - 1, Math.max(0, p.x | 0))] !== GROUND.road) continue;
       for (const q of nudge ? poses.slice(0, 1) : poses) {
         const dx = p.x - q.x;
@@ -833,11 +855,14 @@ export class Traffic {
     }
     // Intelligent Driver Model.
     let a = ACCEL * (1 - Math.pow(v.v / Math.max(1, v0), 4));
+    let follow = 0;
     if (gap < Infinity) {
       const want = S0 + v.v * HEADWAY + (v.v * (v.v - lead)) / (2 * Math.sqrt(ACCEL * BRAKE));
-      a -= ACCEL * Math.pow(Math.max(0, want) / Math.max(0.5, gap), 2);
+      follow = ACCEL * Math.pow(Math.max(0, want) / Math.max(0.5, gap), 2);
+      a -= follow;
     }
     let vmax = Infinity;
+    let line = Infinity;
     // The stop line, unless let in.
     const next = v.plan[0];
     if (next !== undefined && this.segs[next].link && this.nodes[this.segs[next].a].kind === "junction" && v.granted !== next) {
@@ -847,7 +872,8 @@ export class Traffic {
         v.asked = next;
         this.nodes[this.segs[next].a].queue.push(v);
       }
-      vmax = Math.min(vmax, Math.sqrt(2 * STOP_BRAKE * Math.max(0, toLine)));
+      line = Math.sqrt(2 * STOP_BRAKE * Math.max(0, toLine));
+      vmax = Math.min(vmax, line);
     }
     // A halt ahead (bus stop, fare).
     const h = this.toHalt(v);
@@ -856,10 +882,18 @@ export class Traffic {
     v.v = Math.max(0, Math.min(v.v + a * dt, vmax, v0 + 1, nudge && people ? CREEP : Infinity));
     if (gap < 0.5) v.v = 0;
     v.braking = v.v < before - 0.5 * dt || v.v < 0.5;
+    // What holds it: edging past people; the stop line or the halt, braking to it; whoever is in
+    // front, closing in; the bends ahead; or nothing.
+    v.limit =
+      nudge && people ? "creep"
+      : vmax < v0 + 1 && v.v >= vmax - 0.01 ? (vmax === line ? "line" : "halt")
+      : gap < 0.5 || follow > ACCEL * 0.25 ? (people ? "people" : "lead")
+      : v0 < top - 0.5 ? "bend"
+      : "free";
     if (h < 1) {
       v.v = 0;
-      v.dwelling = true;
-      v.dwell = 0;
+      v.limit = "halt";
+      into(v, "stand", v.halt!.kind === "stop" ? "at its stop" : v.halt!.kind === "pickup" ? "at the fare's curb" : "dropping off");
       this.arrive(v);
       this.pose(v);
       return;
@@ -870,7 +904,7 @@ export class Traffic {
       const done = this.segs[v.seg];
       if (!v.plan.length) {
         if (!done.link && this.nodes[done.b].kind === "exit") {
-          v.gone = true;
+          into(v, "off", "left the island");
           v.timer = this.rng.range(2, 10);
           this.release(v);
           this.leaveQueue(v);
@@ -896,7 +930,7 @@ export class Traffic {
       this.release(v);
       this.leaveQueue(v);
       if (v.fare && !v.riders.length) this.cancel(v.fare);
-      v.gone = true;
+      into(v, "off", `towed: held up ${TOW} s`);
       v.timer = 1;
       return;
     }
@@ -958,19 +992,24 @@ export class Traffic {
   private atHalt(v: Vehicle) {
     const h = v.halt!;
     let go = false;
+    let why = "";
     if (h.kind === "stop") {
       const st = h.stop!;
-      go = (v.dwell >= DWELL[0] && (!st.queue.length || v.riders.length >= BUS_SEATS)) || v.dwell >= DWELL[1];
+      go = (v.since >= DWELL[0] && (!st.queue.length || v.riders.length >= BUS_SEATS)) || v.since >= DWELL[1];
       if (go) {
         st.bus = null;
         const r = this.routes[v.route];
         v.next = (v.next + 1) % r.stops.length;
         const nx = r.stops[v.next];
         v.halt = { seg: nx.seg, s: nx.s, kind: "stop", stop: nx };
+        why = v.riders.length >= BUS_SEATS ? "full" : st.queue.length ? "kept waiting long enough" : "no one else waiting";
       }
     } else if (h.kind === "pickup") {
       const f = v.fare;
-      if (!f) go = true;
+      if (!f) {
+        go = true;
+        why = "the fare gave up";
+      }
       else if (v.riders.length) {
         // Aboard: somewhere else in the city.
         const lanes = this.lanes(this.segs[v.seg].part).filter((i) => this.segs[i].len > 30 && Math.hypot(this.at(this.segs[i], 0).x - v.x, this.at(this.segs[i], 0).z - v.z) > FARE_RIDE);
@@ -978,26 +1017,27 @@ export class Traffic {
         const s = this.segs[to].len / 2;
         const route = this.path(v.seg, v.s, to, s, true);
         this.fares.splice(this.fares.indexOf(f), 1);
+        v.task = "carry";
+        why = "the fare is aboard";
         if (route) {
           this.reroute(v, route);
           v.halt = { seg: to, s, kind: "drop" };
         } else v.halt = { seg: v.seg, s: Math.min(this.segs[v.seg].len - 1, v.s + 40), kind: "drop" };
         go = true;
-      } else if (v.dwell > FARE_WAIT) {
+      } else if (v.since > FARE_WAIT) {
         this.cancel(f);
-        go = true;
+        go = false;
       }
     } else {
-      go = v.dwell > 2;
+      go = v.since > 2;
       if (go) {
         v.halt = null;
         v.fare = null;
+        v.task = "cruise";
+        why = "dropped the fare off";
       }
     }
-    if (go) {
-      v.dwelling = false;
-      v.dwell = 0;
-    }
+    if (go) into(v, "drive", why);
   }
 
   /** Where people get on and off: beside the front door (a bus) or the back door. */
@@ -1033,7 +1073,8 @@ export class Traffic {
     if (v && v.fare === f) {
       v.fare = null;
       v.halt = null;
-      v.dwelling = false;
+      v.task = "cruise";
+      if (v.activity === "stand") into(v, "drive", "the fare never came");
     }
     f.taxi = null;
     f.ready = false;
@@ -1047,17 +1088,17 @@ export class Traffic {
 
   /** True if the vehicle is standing at a halt with its doors open. */
   open(v: Vehicle) {
-    return !v.gone && v.dwelling;
+    return v.activity === "stand";
   }
 
   /** True if a moving vehicle will come within reach of (x, z) in the next few seconds, or one kept waiting is about to edge past. */
   danger(x: number, z: number): boolean {
     for (const v of this.vehicles) {
-      if (v.gone) continue;
+      if (v.activity === "off") continue;
       const dx = x - v.x;
       const dz = z - v.z;
       // One kept waiting and edging on: let it through first.
-      if (v.still > PATIENCE && !v.dwelling && Math.hypot(dx, dz) < v.length / 2 + 8) return true;
+      if (v.still > PATIENCE && v.activity === "drive" && Math.hypot(dx, dz) < v.length / 2 + 8) return true;
       if (v.v < 1) continue;
       if (Math.abs(dx) > 60 || Math.abs(dz) > 60) continue;
       const ux = Math.sin(v.heading) * v.v;
@@ -1071,7 +1112,7 @@ export class Traffic {
   /** True if (x, z) is inside a vehicle (grown by `r`). */
   inside(x: number, z: number, r: number): boolean {
     for (const v of this.vehicles) {
-      if (v.gone) continue;
+      if (v.activity === "off") continue;
       const dx = x - v.x;
       const dz = z - v.z;
       if (Math.abs(dx) > 20 || Math.abs(dz) > 20) continue;
@@ -1085,7 +1126,7 @@ export class Traffic {
   /** Out of the way: the direction away from the side of a vehicle (x, z) is within `r` of, or null. */
   clearOf(x: number, z: number, r: number): P2 | null {
     for (const v of this.vehicles) {
-      if (v.gone) continue;
+      if (v.activity === "off") continue;
       const dx = x - v.x;
       const dz = z - v.z;
       if (Math.abs(dx) > 20 || Math.abs(dz) > 20) continue;
@@ -1104,7 +1145,7 @@ export class Traffic {
 
   /** A moving vehicle within `r` of (x, z) (for the pigeons). */
   passing(x: number, z: number, r: number): boolean {
-    return this.vehicles.some((v) => !v.gone && v.v > 2 && Math.hypot(v.x - x, v.z - z) < r + v.length / 2);
+    return this.vehicles.some((v) => v.activity !== "off" && v.v > 2 && Math.hypot(v.x - x, v.z - z) < r + v.length / 2);
   }
 
   /* ---------- Geometry ---------- */
@@ -1220,4 +1261,11 @@ function closest(a: P2[], b: P2[]) {
   let d = Infinity;
   for (let i = 0; i < a.length; i += 2) for (let j = 0; j < b.length; j += 2) d = Math.min(d, Math.hypot(a[i].x - b[j].x, a[i].z - b[j].z));
   return d;
+}
+
+/** Into an activity, saying why. */
+function into(v: Vehicle, activity: VehicleActivity, why: string) {
+  v.activity = activity;
+  v.since = 0;
+  v.why = why;
 }

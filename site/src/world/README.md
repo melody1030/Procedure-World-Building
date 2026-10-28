@@ -808,3 +808,89 @@ sticks. They are now drawn to the scale of the streets and vehicles (render/life
 
 Only the drawing changed: people keep the same paths, bodies (0.75-voxel radius) and speeds.
 
+## 2026-10-29: People's state machine, in three layers
+
+A person's state was one field with 13 values (stroll, go, approach, seat, sit, rise, drink, chat,
+wait, hail, board, ride, gone). It mixed up three different things: what they want, what they are
+doing, and how they are moving. Being stuck, squeezing past people or waiting at the curb were not
+states at all, and could only be found by reading the code. Following how games do it, a person is
+now three layers (life/agents.ts):
+
+| Layer | After | Values |
+|---|---|---|
+| **Goal**: why | Reynolds' action selection; The Sims' needs | the need (thirst, rest, social, home; none while strolling) and the field walked down to it |
+| **Activity**: what, the one state machine | F.E.A.R.'s "Three States and a Plan" (Goto and Animate) | `walk`, `use`, `ride`, `away` |
+| **Motion**: how, this step (reported only) | Reynolds' steering | `walk`, `step`, `wait-to-cross`, `squeeze`, `wander`, `make-way`, `stand` |
+
+- **What is used says the rest**, as The Sims' smart objects do: a seat, a vending machine, a
+  circle of talkers, a bus shelter or the curb (hailing a taxi), each with how long it lasts and
+  what ends it. Walking has its legs: down the goal's field, or the last steps to the front of a
+  seat, onto it and off again, or to a vehicle's door.
+- **Every change of activity goes through one place and says why** (`since`, `why`): "tired",
+  "every seat taken, wants company", "no bus came: walking home". This is what a debug inspector
+  will show.
+- **Two fixes along the way**: someone who reached a bus stop with no shelter near, or found no
+  taxi to hail, used to vanish on the spot; now they walk home to a door. Someone stuck too often
+  walks on to a stroll instead of keeping their need with the goal of a stroll.
+
+Over ten simulated minutes (420 people) the new machine behaves as the old one did:
+
+| Seed | Walking | Seated | Circles | Shelters | Riding | Boarded | Walking but stuck |
+|---|---|---|---|---|---|---|---|
+| blueprint, before | 375 | 9 | 15 | 9 | 7 | 22 | 6.3 |
+| blueprint, after | 375 | 8 | 13 | 8 | 8 | 26 | 6.2 |
+| neon7, before | 345 | 12 | 18 | 22 | 12 | 56 | 11.8 |
+| neon7, after | 339 | 11 | 17 | 25 | 14 | 53 | 11.6 |
+
+The reasons already show something the old states hid: on blueprint, of about 1,000 times someone went
+to rest, only 114 found a free seat (benches are few and far between); most then went to talk
+instead.
+
+## 2026-10-29: Vehicles' state machine, in the same layers
+
+A vehicle's state was spread over many fields (`gone`, `dwelling`, `dwell`, `halt`, `fare`,
+`still`…), so whether it was standing at a stop, fetching a fare, towed or off the island had to be
+worked out from them, and why it was standing still could not be found out at all. It now has the
+people's layers (life/traffic.ts):
+
+| Layer | Values |
+|---|---|
+| **Task**: why, by kind | cars and vans `roam`; a bus keeps to its `route`; a taxi `cruise`s, `fetch`es a fare and `carry`s it |
+| **Activity**: what, the one state machine | `drive`, `stand` (at its halt, doors open), `off` (over the island's edge, towed, or waiting for room to come back on) |
+| **Limit**: what holds its speed this step (reported only) | `free`, `bend`, `lead` (the vehicle ahead), `people`, `creep` (edging past them), `line` (the stop line, not let in yet), `halt` |
+
+As with people, every change of activity goes through one place and says why: "at its stop", "no
+one else waiting", "the fare is aboard", "dropped the fare off", "towed: held up 45 s", "left the
+island", "back on the island".
+
+Only the bookkeeping changed. With a fixed clock (the flow fields are worked out in slices of wall
+time, so a run otherwise depends on the machine's speed), ten simulated minutes come out the same
+before and after on blueprint, neon7 and harbor: tows, boardings, taxi rides, vehicles crawling and
+mean speed alike. What holds the vehicles up, as a share of the time they are driving:
+
+| Seed | Free | Bend | Lead | People | Stop line | Creep |
+|---|---|---|---|---|---|---|
+| blueprint | 73% | 5% | 8% | 9% | 3% | 0% |
+| neon7 | 49% | 5% | 25% | 10% | 11% | 0% |
+| harbor | 32% | 5% | 37% | 12% | 11% | 3% |
+
+## 2026-10-29: Pigeons and cats, in the same shape
+
+The last two agents now keep their state the way people and vehicles do (life/agents.ts): one
+activity, how long they have been in it, and why it began, all set through one `into()` shared
+with the people.
+
+| Agent | Activities | Before |
+|---|---|---|
+| **Pigeon** | `ground` (pecking and hopping about its roost), `fly` (with its flock, round the roost), `land` (coming down to a free spot) | two flags, `flying` and `landing` |
+| **Cat** | `prowl`, `rest`, `hunt` (in two stages: `stalk`, then `sprint`), `flee` | five states, the hunt's two stages among them |
+
+The reasons say what set them off: a pigeon goes up because "a person came close", "a cat came
+close", "a vehicle went by" or "the flock went up"; a cat rests because it "missed: the pigeon flew
+off", "lost sight of it" or is "safe again" after fleeing.
+
+Only the bookkeeping changed: with a fixed clock, ten simulated minutes on blueprint and neon7 come
+out the same before and after (pigeons going up and landing, time in the air, the cats' time in
+each state and every change between them). Over those ten minutes on blueprint, a cat set off a
+pigeon's flock 238 times and people 221; the cats sprinted 79 times and missed every time, as they
+are meant to.

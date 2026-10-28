@@ -235,8 +235,8 @@ export class LifeView {
     for (const p of parts) p.begin();
 
     for (const p of this.life.people) {
-      if (p.state === "gone" || p.state === "ride") continue;
-      const seated = p.state === "sit";
+      if (p.activity === "away" || p.activity === "ride") continue;
+      const seated = p.activity === "use" && p.use === "seat";
       const bob = p.moving ? Math.abs(Math.sin(p.phase)) * 0.18 : 0;
       base.makeRotationY(p.heading).setPosition(p.x - half, p.y + bob, p.z - half);
       if (seated) {
@@ -258,7 +258,7 @@ export class LifeView {
       // Legs swing as they walk, arms the other way; hailing a taxi, the right arm holds a glowing
       // phone up (the right is -x).
       const swing = p.moving ? Math.sin(p.phase) * 0.55 : 0;
-      const hailing = p.state === "hail";
+      const hailing = p.activity === "use" && p.use === "curb";
       for (const s of [-1, 1]) {
         m.multiplyMatrices(base, t.makeTranslation(s * 0.33, HIP, 0)).multiply(r.makeRotationX(swing * s));
         this.leg.add(m, p.pants);
@@ -271,11 +271,11 @@ export class LifeView {
 
     for (const b of this.life.pigeons) {
       base.makeRotationY(b.heading).setPosition(b.x - half, b.y, b.z - half);
-      if (b.flying) {
+      if (b.activity !== "ground") {
         const pitch = -Math.atan2(b.vy, Math.hypot(b.vx, b.vz) || 1) * 0.6;
         base.multiply(r.makeRotationX(pitch));
         this.pigeon.add(base, b.color);
-        const beat = Math.sin(b.flap) * (b.landing ? 0.5 : 0.9);
+        const beat = Math.sin(b.flap) * (b.activity === "land" ? 0.5 : 0.9);
         for (const s of [-1, 1]) {
           m.multiplyMatrices(base, t.makeTranslation(s * 0.25, 0.5, 0.05)).multiply(r.makeRotationZ(s > 0 ? beat : Math.PI - beat));
           this.wing.add(m, b.color);
@@ -288,15 +288,15 @@ export class LifeView {
 
     for (const c of this.life.cats) {
       base.makeRotationY(c.heading).setPosition(c.x - half, c.y, c.z - half);
-      if (c.state === "rest") m.multiplyMatrices(base, r.makeRotationX(-0.55)).multiply(t.makeScale(1, 1, 0.8));
-      else if (c.state === "stalk") m.multiplyMatrices(base, t.makeScale(1, 0.7, 1.08));
-      else if (c.state === "sprint" || c.state === "flee") m.multiplyMatrices(base, t.makeTranslation(0, Math.abs(Math.sin(c.phase)) * 0.4, 0)).multiply(r.makeScale(1, 0.85, 1.2));
+      if (c.activity === "rest") m.multiplyMatrices(base, r.makeRotationX(-0.55)).multiply(t.makeScale(1, 1, 0.8));
+      else if (c.activity === "hunt" && c.stage === "stalk") m.multiplyMatrices(base, t.makeScale(1, 0.7, 1.08));
+      else if (c.activity === "hunt" || c.activity === "flee") m.multiplyMatrices(base, t.makeTranslation(0, Math.abs(Math.sin(c.phase)) * 0.4, 0)).multiply(r.makeScale(1, 0.85, 1.2));
       else m.copy(base).multiply(t.makeTranslation(0, Math.abs(Math.sin(c.phase)) * 0.08, 0));
       this.cat.add(m, c.color);
     }
 
     for (const v of this.life.traffic.vehicles) {
-      if (v.gone) continue;
+      if (v.activity === "off") continue;
       const model = this.models[v.kind];
       base.makeRotationY(v.heading).setPosition(v.x - half, v.y, v.z - half).multiply(r.makeRotationX(-v.pitch));
       this.shells[v.kind].add(base, v.color);
@@ -310,7 +310,7 @@ export class LifeView {
       if (v.kind === "taxi") this.taxiSign.add(m.multiplyMatrices(base, t.makeTranslation(0, 5.7, -0.8)), v.fare ? TAXI_HIRED : TAXI_FREE);
       if (v.kind === "bus") {
         this.windows.add(base, INTERIOR);
-        this.door.add(base, v.dwelling ? INTERIOR : DOOR);
+        this.door.add(base, v.activity === "stand" ? INTERIOR : DOOR);
         this.destination.add(base, v.color);
       }
     }
