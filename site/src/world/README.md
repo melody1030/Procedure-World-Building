@@ -767,3 +767,27 @@ one of the agent models, and each reacting to the others.
   neon-commercial-tower 15, stacked-megablock 13, modular-apartment-block 7, terraced-residential 5,
   vertical-neighborhood 2, twin-tower-complex 2, tower-and-annex 2; neon7 now has a
   corporate-megatower and a research-lab-tower too.
+
+## 2026-10-29: No more buses stuck at busy corners
+
+A bus turning at a junction full of people could sit there for minutes, edging forward, never
+towed. Kept waiting, it crept on at walking pace; the people at the curb, seeing it nearly stopped,
+stepped out in front of it; and every time its bumper was clear for a moment it counted as moving
+again, so its wait never reached the tow. Four changes (life/traffic.ts):
+
+- **Edging only while people are there.** A vehicle kept waiting is held to walking pace only
+  while someone is at its bumper; clear, it drives on. Its wait is reset only once it is really
+  under way again (faster than walking pace), so a vehicle kept in a crowd for 45 s is towed.
+- **People let it through.** A vehicle that has been kept waiting and is edging on counts as
+  coming: people at the curb nearby wait for it instead of stepping out in front of it.
+- **Out of its way to the side.** Someone in front of a vehicle steps aside, off its path, or
+  back if behind it; they used to be pushed on ahead of it, along its way.
+- **Routes avoid turning round.** Turning round at a dead end (into the plaza, where people stand
+  talking) costs a route 100 m more, so buses and taxis do it only when there is no other way.
+
+Vehicle-seconds spent crawling (under 5 m in 40 s):
+- the first three changes, over five minutes: blueprint 486 → 112 and neon7 1363 → 129 (of
+  7,800), harbor 1148 → 646 (of 4,420);
+- the route cost on top of them, over ten minutes: blueprint 634 → 309, neon7 1105 → 542 (of
+  16,800). Harbor, whose network is three streets between the same two junctions, got worse
+  (1004 → 1417 of 9,520): without turning round, it has to go through its one busy junction.

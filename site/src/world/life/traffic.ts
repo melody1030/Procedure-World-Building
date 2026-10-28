@@ -80,6 +80,8 @@ const TOW = 45;
 /** At the most crowded: lane length (voxels) per vehicle, and vehicles per junction. */
 const ROOM = 70;
 const PER_JUNCTION = 3;
+/** What turning round costs a route, as so many voxels of driving. */
+const ROUND_COST = 400;
 /** Dead ends shorter than this (voxels) are kept out of. */
 const STUB = 40;
 /** Bus: riders, the least and most time at a stop (s), the chance a rider gets off at each stop. */
@@ -510,7 +512,8 @@ export class Traffic {
       const s = this.segs[best];
       if ((stay && !s.link && this.nodes[s.b].kind === "exit") || this.stub(s)) continue;
       for (const j of s.next) {
-        const d = dist[best] + s.len;
+        // (Turning round at a dead end, into the plaza's crowd, only if there is no other way.)
+        const d = dist[best] + s.len + (this.segs[j].link && this.nodes[this.segs[j].a].kind === "end" ? ROUND_COST : 0);
         if (d < dist[j]) {
           dist[j] = d;
           prev[j] = best;
@@ -850,7 +853,7 @@ export class Traffic {
     const h = this.toHalt(v);
     if (h < Infinity) vmax = Math.min(vmax, Math.sqrt(2 * STOP_BRAKE * Math.max(0, h)));
     const before = v.v;
-    v.v = Math.max(0, Math.min(v.v + a * dt, vmax, v0 + 1, nudge ? CREEP : Infinity));
+    v.v = Math.max(0, Math.min(v.v + a * dt, vmax, v0 + 1, nudge && people ? CREEP : Infinity));
     if (gap < 0.5) v.v = 0;
     v.braking = v.v < before - 0.5 * dt || v.v < 0.5;
     if (h < 1) {
@@ -886,7 +889,9 @@ export class Traffic {
     // Clear of the junction (its back out of the link): let it go.
     if (v.holds >= 0 && this.segs[v.granted].next[0] === v.seg && v.s > v.length / 2 + 1) this.release(v);
     // Stuck too long (in a knot): towed, riders and all.
-    v.still = v.v < 0.3 || (nudge && people) ? v.still + dt : 0;
+    // (Only really under way does it count as moving again: edging past people, it is still kept waiting.)
+    if (v.v < 0.3 || (nudge && people)) v.still += dt;
+    else if (v.v > CREEP + 0.5) v.still = 0;
     if (v.still > TOW) {
       this.release(v);
       this.leaveQueue(v);
@@ -1045,12 +1050,15 @@ export class Traffic {
     return !v.gone && v.dwelling;
   }
 
-  /** True if a moving vehicle will come within reach of (x, z) in the next few seconds. */
+  /** True if a moving vehicle will come within reach of (x, z) in the next few seconds, or one kept waiting is about to edge past. */
   danger(x: number, z: number): boolean {
     for (const v of this.vehicles) {
-      if (v.gone || v.v < 1) continue;
+      if (v.gone) continue;
       const dx = x - v.x;
       const dz = z - v.z;
+      // One kept waiting and edging on: let it through first.
+      if (v.still > PATIENCE && !v.dwelling && Math.hypot(dx, dz) < v.length / 2 + 8) return true;
+      if (v.v < 1) continue;
       if (Math.abs(dx) > 60 || Math.abs(dz) > 60) continue;
       const ux = Math.sin(v.heading) * v.v;
       const uz = Math.cos(v.heading) * v.v;
@@ -1086,8 +1094,8 @@ export class Traffic {
       const along = dx * fx + dz * fz;
       const lat = -dx * fz + dz * fx;
       if (Math.abs(along) >= v.length / 2 + r || Math.abs(lat) >= v.width / 2 + r) continue;
-      // Out the nearer way: to the side, or off the front or back.
-      if (v.length / 2 - Math.abs(along) < v.width / 2 - Math.abs(lat)) return { x: fx * Math.sign(along), z: fz * Math.sign(along) };
+      // Out the nearer way: to the side, or off the back; never ahead of it, along its way.
+      if (along < 0 && v.length / 2 + along < v.width / 2 - Math.abs(lat)) return { x: -fx, z: -fz };
       const s = Math.sign(lat) || 1;
       return { x: -fz * s, z: fx * s };
     }

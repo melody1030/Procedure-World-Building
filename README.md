@@ -1,10 +1,10 @@
-![Blueprint City: from empty ground to streets and lots, to the finished city, to people and traffic](docs/images/banner.webp)
+![Blueprint City: from empty ground to streets and lots, to the finished city, to people and traffic](docs/images/banner.png)
 
 # Blueprint City
 
 > **From empty ground to a working city: built layer by layer, then brought to life by people and traffic.**
 
-A procedural voxel city for **Procedural World Building** at Cornell Tech (Fall 2026). Every
+A procedural voxel city for **Procedural World Building**. Every
 island is grown from a seed by rules, not by hand: the ground is printed, the streets are paved
 outward from a plaza, the buildings rise storey by storey, and then people, pigeons, cats and
 traffic move in.
