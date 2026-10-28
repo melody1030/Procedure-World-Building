@@ -550,6 +550,8 @@ districts stage; drawn from `city/parkModels.ts` by `WorldView.setParks`).
 
 ## 2026-10-27: Inhabitants (agents, after Class 08)
 
+![People on the paths, pigeons taking off as they pass, a flower garden in the park](screenshots/2026-10-27-inhabitants.webp)
+
 The city is lived in once it is built (`life/`, drawn by render/life.ts; "Show life" in the
 Town section, `?hide=life` to start without). 420 people, 150 pigeons and 8 cats, each kind from
 one of the agent models, and each reacting to the others.
@@ -611,6 +613,8 @@ one of the agent models, and each reacting to the others.
 
 ## 2026-10-27: One concrete city: Surfaces rewritten for the cyberpunk island
 
+![The build animation partway: the island is concrete from its first layer, terraced hills and all](screenshots/2026-10-27-concrete-build.webp)
+
 - **The whole island is one pour of concrete** (terrain/surfaces.ts). Surfaces no longer makes
   grass, dirt and rock: everything that isn't river, street or plaza is concrete, with two kinds
   read from the land, with their settings (the panel's Surfaces section):
@@ -633,6 +637,12 @@ one of the agent models, and each reacting to the others.
   sidewalks, plaza, parks and river.
 
 ## 2026-10-28: Traffic: cars, vans, taxis and buses, and how people live with them
+
+| Bus stop | Taxi pickup |
+|---|---|
+| ![A bus at its shelter, door lit, the people waiting walking to it](screenshots/2026-10-28-bus-stop.webp) | ![A taxi pulled up at the curb for the person who hailed it](screenshots/2026-10-28-taxi-pickup.webp) |
+
+![A bus and a car on a stepped street, people on the sidewalks](screenshots/2026-10-28-street-traffic.webp)
 
 - **The road graph** (life/traffic.ts): every street is two lanes, keeping right, each 0.24 of the
   street's width off its center line and trimmed back from the junctions. At a junction, each lane
@@ -679,6 +689,10 @@ one of the agent models, and each reacting to the others.
 
 ## 2026-10-28: Smoother blocks, graded lots, deeper lots
 
+| Ground (buildings hidden) | With buildings |
+|---|---|
+| ![Buildings hidden: the blocks slope evenly between the streets, the lots shallow pads](screenshots/2026-10-28-smoothed-blocks.webp) | ![The same ground with its buildings](screenshots/2026-10-28-city-after-grading.webp) |
+
 - **Blocks smoothed** (terrain/streets.ts, `smoothBlocks`, a new step after the carve): the ground
   between the streets keeps the hill's terraces no longer. It takes the smoothest shape (a membrane,
   Laplace's equation) held at the paving's levels (streets, sidewalks, plaza) and the river's,
@@ -713,6 +727,8 @@ one of the agent models, and each reacting to the others.
 
 ## 2026-10-28: No more small plots
 
+![Blueprint from above, lots shown, buildings hidden: small lots merged into larger ones](screenshots/2026-10-28-lots-merged.webp)
+
 - **Small lots merged or given up** (terrain/districts.ts, step 6, `mergeSmallLots`): a lot under
   10 m either way (`MERGE_BELOW`) is merged with the neighbor beside it on the same frontage, across
   their alley (same district, same facing, as deep as the shallower, at most 24 m wide
@@ -728,6 +744,8 @@ one of the agent models, and each reacting to the others.
   vertical-neighborhood 1.
 
 ## 2026-10-28: Filling the gaps
+
+![Blueprint from above, lots shown: the gaps beside bends, at block ends and on the hill inside a loop now have lots](screenshots/2026-10-28-lots-filled.webp)
 
 - Empty frontage next to the streets (beside bends, at block ends, on the hill inside a loop) got
   no lot. Three reasons, three changes (terrain/districts.ts, terrain/streets.ts):
