@@ -14,3 +14,8 @@
 - the type of technique: terrain, shader, agent, building morphology, network
 	- each with clickable link to another tab
 -  include diagram and screenshots
+- different layers of system
+- putting more effort on data structure (have a sense of diagram of how the world is interacting)
+	- agents are graphs
+	- scale and layers
+	- 
