@@ -85,6 +85,8 @@ const BY_TAXI = 0.1;
 const BUS_WAIT = 150;
 const TAXI_WAIT = 90;
 const CROSS_WAIT = 12;
+/** Done waiting, how long (s) someone walks on before minding the traffic again (time to cross a street). */
+const CROSS_GO = 4;
 /** Crossing the road, people walk this much faster; stepping out of a vehicle's way, this fast (voxels per second). */
 const HURRY = 1.35;
 const MAKE_WAY = 5;
@@ -702,7 +704,11 @@ export class Life {
       p.motion = "wait-to-cross";
       return;
     }
-    if (!onRoad) p.cross = 0;
+    // Waited long enough: it goes, and minds the traffic again only CROSS_GO seconds on (reset at
+    // once, one step along the curb would start the wait again, and it could wait there for ever).
+    if (p.cross >= CROSS_WAIT) {
+      if ((p.cross += dt) > CROSS_WAIT + CROSS_GO) p.cross = 0;
+    } else if (!onRoad) p.cross = 0;
     // Headway: nearer the goal than ever, or stuck. Stuck a while, squeeze past people; stuck
     // through that again and again, give up and go elsewhere.
     if (p.track !== p.goal) {
