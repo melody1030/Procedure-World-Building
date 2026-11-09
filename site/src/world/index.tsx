@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useShortcutToggle } from "../components/SidePanel";
-import { WorldView } from "./render/WorldView";
+import { WorldView, type CameraPreset } from "./render/WorldView";
+import { CameraBar } from "./ui/CameraBar";
 import { useWorldState } from "./state";
 import { finishTerrain, generateTerrain, type Terrain } from "./terrain/pipeline";
 import { PrintBar } from "./ui/PrintBar";
@@ -30,6 +31,9 @@ export default function WorldPage() {
   const [overlays, setOverlays] = useState(true);
   const [panelOpen, setPanelOpen] = useState(() => window.matchMedia("(min-width: 1024px)").matches);
   useShortcutToggle(overlays, () => setOverlays((v) => !v));
+  /** The camera preset the view is at, or null once it has been moved by hand. */
+  const [view, setView] = useState<CameraPreset | null>("overview");
+  const flyTo = useCallback((preset: CameraPreset) => viewRef.current?.flyTo(preset), []);
 
   // The seed and settings the terrain is made for follow the requested ones two frames later, so
   // "Generating…" shows (and the slider stays where it was let go) before the work blocks the page.
@@ -71,6 +75,7 @@ export default function WorldPage() {
   useEffect(() => {
     const view = new WorldView(mountRef.current!);
     viewRef.current = view;
+    view.setViewHandler(setView);
     // A dropped river point replaces that point in the current path; the river rebuilds from it.
     view.setPathEditHandler((index, point) => {
       const path = terrainRef.current.river.path;
@@ -107,7 +112,7 @@ export default function WorldPage() {
   useEffect(() => viewRef.current?.setPathVisible(state.showPath), [state.showPath]);
   useEffect(() => viewRef.current?.setClaims(terrain.districts.claims.claim, terrain.districts.claims.n), [terrain.districts]);
   useEffect(() => viewRef.current?.setDistricts(terrain.districts), [terrain.districts]);
-  useEffect(() => viewRef.current?.setShowDistricts(state.showDistricts), [state.showDistricts]);
+  useEffect(() => viewRef.current?.setGroundTint(state.groundTint), [state.groundTint]);
   useEffect(() => viewRef.current?.setShowLots(state.showLots), [state.showLots]);
   useEffect(() => viewRef.current?.setShowParks(state.showParks), [state.showParks]);
   useEffect(() => viewRef.current?.setShowBuildings(state.showBuildings), [state.showBuildings]);
@@ -121,7 +126,6 @@ export default function WorldPage() {
   useEffect(() => viewRef.current?.setLife(life), [life]);
   useEffect(() => viewRef.current?.setShowLife(state.showLife), [state.showLife]);
   useEffect(() => viewRef.current?.setParks(terrain.parks), [terrain.parks]);
-  useEffect(() => viewRef.current?.setShowClaims(state.showClaims), [state.showClaims]);
   useEffect(() => {
     const { n, height } = terrain.columns;
     viewRef.current?.setNetwork(terrain.hubs, terrain.streets, (x, z) => height[Math.min(n - 1, Math.max(0, Math.round(z))) * n + Math.min(n - 1, Math.max(0, Math.round(x)))]);
@@ -138,6 +142,17 @@ export default function WorldPage() {
 
   /** The city is rebuilding: a settings change is being applied, or its districts are still coming. */
   const busy = generating || !!terrain.pendingDistricts;
+  const river = terrain.river.path;
+  const available = useMemo(
+    () => ({
+      overview: true,
+      plaza: terrain.streets.plazas.length > 0,
+      park: !!terrain.parks?.parks.some((pk) => pk.props.length > 0),
+      river: !!river && river.curve.length >= 40,
+      street: terrain.streets.streets.some((st) => st.kind === "main" && st.curve.length >= 20),
+    }),
+    [terrain.streets, terrain.parks, river],
+  );
 
   return (
     <div className="relative h-screen w-full overflow-hidden bg-stage">
@@ -145,10 +160,11 @@ export default function WorldPage() {
       {/* The whole interface is drawn at UI_SCALE (80%), so it takes less of the view. */}
       <div className="pointer-events-none absolute inset-0" style={{ zoom: UI_SCALE }}>
         <TerrainPanel terrain={terrain} life={life} ctl={ctl} open={panelOpen} onToggle={() => setPanelOpen((v) => !v)} busy={busy} />
+        <CameraBar view={view} available={available} onFly={flyTo} shown={overlays} />
         {/* While the city rebuilds: a quiet note at the top of the view, over the part the panel leaves. */}
         <div
           className={"absolute top-4 flex justify-center transition-[left,opacity] duration-300 " + (busy ? "opacity-100" : "opacity-0")}
-          style={{ left: panelOpen ? "18.2rem" : "1rem", right: "1rem" }}
+          style={{ left: panelOpen ? "18.2rem" : "1rem", right: "4rem" }}
           aria-live="polite"
         >
           <div className={"flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[12px] text-[#dce8f5] " + GLASS}>
@@ -161,7 +177,7 @@ export default function WorldPage() {
           className={"absolute bottom-4 right-4 flex justify-center transition-[left] duration-300 " + (overlays ? "" : "hidden")}
           style={{ left: panelOpen ? "18.2rem" : "1rem" }}
         >
-          <PrintBar replayKey={terrain.seed} onChange={setPrint} busy={busy} />
+          <PrintBar replayKey={terrain.seed} onChange={setPrint} />
         </div>
       </div>
     </div>

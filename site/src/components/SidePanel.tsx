@@ -38,7 +38,7 @@ interface PanelHandle {
 const panelRegistry = new Set<PanelHandle>();
 
 /** True while the user is typing somewhere the "E" key should type a letter instead. */
-function isTextEntry(target: EventTarget | null): boolean {
+export function isTextEntry(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   if (target.isContentEditable || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) return true;
   if (target instanceof HTMLInputElement) {
@@ -47,17 +47,22 @@ function isTextEntry(target: EventTarget | null): boolean {
   return false;
 }
 
-/** Pressing E closes every open panel, or, if none is open, opens them all again. */
-function handlePanelShortcut(event: KeyboardEvent) {
-  if (event.key.toLowerCase() !== "e" || event.repeat || event.metaKey || event.ctrlKey || event.altKey) return;
-  if (isTextEntry(event.target)) return;
+/** Closes every open panel, or, if none is open, opens them all again (what E does). */
+export function togglePanels(): boolean {
   const panels = [...panelRegistry];
-  if (panels.length === 0) return;
-  event.preventDefault();
+  if (panels.length === 0) return false;
   const anyOpen = panels.some((panel) => panel.isOpen());
   for (const panel of panels) {
     if (panel.isOpen() === anyOpen) panel.toggle();
   }
+  return true;
+}
+
+/** Pressing E toggles the panels (see togglePanels). */
+function handlePanelShortcut(event: KeyboardEvent) {
+  if (event.key.toLowerCase() !== "e" || event.repeat || event.metaKey || event.ctrlKey || event.altKey) return;
+  if (isTextEntry(event.target)) return;
+  if (togglePanels()) event.preventDefault();
 }
 
 function registerPanel(handle: PanelHandle): () => void {

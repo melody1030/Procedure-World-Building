@@ -4,18 +4,23 @@ import { DEFAULT_PARAMS, type ParamGroup, type ParamKey, type TerrainParams } fr
 export const DEFAULT_SEED = "blueprint";
 export const MAX_SEED_LENGTH = 32;
 
+/**
+ * The ground tints: by district, by what owns each column (river, bank, roads…), or by how well
+ * each column suits a city center.
+ */
+export const GROUND_TINTS = ["none", "districts", "claims", "suitability"] as const;
+export type GroundTint = (typeof GROUND_TINTS)[number];
+
 export interface WorldState {
   seed: string;
   /** Changing a parameter regenerates from the stage that reads it. */
   params: TerrainParams;
   /** Draw the river's control points and curve over the terrain. */
   showPath: boolean;
-  /** Tint the ground by what owns each column (river, bank, roads…). */
-  showClaims: boolean;
-  /** Draw the town's hubs (and later its streets) and tint the ground by hub suitability. */
+  /** What the ground is colored by: one tint at a time, since they all paint the same columns. */
+  groundTint: GroundTint;
+  /** Draw the street network: the city center's pin, the junctions and the streets' center lines. */
   showNetwork: boolean;
-  /** Tint the ground by district. */
-  showDistricts: boolean;
   /** Outline the lots. */
   showLots: boolean;
   showParks: boolean;
@@ -30,9 +35,8 @@ type Action =
   | { type: "setParam"; group: ParamGroup; patch: Partial<TerrainParams[ParamGroup]> }
   | { type: "resetParams"; keys: ParamKey[] }
   | { type: "setShowPath"; on: boolean }
-  | { type: "setShowClaims"; on: boolean }
+  | { type: "setGroundTint"; tint: GroundTint }
   | { type: "setShowNetwork"; on: boolean }
-  | { type: "setShowDistricts"; on: boolean }
   | { type: "setShowLots"; on: boolean }
   | { type: "setShowParks"; on: boolean }
   | { type: "setShowBuildings"; on: boolean }
@@ -57,12 +61,10 @@ function reducer(state: WorldState, action: Action): WorldState {
     }
     case "setShowPath":
       return { ...state, showPath: action.on };
-    case "setShowClaims":
-      return { ...state, showClaims: action.on };
+    case "setGroundTint":
+      return { ...state, groundTint: action.tint };
     case "setShowNetwork":
       return { ...state, showNetwork: action.on };
-    case "setShowDistricts":
-      return { ...state, showDistricts: action.on };
     case "setShowLots":
       return { ...state, showLots: action.on };
     case "setShowParks":
@@ -86,7 +88,10 @@ function seedFromUrl(): string {
   return cleanSeed(new URLSearchParams(window.location.search).get("seed") ?? "");
 }
 
-/** Overlays to start with, also from the URL (`/world?show=districts,lots,parks`), so a view can be linked. */
+/**
+ * Overlays to start with, also from the URL (`/world?show=districts,lots,parks`), so a view can be
+ * linked. A tint's name (districts, claims, suitability) picks the ground tint; the first one wins.
+ */
 function shownFromUrl(name: string): boolean {
   return (new URLSearchParams(window.location.search).get("show") ?? "").split(",").includes(name);
 }
@@ -96,9 +101,8 @@ export function useWorldState() {
     seed: seedFromUrl(),
     params: DEFAULT_PARAMS,
     showPath: shownFromUrl("path"),
-    showClaims: shownFromUrl("claims"),
+    groundTint: GROUND_TINTS.find((t) => t !== "none" && shownFromUrl(t)) ?? "none",
     showNetwork: shownFromUrl("network"),
-    showDistricts: shownFromUrl("districts"),
     showLots: shownFromUrl("lots"),
     showParks: shownFromUrl("parks"),
     showBuildings: !(new URLSearchParams(window.location.search).get("hide") ?? "").split(",").includes("buildings"),
@@ -110,9 +114,8 @@ export function useWorldState() {
     setParam: <G extends ParamGroup>(group: G, patch: Partial<TerrainParams[G]>) => dispatch({ type: "setParam", group, patch }),
     resetParams: (keys: ParamKey[]) => dispatch({ type: "resetParams", keys }),
     setShowPath: (on: boolean) => dispatch({ type: "setShowPath", on }),
-    setShowClaims: (on: boolean) => dispatch({ type: "setShowClaims", on }),
+    setGroundTint: (tint: GroundTint) => dispatch({ type: "setGroundTint", tint }),
     setShowNetwork: (on: boolean) => dispatch({ type: "setShowNetwork", on }),
-    setShowDistricts: (on: boolean) => dispatch({ type: "setShowDistricts", on }),
     setShowLots: (on: boolean) => dispatch({ type: "setShowLots", on }),
     setShowParks: (on: boolean) => dispatch({ type: "setShowParks", on }),
     setShowBuildings: (on: boolean) => dispatch({ type: "setShowBuildings", on }),

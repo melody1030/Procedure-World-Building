@@ -27,10 +27,11 @@ seed → noise → shaping → heights → terraces → river → claims → hub
 - **Next:** place buildings on the lots by district (one landmark at the plaza), then scatter
   and bridges.
 
-Overlays can be opened from the URL: `/world?show=districts,lots,parks`.
+Overlays can be opened from the URL: `/world?show=districts,lots,parks`. One ground tint shows at
+a time (`districts`, `claims` or `suitability`); `network` draws the street network on top.
 
 Code: `terrain/` holds one file per stage; `ui/TerrainPanel.tsx` is the panel, `ui/PrintBar.tsx`
-the build timeline, `render/print.ts` the ground shader, `terrain/buildup.ts` the timeline's data. `noise.ts` and `rng.ts` are shared with
+the build timeline, `ui/CameraBar.tsx` the camera toolbar, `render/print.ts` the ground shader, `terrain/buildup.ts` the timeline's data. `noise.ts` and `rng.ts` are shared with
 Week 5.
 
 ---
@@ -894,3 +895,86 @@ out the same before and after (pigeons going up and landing, time in the air, th
 each state and every change between them). Over those ten minutes on blueprint, a cat set off a
 pigeon's flock 238 times and people 221; the cats sprinted 79 times and missed every time, as they
 are meant to.
+
+## 2026-11-08: City controls, after the Component Gallery
+
+The panel had grown one setting at a time: overlays that fought over the ground's color, a
+reset button on every section, explanations in tooltips you had to find, a timeline that said
+nothing of what it was building, and no way to get to a place in the city but dragging. Following
+the patterns collected on [component.gallery](https://component.gallery/components/) (tabs,
+segmented control, badge, tooltip, stepper, toolbar), the controls were reworked in three steps.
+The plan, with what each component is for and the six milestones, is
+[docs/plans/city-controls-plan.md](../../../docs/plans/city-controls-plan.md); these are the
+first three.
+
+### The panel: Build and Layers
+
+| ![The Build tab: settings in five sections, an explanation beside the panel for the setting under the pointer](screenshots/2026-11-08-panel-build.webp) | ![The Layers tab: one ground color at a time (here Claims, with its legend, buildings hidden), and what is drawn on top](screenshots/2026-11-08-panel-layers.webp) |
+|---|---|
+
+- **Two tabs** (ui/TerrainPanel.tsx): **Build**, the settings that change the city (Noise,
+  Shaping, Terraces, River, Surfaces), and **Layers**, what is shown over it. The open tab is
+  remembered.
+- **One ground color at a time.** Districts, claims and suitability all tinted the ground, and
+  turning on two mixed them into a color that meant nothing. They are now a segmented control
+  (None, Districts, Claims, Suitability) with the chosen one's legend under it; `showClaims` and
+  `showDistricts` became one `groundTint` (state.ts, `setGroundTint` in render/WorldView.ts).
+  The street network, lots, parks, buildings and life are switches drawn on top, each with a
+  count.
+- **Explanations on hover, beside the panel.** Each setting's explanation used to sit behind an
+  ⓘ. Now hovering the setting's name (or focusing its control from the keyboard) shows it in a
+  speech bubble just outside the panel's right edge, level with the name, so it never covers
+  the panel or gets clipped by its scrolling (ui/kit.tsx, `useHoverTip`, portaled to the page
+  and tied to the control with `aria-describedby`).
+- **A badge on each section** says how many of its settings differ from their defaults, so a
+  changed setting can be found with the sections closed. One **Reset all** at the end replaces
+  the reset button on every section.
+
+### The timeline: named steps, time kept honest
+
+![The timeline partway through the build: the track in six stretches, one per step, the steps named under them, and the speed control](screenshots/2026-11-08-timeline.webp)
+
+- **The track is the build's six steps** (Terrain, River, Water, Plaza, Streets, Buildings),
+  each stretch as long as the step takes, so the thumb moves at one steady pace. (Equal stretches
+  were tried first, but then the thumb sped up and slowed down from one step to the next.)
+- **Each step is named under its own stretch**: done in cyan, the current one in white, the
+  rest dimmed. Clicking a name plays the build from the start of that step. When the bar is too
+  narrow for every name to fit its stretch (on a phone), one line names the current step instead
+  ("Streets · 5/6").
+- **Speed is a segmented control**: 0.5×, 1×, 2×, 4×, applied at once, even mid-play.
+- The slider tells screen readers which step it is on ("Streets, step 5 of 6").
+
+### The camera toolbar: five places to fly to
+
+| ![Plaza](screenshots/2026-11-08-view-plaza.webp) | ![Park](screenshots/2026-11-08-view-park.webp) |
+|---|---|
+| ![River](screenshots/2026-11-08-view-river.webp) | ![Street](screenshots/2026-11-08-view-street.webp) |
+
+A toolbar at the top right (ui/CameraBar.tsx) flies the camera to a place in the city, with keys
+`1`–`5`; each button names itself and its key on hover. The flight takes 700 ms, easing in and
+out; dragging the view by hand cancels it and clears the lit button. A place the city doesn't
+have yet (no streets while the timeline is early) is disabled. Each view is worked out from the
+city, so it finds the same kind of place on any seed. The angles were matched by eye to views set
+by hand on seed km8gt7:
+
+| Preset | Where it looks from |
+|---|---|
+| **Overview** `1` | the default view of the whole diorama |
+| **Plaza** `2` | 95 m out, 36° down onto the paving and the Landmark's base, from the clearest side turned 45° counterclockwise |
+| **Park** `3` | 43° down into the park with the most in it (a full park before a flower garden), 40–60 m out by its size, from the clearest side turned 10° clockwise |
+| **River** `4` | a long look up the river at a point a little past halfway down it: 108 m out and 27° up from downstream, turned 25° off the river's line |
+| **Street** `5` | 70 m past the far end of the longest main street and 27 m up, looking back along it toward the plaza, 21.5° down |
+
+**The clearest side.** A tower in front of the plaza or the camera inside a building made the
+first versions useless on some seeds. The Plaza and Park views now score 24 directions round the
+place (render/WorldView.ts, `openSide`): a building standing in the corridor between the whole
+place and the camera and rising above the line of sight costs 1, a hill above it 2, and a
+building or hill at the camera's own spot rules the side out. Then the view turns by its set
+angle; if that side is blocked, the camera first comes closer (85%, 70%, then 55% of the
+distance), then tries the sides next to it, nearest first and up to 90° off, and takes the first
+clear one. On km8gt7 and blueprint the Park view comes in to 70% and 55% to clear the towers on
+its far side.
+
+**What's next** (Milestones 4–6): an inspector (click a building, person or vehicle to see what it
+is and why it's doing what it does, and follow it), notices with Undo for Reset all, a
+keyboard-shortcut sheet and a short tour.

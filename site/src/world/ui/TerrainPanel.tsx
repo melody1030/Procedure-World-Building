@@ -1,19 +1,21 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { SidePanel } from "../../components/SidePanel";
 import type { Life } from "../life/agents";
-import { Button, GLASS, Legend, Note, Row, Section, Select, Slider, Switch } from "./kit";
-import type { WorldController } from "../state";
+import { Button, GLASS, Legend, Note, Row, RULE, Section, Segmented, Select, Slider, Subheading, Switch, Tabs } from "./kit";
+import type { GroundTint, WorldController } from "../state";
 import { DEFAULT_PARAMS, PARAM_SPECS, RIVER_VISIBLE, type ParamKey, type ParamSpec, type RangeSpec, type TerrainParams } from "../terrain/params";
 import { CLAIM_COLORS } from "../terrain/claims";
 import { DISTRICTS } from "../terrain/districts";
 import type { Terrain } from "../terrain/pipeline";
-import { NoiseIcon, ResetIcon, RiverIcon, ShapingIcon, Spinner, SurfaceIcon, TerraceIcon, TownIcon } from "./icons";
+import { NoiseIcon, ResetIcon, RiverIcon, ShapingIcon, Spinner, SurfaceIcon, TerraceIcon } from "./icons";
 import { TitleBlock } from "./TitleCard";
 
 /**
- * The world's one panel, on the left: the title and seed at the top, then the terrain's settings
- * laid out like the weekly studios (icon sections in pipeline order) and Reset. Sliders apply when
- * released, since the terrain takes a moment to rebuild; selects apply at once.
+ * The world's one panel, on the left: the title and seed at the top, then two tabs. **Build** holds
+ * the terrain's settings, laid out like the weekly studios (icon sections in pipeline order, each
+ * with a count of its changed settings and its own reset) and Reset all. Sliders apply when
+ * released, since the terrain takes a moment to rebuild; selects apply at once. **Layers** holds
+ * what only changes the drawing: one ground tint at a time, and the layers drawn on top.
  */
 
 const SECTIONS: { title: string; icon: ReactNode; keys: ParamKey[] }[] = [
@@ -62,11 +64,6 @@ const SECTIONS: { title: string; icon: ReactNode; keys: ParamKey[] }[] = [
       ["look", "grid"],
     ],
   },
-  {
-    title: "Town",
-    icon: <TownIcon />,
-    keys: [],
-  },
 ];
 /** The Show claims legend: the claims made so far (lots come with the districts). */
 const CLAIM_LEGEND: [string, number][] = [
@@ -83,6 +80,25 @@ const CLAIM_LEGEND: [string, number][] = [
 const ALL_KEYS: ParamKey[] = [...SECTIONS.flatMap((s) => s.keys), ["river", "control"]];
 
 /** A setting's name, and a spinner while the rebuild it started runs. */
+/** The panel's tabs; the open one is remembered in this browser. */
+type Tab = "build" | "layers";
+const TAB_KEY = "world.panelTab";
+function savedTab(): Tab {
+  try {
+    return localStorage.getItem(TAB_KEY) === "layers" ? "layers" : "build";
+  } catch {
+    return "build";
+  }
+}
+
+/** The ground tints, in the order the segmented control shows them. */
+const TINT_OPTIONS: { value: GroundTint; label: string }[] = [
+  { value: "none", label: "None" },
+  { value: "districts", label: "Districts" },
+  { value: "claims", label: "Claims" },
+  { value: "suitability", label: "Suitability" },
+];
+
 function SettingLabel({ label, pending }: { label: string; pending: boolean }) {
   return (
     <span className="inline-flex items-center gap-1.5">
@@ -146,92 +162,144 @@ const read = (params: TerrainParams, [g, key]: ParamKey) => (params[g] as unknow
 const specOf = ([g, key]: ParamKey) => (PARAM_SPECS[g] as Record<string, ParamSpec>)[key];
 
 export function TerrainPanel({ terrain, life, ctl, open, onToggle, busy }: { terrain: Terrain; life: Life | null; ctl: WorldController; open: boolean; onToggle: () => void; busy: boolean }) {
-  const changed = ALL_KEYS.some((k) => read(ctl.state.params, k) !== read(DEFAULT_PARAMS, k));
-  // The last setting changed, to put the spinner by it while the city rebuilds.
-  const [lastKey, setLastKey] = useState<string | null>(null);
-  const { state } = ctl;
+  const [tab, setTab] = useState<Tab>(savedTab);
+  const pickTab = (next: Tab) => {
+    setTab(next);
+    try {
+      localStorage.setItem(TAB_KEY, next);
+    } catch {
+      // Private windows may refuse storage; the tab just isn't remembered.
+    }
+  };
 
   return (
     <SidePanel side="left" open={open} onToggle={onToggle} widthRem={16.2} label="settings panel" glass={GLASS} bodyClassName="gap-3.5 p-4">
-      <TitleBlock seed={state.seed} onSeed={ctl.setSeed} />
-      {SECTIONS.map((section) => (
-        <Section key={section.title} icon={section.icon} title={section.title}>
-          {/* With the river off, only its on/off switch is shown; while it is hidden, none of it. */}
-          {section.keys
-            .filter((k) => k[0] !== "river" || (RIVER_VISIBLE && (k[1] === "enabled" || state.params.river.enabled)))
-            .map((k) => (
-              <ParamControl
-                key={k.join(".")}
-                spec={specOf(k)}
-                value={read(state.params, k)}
-                fallback={read(DEFAULT_PARAMS, k)}
-                pending={busy && lastKey === k.join(".")}
-                onChange={(v) => {
-                  setLastKey(k.join("."));
-                  ctl.setParam(k[0], { [k[1]]: v });
-                }}
-              />
-            ))}
-          {section.title === "Town" && (
-            <>
-              <Row label="Show network" description="Pin the city center (large, white), dot every junction, draw the streets' center lines and the street tiles they were collapsed on (white squares). Buildable ground is tinted by how well it suits a city center, from violet to amber; unbuildable ground is dark." inline>
-                <Switch checked={state.showNetwork} onChange={(e) => ctl.setShowNetwork(e.target.checked)} />
-              </Row>
-              {state.showNetwork && (
-                <Note>
-                  {terrain.streets.streets.filter((st) => st.kind === "main").length} main and {terrain.streets.streets.filter((st) => st.kind === "street").length} side street segments, {terrain.streets.junctions.length} junctions.
-                </Note>
-              )}
-              <Row label="Show districts" description="Tint the ground by district: corporate core, commercial, megablocks, industrial and docks, wealthy enclave." inline>
-                <Switch checked={state.showDistricts} onChange={(e) => ctl.setShowDistricts(e.target.checked)} />
-              </Row>
-              {state.showDistricts && <Legend items={DISTRICTS.map((d, i) => [`${d.name} ${Math.round(terrain.districts.shares[i] * 100)}%`, d.color])} />}
-              <Row label="Show lots" description="Fill every building lot in its district's color, with a stronger edge." inline>
-                <Switch checked={state.showLots} onChange={(e) => ctl.setShowLots(e.target.checked)} />
-              </Row>
-              {state.showLots && <Note>{terrain.districts.lots.length} lots, each facing a street.</Note>}
-              <Row label="Show parks" description="Draw the parks, a layer of their own over the districts: 3 to 6 per city, each kept at least 25 m from the others. No lot goes on a park." inline>
-                <Switch checked={state.showParks} onChange={(e) => ctl.setShowParks(e.target.checked)} />
-              </Row>
-              {state.showParks && <Note>{terrain.districts.parks} parks.</Note>}
-              <Row label="Show buildings" description="Stand a building from the library on each lot: picked by district, sized to the lot, entrance to the street. The Landmark stands on the plaza." inline>
-                <Switch checked={state.showBuildings} onChange={(e) => ctl.setShowBuildings(e.target.checked)} />
-              </Row>
-              <Row label="Show life" description="Let the inhabitants out once the city is built. People walk the sidewalks and park paths to whatever they need most (a drink, a bench, company, home), pigeons flock round the plaza and the parks and take off when someone comes close, and cats stalk them. Cars, vans, taxis and buses drive the streets: people wait at the curb for a gap and vehicles stop for them, and going home some take the bus from a shelter or hail a taxi." inline>
-                <Switch checked={state.showLife} onChange={(e) => ctl.setShowLife(e.target.checked)} />
-              </Row>
-              {state.showLife && life && (
-                <Note>
-                  {life.people.length} people, {life.pigeons.length} pigeons, {life.cats.length} cats; {life.traffic.vehicles.length} vehicles on {life.traffic.routes.length} bus routes ({life.traffic.stops.length} stops).
-                </Note>
-              )}
-              <Row label="Show claims" description="Tint the ground by what owns each column. Later stages only build on free ground." inline>
-                <Switch checked={state.showClaims} onChange={(e) => ctl.setShowClaims(e.target.checked)} />
-              </Row>
-              {state.showClaims && <Legend items={CLAIM_LEGEND} />}
-            </>
-          )}
-          {section.title === "River" && RIVER_VISIBLE && state.params.river.enabled && (
-            <>
-              <Row label="Show path" description="Draw the control points and the curve over the terrain." inline>
-                <Switch checked={state.showPath} onChange={(e) => ctl.setShowPath(e.target.checked)} />
-              </Row>
-              {state.showPath && <Note>Drag a point to move it.</Note>}
-              {state.params.river.control && (
-                <Button onClick={() => ctl.setRiverControl(null)}>
-                  <ResetIcon className="h-3.5 w-3.5" />
-                  Reset path
-                </Button>
-              )}
-            </>
-          )}
-        </Section>
-      ))}
+      <TitleBlock seed={ctl.state.seed} onSeed={ctl.setSeed} />
+      <Tabs
+        label="Panel"
+        value={tab}
+        onChange={pickTab}
+        tabs={[
+          { id: "build", label: "Build", panel: <BuildTab ctl={ctl} busy={busy} /> },
+          { id: "layers", label: "Layers", panel: <LayersTab terrain={terrain} life={life} ctl={ctl} /> },
+        ]}
+      />
+    </SidePanel>
+  );
+}
+
+const changedIn = (params: TerrainParams, keys: ParamKey[]) => keys.filter((k) => read(params, k) !== read(DEFAULT_PARAMS, k)).length;
+
+/** Everything that rebuilds the terrain, section by section. */
+function BuildTab({ ctl, busy }: { ctl: WorldController; busy: boolean }) {
+  const { state } = ctl;
+  const changed = changedIn(state.params, ALL_KEYS) > 0;
+  // The last setting changed, to put the spinner by it while the city rebuilds.
+  const [lastKey, setLastKey] = useState<string | null>(null);
+
+  return (
+    <>
+      {SECTIONS.map((section) => {
+        const count = changedIn(state.params, section.keys);
+        return (
+          <Section key={section.title} icon={section.icon} title={section.title} changed={count}>
+            {/* With the river off, only its on/off switch is shown; while it is hidden, none of it. */}
+            {section.keys
+              .filter((k) => k[0] !== "river" || (RIVER_VISIBLE && (k[1] === "enabled" || state.params.river.enabled)))
+              .map((k) => (
+                <ParamControl
+                  key={k.join(".")}
+                  spec={specOf(k)}
+                  value={read(state.params, k)}
+                  fallback={read(DEFAULT_PARAMS, k)}
+                  pending={busy && lastKey === k.join(".")}
+                  onChange={(v) => {
+                    setLastKey(k.join("."));
+                    ctl.setParam(k[0], { [k[1]]: v });
+                  }}
+                />
+              ))}
+            {section.title === "River" && RIVER_VISIBLE && state.params.river.enabled && (
+              <>
+                <Row label="Show path" description="Draw the control points and the curve over the terrain. Drag a point to move the river." inline>
+                  <Switch checked={state.showPath} onChange={(e) => ctl.setShowPath(e.target.checked)} />
+                </Row>
+                {state.showPath && <Note>Drag a point to move it.</Note>}
+                {state.params.river.control && (
+                  <Button onClick={() => ctl.setRiverControl(null)}>
+                    <ResetIcon className="h-3.5 w-3.5" />
+                    Reset path
+                  </Button>
+                )}
+              </>
+            )}
+          </Section>
+        );
+      })}
 
       <Button className="mt-1 disabled:cursor-default disabled:opacity-40" disabled={!changed} onClick={() => ctl.resetParams(ALL_KEYS)}>
         <ResetIcon className="h-3.5 w-3.5" />
-        Reset to defaults
+        Reset all
       </Button>
-    </SidePanel>
+    </>
+  );
+}
+
+/** Everything that only changes what is drawn: one ground tint, then the layers on top. */
+function LayersTab({ terrain, life, ctl }: { terrain: Terrain; life: Life | null; ctl: WorldController }) {
+  const { state } = ctl;
+  const tint = state.groundTint;
+  return (
+    <>
+      <div className="flex flex-col gap-2.5">
+        <Subheading info="Color the ground by one thing at a time. Districts: which kind of neighborhood each column belongs to. Claims: what owns each column (river, bank, road…); later stages only build on free ground. Suitability: how well each column suits the city center.">
+          Ground color
+        </Subheading>
+        <Segmented label="Ground color" options={TINT_OPTIONS} value={tint} onChange={ctl.setGroundTint} />
+        {tint === "districts" && <Legend items={DISTRICTS.map((d, i) => [`${d.name} ${Math.round(terrain.districts.shares[i] * 100)}%`, d.color])} />}
+        {tint === "claims" && <Legend items={CLAIM_LEGEND} />}
+        {tint === "suitability" && (
+          <div className="flex flex-col gap-1">
+            <span className="h-1.5 rounded-full bg-gradient-to-r from-[#33296b] to-[#ffb82e]" aria-hidden />
+            <span className="flex justify-between">
+              <Note>Less suited</Note>
+              <Note>Best for the center</Note>
+            </span>
+            <Note>Dark ground can't be built on.</Note>
+          </div>
+        )}
+      </div>
+
+      <div className={"flex flex-col gap-3.5 border-t pt-3.5 " + RULE}>
+        <Subheading>Drawn on top</Subheading>
+        <Row label="Street network" description="Pin the city center (large, white), dot every junction, and draw the streets' center lines and the street tiles they were collapsed on (white squares)." inline>
+          <Switch checked={state.showNetwork} onChange={(e) => ctl.setShowNetwork(e.target.checked)} />
+        </Row>
+        {state.showNetwork && (
+          <Note>
+            {terrain.streets.streets.filter((st) => st.kind === "main").length} main and {terrain.streets.streets.filter((st) => st.kind === "street").length} side street segments, {terrain.streets.junctions.length} junctions.
+          </Note>
+        )}
+        <Row label="Lots" description="Fill every building lot in its district's color, with a stronger edge." inline>
+          <Switch checked={state.showLots} onChange={(e) => ctl.setShowLots(e.target.checked)} />
+        </Row>
+        {state.showLots && <Note>{terrain.districts.lots.length} lots, each facing a street.</Note>}
+        <Row label="Parks" description="Draw the parks, a layer of their own over the districts: 3 to 6 per city, each kept at least 25 m from the others. No lot goes on a park." inline>
+          <Switch checked={state.showParks} onChange={(e) => ctl.setShowParks(e.target.checked)} />
+        </Row>
+        {state.showParks && <Note>{terrain.districts.parks} parks.</Note>}
+        <Row label="Buildings" description="Stand a building from the library on each lot: picked by district, sized to the lot, entrance to the street. The Landmark stands on the plaza." inline>
+          <Switch checked={state.showBuildings} onChange={(e) => ctl.setShowBuildings(e.target.checked)} />
+        </Row>
+        <Row label="Life" description="Let the inhabitants out once the city is built. People walk the sidewalks and park paths to whatever they need most (a drink, a bench, company, home), pigeons flock round the plaza and the parks and take off when someone comes close, and cats stalk them. Cars, vans, taxis and buses drive the streets: people wait at the curb for a gap and vehicles stop for them, and going home some take the bus from a shelter or hail a taxi." inline>
+          <Switch checked={state.showLife} onChange={(e) => ctl.setShowLife(e.target.checked)} />
+        </Row>
+        {state.showLife && life && (
+          <Note>
+            {life.people.length} people, {life.pigeons.length} pigeons, {life.cats.length} cats; {life.traffic.vehicles.length} vehicles on {life.traffic.routes.length} bus routes ({life.traffic.stops.length} stops).
+          </Note>
+        )}
+      </div>
+    </>
   );
 }

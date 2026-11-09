@@ -110,6 +110,8 @@ The full dated log with every screenshot is in
 | 2026-10-26    | **Buildings are built storey by storey**, under scaffolding                                                                          |
 | 2026-10-27    | **Landscaped parks**; **inhabitants** (people, pigeons, cats); one concrete city                                                     |
 | 2026-10-28    | **Traffic** (cars, vans, taxis, buses); **smoothed blocks** and graded lots; small lots merged and gaps filled                       |
+| 2026-10-29    | **One state machine per agent**, each change with its reason; people drawn to the scale of the streets; buses kept moving at corners |
+| 2026-11-08    | **City controls**: Build and Layers tabs, one ground color at a time, a timeline of named steps, and a camera toolbar of five views |
 
 | Version 1, rainy night (Oct 7) | Districts and parks (Oct 12) |
 |---|---|
@@ -119,7 +121,11 @@ The full dated log with every screenshot is in
 |---|---|
 | ![The city](site/src/world/screenshots/2026-10-28-city-after-grading.webp) | ![A bus at its shelter](site/src/world/screenshots/2026-10-28-bus-stop.webp) |
 
-Plans: [terrain plan](docs/plans/terrain-plan.md) · [town plan](docs/plans/town-plan.md) · [shader studio plan](docs/plans/shader-studio-plan.md)
+| The new panel (Nov 8)                                                                                         | The Park view from the camera toolbar (Nov 8)                          |
+| ------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| ![The Build tab with an explanation beside the panel](site/src/world/screenshots/2026-11-08-panel-build.webp) | ![The Park view](site/src/world/screenshots/2026-11-08-view-park.webp) |
+
+Plans: [terrain plan](docs/plans/terrain-plan.md) · [town plan](docs/plans/town-plan.md) · [shader studio plan](docs/plans/shader-studio-plan.md) · [city controls plan](docs/plans/city-controls-plan.md)
 
 ---
 

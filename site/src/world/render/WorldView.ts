@@ -12,7 +12,7 @@ import { buildPlinth } from "./base";
 import { makePrintable, type PrintableBuilding } from "../buildings/print";
 import { buildingMaterials, buildingObject, disposeBuilding } from "../buildings/render";
 import { fitBuilding, type BuildingPlan } from "../city/placement";
-import type { Parks } from "../city/parks";
+import type { Park, Parks } from "../city/parks";
 import { buildParkModel } from "../city/parkModels";
 import { BUILD_PHASES, PAVING_FROM, PAVING_TO, type BuildUp } from "../terrain/buildup";
 import { createLookUniforms, createPrintUniforms, printDepthMaterial, printMaterial } from "./print";
@@ -41,6 +41,51 @@ function toGeometry(data: GeometryData): THREE.BufferGeometry {
   geometry.computeBoundingSphere();
   return geometry;
 }
+
+/** The camera presets the toolbar flies to. */
+export type CameraPreset = "overview" | "plaza" | "park" | "river" | "street";
+interface Pose {
+  position: THREE.Vector3;
+  target: THREE.Vector3;
+}
+/** How long a flight to a preset takes, in ms. */
+const FLIGHT_MS = 700;
+const easeInOut = (k: number) => (k < 0.5 ? 4 * k * k * k : 1 - (-2 * k + 2) ** 3 / 2);
+/** A point `distance` from `target`, at the given elevation and azimuth (the overview's by default). */
+function orbit(target: THREE.Vector3, distance: number, elevation: number, azimuth = VIEW_AZIMUTH) {
+  return new THREE.Vector3(
+    target.x + distance * Math.cos(elevation) * Math.sin(azimuth),
+    target.y + distance * Math.sin(elevation),
+    target.z + distance * Math.cos(elevation) * Math.cos(azimuth),
+  );
+}
+/** The Plaza preset's distance from the plaza and its angle above it. */
+const PLAZA_DISTANCE = voxels(95);
+const PLAZA_ELEVATION = THREE.MathUtils.degToRad(36);
+/** The Park preset looks down more steeply, from as far as the park needs to fill the view. */
+const PARK_ELEVATION = THREE.MathUtils.degToRad(43);
+/**
+ * How the Plaza and Park views turn from their clearest side, set by eye: the plaza 45°
+ * counterclockwise (seen from above), the park 10° clockwise.
+ */
+const PLAZA_TURN = Math.PI / 4;
+const PARK_TURN = THREE.MathUtils.degToRad(-10);
+/** The River preset, matched to a view set by hand on seed km8gt7: 108 m out, 27° up, from
+ * downstream turned 25° counterclockwise (seen from above) off the river's line. */
+const RIVER_DISTANCE = voxels(108);
+const RIVER_ELEVATION = THREE.MathUtils.degToRad(27);
+const RIVER_TURN = THREE.MathUtils.degToRad(25);
+/** The Street preset, matched to a view set by hand on seed km8gt7: 70 m out past the end of
+ * the longest main street and 27 m above it, looking back along it 21.5° down. */
+const STREET_BACK = voxels(70);
+const STREET_HEIGHT = voxels(27);
+const STREET_ELEVATION = THREE.MathUtils.degToRad(21.5);
+/** How much closer the camera may come when the turned side is blocked (fractions of its distance). */
+const CLOSER = [1, 0.85, 0.7, 0.55];
+/** A side score at or above this has the camera inside a building or a hill. */
+const RULED_OUT = 100;
+/** 0, 1, −1, 2, −2…: steps out from a direction, nearest first. */
+const fan = (i: number) => (i % 2 ? (i + 1) / 2 : -i / 2);
 
 /** Half the diorama's width, in voxels: everything about the camera and light scales from it. */
 const EXTENT = WORLD_SIZE / 2;
@@ -97,6 +142,10 @@ export class WorldView {
    * phase (`delay` 0–RAISE_SPREAD, the Landmark first, then outward from the plaza). */
   private readonly city = new THREE.Group();
   private cityItems: { group: THREE.Group; delay: number; print: PrintableBuilding }[] = [];
+  /** The buildings' plans, so the Plaza preset can look from the side with the fewest in the way. */
+  private plans: BuildingPlan[] = [];
+  /** The parks, for the Park preset. */
+  private parkData: Parks | null = null;
   private cityQueue: { plan: BuildingPlan; delay: number }[] = [];
   private cityFrame = 0;
   /** The parks' props, grown out of the ground in turn as `raise` passes each one's start (see setParks). */
@@ -114,6 +163,13 @@ export class WorldView {
   private lifeShown = true;
   private built = true;
   private readonly clock = new THREE.Clock();
+  /** What the presets aim at: the river's course, the streets and plaza, and the ground's height. */
+  private riverPath: RiverPath | null = null;
+  private streetData: Streets | null = null;
+  private heightAt: ((x: number, z: number) => number) | null = null;
+  /** The flight to a preset under way, if any. */
+  private flight: { from: Pose; to: Pose; start: number } | null = null;
+  private onView: ((preset: CameraPreset | null) => void) | null = null;
 
   constructor(private readonly mount: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
@@ -131,6 +187,11 @@ export class WorldView {
     this.controls.maxPolarAngle = THREE.MathUtils.degToRad(86);
     this.controls.minDistance = 8;
     this.controls.maxDistance = EXTENT * 5.5;
+    // Grabbing the view ends a flight and leaves the preset.
+    this.controls.addEventListener("start", () => {
+      this.flight = null;
+      this.onView?.(null);
+    });
 
     const hemi = new THREE.HemisphereLight(SKY.hemisphereSky, SKY.hemisphereGround, SKY.hemisphereIntensity);
     const sun = new THREE.DirectionalLight(SKY.sun, SKY.sunIntensity);
@@ -166,6 +227,7 @@ export class WorldView {
     const loop = () => {
       this.frame = requestAnimationFrame(loop);
       this.easeInset();
+      this.fly();
       this.controls.update();
       this.fitNear();
       const dt = this.clock.getDelta();
@@ -237,18 +299,185 @@ export class WorldView {
    * fits the part of the view a panel doesn't cover.
    */
   frameCamera() {
+    const pose = this.overviewPose();
+    this.controls.target.copy(pose.target);
+    this.camera.position.copy(pose.position);
+    this.controls.update();
+  }
+
+  private overviewPose(): Pose {
     const fit = EXTENT / Math.tan(THREE.MathUtils.degToRad(FOV / 2));
     const width = this.mount.clientWidth;
     const height = this.mount.clientHeight;
     const aspect = width && height ? Math.max(0.3, (width - this.insetTarget) / height) : this.camera.aspect;
     const distance = fit * (aspect < 1.2 ? Math.min(2.0, 1.05 / aspect) : 0.86);
-    this.controls.target.set(0, 0, 0);
-    this.camera.position.set(
-      distance * Math.cos(VIEW_ELEVATION) * Math.sin(VIEW_AZIMUTH),
-      distance * Math.sin(VIEW_ELEVATION),
-      distance * Math.cos(VIEW_ELEVATION) * Math.cos(VIEW_AZIMUTH),
-    );
-    this.controls.update();
+    return { target: new THREE.Vector3(0, 0, 0), position: orbit(new THREE.Vector3(0, 0, 0), distance, VIEW_ELEVATION) };
+  }
+
+  /** Tells React which preset the view is at (null once the user moves it). */
+  setViewHandler(handler: (preset: CameraPreset | null) => void) {
+    this.onView = handler;
+  }
+
+  /** Flies the camera to a preset, easing in and out. Does nothing if the preset has nothing to show. */
+  flyTo(preset: CameraPreset) {
+    const to = this.poseFor(preset);
+    if (!to) return;
+    this.flight = { from: { position: this.camera.position.clone(), target: this.controls.target.clone() }, to, start: performance.now() };
+    this.onView?.(preset);
+  }
+
+  private fly() {
+    if (!this.flight) return;
+    const { from, to, start } = this.flight;
+    const k = Math.min(1, (performance.now() - start) / FLIGHT_MS);
+    const e = easeInOut(k);
+    this.camera.position.lerpVectors(from.position, to.position, e);
+    this.controls.target.lerpVectors(from.target, to.target, e);
+    if (k >= 1) this.flight = null;
+  }
+
+  /**
+   * The azimuth to look at a place from (the plaza, a park): of 24 directions round it, the one
+   * whose line of sight passes through the fewest buildings and hills, the overview's side on a
+   * tie. A building blocks when it stands in the corridor from the whole place (`half` columns
+   * round its center) to the camera and rises above the line of sight there; a building or ground
+   * at the camera's own spot rules the side out. Buildings within `skip`
+   * columns of the center (the Landmark on the plaza) don't count.
+   */
+  private openSide(place: { x: number; z: number }, half: number, groundY: number, distance: number, elevation: number, skip = 0, turn = 0): { azimuth: number; distance: number } {
+    const score = (azimuth: number) => this.sideScore(place, half, groundY, distance, elevation, skip, azimuth);
+    let best = VIEW_AZIMUTH;
+    let bestScore = Infinity;
+    // Directions in order of nearness to the overview's: 0, +15°, −15°, +30°…
+    for (let i = 0; i < 24; i++) {
+      const azimuth = VIEW_AZIMUTH + (fan(i) * Math.PI) / 12;
+      const s = score(azimuth);
+      // Ties keep the earlier direction, the one nearer the overview's.
+      if (s < bestScore) {
+        bestScore = s;
+        best = azimuth;
+      }
+    }
+    if (!turn) return { azimuth: best, distance };
+    // Then turned by `turn` (a framing chosen by eye). If something stands in the way from there,
+    // the camera first comes closer (in front of it), then tries the sides next to the turned one,
+    // nearest first and up to 90° off: the first clear one, else the least blocked; never one with
+    // the camera inside a building or a hill.
+    let pick = { azimuth: best, distance };
+    let pickScore = RULED_OUT;
+    for (let i = 0; i < 13; i++) {
+      const azimuth = best + turn + (fan(i) * Math.PI) / 12;
+      for (const k of CLOSER) {
+        const s = this.sideScore(place, half, groundY, distance * k, elevation, skip, azimuth);
+        if (s === 0) return { azimuth, distance: distance * k };
+        if (s < pickScore) {
+          pickScore = s;
+          pick = { azimuth, distance: distance * k };
+        }
+      }
+    }
+    return pick;
+  }
+
+  /** How badly buildings and hills block the view of a place from one side (see openSide). */
+  private sideScore(place: { x: number; z: number }, half: number, groundY: number, distance: number, elevation: number, skip: number, azimuth: number): number {
+    const reach = distance * Math.cos(elevation);
+    const rise = distance * Math.sin(elevation);
+    const others = this.plans.filter((b) => Math.max(Math.abs(b.x - place.x), Math.abs(b.z - place.z)) > skip);
+    {
+      const dx = Math.sin(azimuth);
+      const dz = Math.cos(azimuth);
+      let score = 0;
+      for (const b of others) {
+        // How far out along the line (0 at the place, 1 at the camera), and how far off it.
+        const radius = voxels(Math.max(b.width, b.depth) / 2);
+        const along = ((b.x - place.x) * dx + (b.z - place.z) * dz) / reach;
+        if (along <= 0 || along >= 1 + radius / reach) continue;
+        const off = Math.abs((b.x - place.x) * dz - (b.z - place.z) * dx);
+        const sightY = groundY + rise * Math.min(1, along);
+        if (sightY >= b.base + voxels(b.height)) continue;
+        // A building round the camera rules the side out; otherwise the corridor is as wide as
+        // the place there and narrows to nothing at the camera.
+        if (along > 1 - radius / reach && off < radius) score += RULED_OUT;
+        else if (off < radius + half * Math.max(0, 1 - along)) score += 1;
+      }
+      // Ground (a hill) above the line of sight blocks too, and rules the side out at the camera.
+      if (this.heightAt) {
+        for (let t = 0.1; t <= 1.001; t += 0.1) {
+          const y = this.heightAt(place.x + dx * reach * t, place.z + dz * reach * t);
+          if (y > groundY + rise * t - voxels(1)) score += t > 0.95 ? RULED_OUT : 2;
+        }
+      }
+      return score;
+    }
+  }
+
+  /**
+   * The park to show: a full park (trees, pavilion, play and picnic areas) rather than a flower
+   * garden when there is one, the one with the most in it; and how far its props reach (columns).
+   */
+  private mainPark(): { x: number; z: number; reach: number; ground: number } | null {
+    const parks = this.parkData?.parks.filter((p) => p.props.length > 0) ?? [];
+    const pool = parks.some((p) => !p.garden) ? parks.filter((p) => !p.garden) : parks;
+    const park = pool.reduce<Park | null>((best, p) => (!best || p.props.length > best.props.length ? p : best), null);
+    if (!park || park.props.length === 0) return null;
+    const reach = Math.max(...park.props.map((q) => Math.hypot(q.x - park.x, q.z - park.z)));
+    const ground = park.props.reduce((sum, q) => sum + q.y, 0) / park.props.length;
+    return { x: park.x, z: park.z, reach, ground };
+  }
+
+  /** Where each preset puts the camera, from the current city (null if it has nothing to show). */
+  private poseFor(preset: CameraPreset): Pose | null {
+    const half = WORLD_SIZE / 2;
+    const at = (q: { x: number; z: number }, y: number) => new THREE.Vector3(q.x - half + 0.5, y, q.z - half + 0.5);
+    if (preset === "overview") return this.overviewPose();
+    if (preset === "plaza") {
+      // Close on the plaza and the Landmark's base, looking down on the paving so the whole square
+      // shows, from whichever side has the fewest buildings in the way.
+      const plaza = this.streetData?.plazas[0];
+      if (!plaza) return null;
+      const target = at(plaza, plaza.level + voxels(4));
+      const side = this.openSide(plaza, plaza.half, target.y, PLAZA_DISTANCE, PLAZA_ELEVATION, plaza.half, PLAZA_TURN);
+      return { target, position: orbit(target, side.distance, PLAZA_ELEVATION, side.azimuth) };
+    }
+    if (preset === "park") {
+      // Down into the park, close enough to see its people, benches and trees (the middle of it
+      // fills the view), from the side with the fewest buildings in the way.
+      const park = this.mainPark();
+      if (!park) return null;
+      const distance = THREE.MathUtils.clamp(park.reach * 2.2, voxels(40), voxels(60));
+      const target = at(park, park.ground);
+      const side = this.openSide(park, park.reach, target.y, distance, PARK_ELEVATION, 0, PARK_TURN);
+      return { target, position: orbit(target, side.distance, PARK_ELEVATION, side.azimuth) };
+    }
+    if (preset === "river") {
+      // A long look up the river from downstream of a point on the water a little past halfway
+      // (a third of the way down plus 60 m), turned a little off the line of the river so its
+      // banks and the town beside it show.
+      const path = this.riverPath;
+      if (!path || path.curve.length < 40) return null;
+      const n = path.curve.length;
+      const j = Math.min(n - 1, Math.floor(n * 0.3) + voxels(60));
+      const target = at(path.curve[j], Math.max(path.level[j], 0));
+      const up = path.curve[Math.max(0, j - 20)];
+      const down = path.curve[Math.min(n - 1, j + 20)];
+      const downstream = Math.atan2(down.x - up.x, down.z - up.z);
+      return { target, position: orbit(target, RIVER_DISTANCE, RIVER_ELEVATION, downstream + RIVER_TURN) };
+    }
+    // Street: down the longest main street from beyond its far end (it grows from the plaza), on
+    // the line of its last stretch and above the rooftops, looking back along it toward the plaza.
+    // The target is where that look meets the street's level, so the view orbits round it.
+    const streets = this.streetData?.streets.filter((st) => st.kind === "main") ?? [];
+    const street = streets.reduce<(typeof streets)[number] | null>((best, st) => (!best || st.curve.length > best.curve.length ? st : best), null);
+    if (!street || street.curve.length < 20) return null;
+    const n = street.curve.length;
+    const end = street.curve[n - 1];
+    const from = street.curve[n - 21];
+    const out = Math.atan2(end.x - from.x, end.z - from.z);
+    const ahead = STREET_BACK - STREET_HEIGHT / Math.tan(STREET_ELEVATION);
+    const target = at({ x: end.x + Math.sin(out) * ahead, z: end.z + Math.cos(out) * ahead }, street.level[n - 1]);
+    return { target, position: orbit(target, STREET_HEIGHT / Math.sin(STREET_ELEVATION), STREET_ELEVATION, out) };
   }
 
   private remove(mesh: THREE.Mesh | null) {
@@ -299,6 +528,7 @@ export class WorldView {
    * Models are built a few per frame so the page stays responsive.
    */
   setBuildings(plans: BuildingPlan[], n: number) {
+    this.plans = plans;
     cancelAnimationFrame(this.cityFrame);
     for (const { group, print } of this.cityItems) {
       print.dispose();
@@ -336,6 +566,7 @@ export class WorldView {
    * the middle first (the props' `delay`).
    */
   setParks(parks: Parks | null) {
+    this.parkData = parks;
     for (const o of [...this.parks.children]) {
       (o as THREE.Mesh).geometry.dispose();
       this.parks.remove(o);
@@ -491,6 +722,7 @@ transformed = aGrow.xyz + (transformed - aGrow.xyz) * popped;`,
    * the water. Dots can be dragged.
    */
   setPath(path: RiverPath | null) {
+    this.riverPath = path;
     if (this.path) {
       this.path.traverse((o) => {
         if (o instanceof THREE.Line || o instanceof THREE.Points) {
@@ -545,6 +777,8 @@ transformed = aGrow.xyz + (transformed - aGrow.xyz) * popped;`,
    * amber by suitability elsewhere. `heightAt` gives the ground's top at a column, in voxels.
    */
   setNetwork(hubs: Hubs, network: Streets, heightAt: (x: number, z: number) => number) {
+    this.streetData = network;
+    this.heightAt = heightAt;
     if (this.network) {
       this.network.traverse((o) => {
         if (o instanceof THREE.LineSegments || o instanceof THREE.Points) {
@@ -697,8 +931,11 @@ transformed = aGrow.xyz + (transformed - aGrow.xyz) * popped;`,
     this.look.uShowParks.value = on ? 1 : 0;
   }
 
-  setShowDistricts(on: boolean) {
-    this.look.uShowDistricts.value = on ? 1 : 0;
+  /** Color the ground by one thing at a time: districts, claims, city-center suitability, or nothing. */
+  setGroundTint(tint: "none" | "districts" | "claims" | "suitability") {
+    this.look.uShowDistricts.value = tint === "districts" ? 1 : 0;
+    this.look.uShowClaims.value = tint === "claims" ? 1 : 0;
+    this.look.uShowSuit.value = tint === "suitability" ? 1 : 0;
   }
 
   setShowLots(on: boolean) {
@@ -708,7 +945,6 @@ transformed = aGrow.xyz + (transformed - aGrow.xyz) * popped;`,
   setNetworkVisible(visible: boolean) {
     this.networkVisible = visible;
     if (this.network) this.network.visible = visible;
-    this.look.uShowSuit.value = visible ? 1 : 0;
   }
 
   setPathVisible(visible: boolean) {
@@ -799,10 +1035,6 @@ transformed = aGrow.xyz + (transformed - aGrow.xyz) * popped;`,
     this.look.uClaimSize.value = n;
   }
 
-  setShowClaims(on: boolean) {
-    this.look.uShowClaims.value = on ? 1 : 0;
-  }
-
   /**
    * Where the build timeline is, 0 (nothing above the plinth) to 1 (finished), in the phases of
    * BUILD_PHASES: the terrain prints one whole voxel layer at a time, the river cut is dug away
@@ -865,3 +1097,4 @@ transformed = aGrow.xyz + (transformed - aGrow.xyz) * popped;`,
     this.renderer.domElement.remove();
   }
 }
+
