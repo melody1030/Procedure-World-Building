@@ -1010,6 +1010,10 @@ of the ground wins.
 
 The help half of Milestone 5 (§4.9 of the city controls plan); the notices with Undo come next.
 
+| Shortcuts | The tour, step 1 |
+|---|---|
+| <img src="screenshots/2026-11-11-help.webp" alt="The shortcuts sheet: keys E, Space, 1 to 5, 6, Esc and ?, then the mouse gestures, and a Take the tour button" width="300"> | <img src="screenshots/2026-11-11-tour.webp" alt="The tour's first card beside the seed field, which stays lit while the rest of the page dims; a progress bar reads 1 of 4, with Skip tour and Next" width="420"> |
+
 - **Shortcuts** (ui/Help.tsx). A **?** button at the bottom of the camera toolbar, or the `?`
   key, opens a sheet listing every key and mouse gesture, with a button to take the tour. It is
   a native modal dialog, so the page behind can't be reached until it closes, and keys pressed
