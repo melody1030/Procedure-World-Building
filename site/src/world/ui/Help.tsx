@@ -2,7 +2,7 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { GLASS } from "./kit";
 
 /**
- * The shortcuts sheet (§4.9 of docs/plans/city-controls-plan.md): every key and pointer gesture
+ * The shortcuts sheet (§4.8 of docs/plans/city-controls-plan.md): every key and pointer gesture
  * the city answers to, and a button to take the tour again. It is a native modal <dialog>, so the
  * page behind is inert, Tab stays inside, and Escape closes it; focus goes back to whatever opened
  * it. Keys pressed inside don't reach the page's shortcuts (E, Space, 1–6).

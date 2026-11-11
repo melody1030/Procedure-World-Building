@@ -58,7 +58,6 @@ in Tailwind like the rest of the kit. The same pieces can be copied into `river-
 | Camera presets, help, hide UI (7) | **Button group** (toolbar) with **Tooltip**s | [button-group](https://component.gallery/components/button-group/) | Figma-style vertical toolbar |
 | Keyboard shortcuts (7) | **Modal** | [modal](https://component.gallery/components/modal/) | — |
 | First-visit tour (7) | **Popover** steps with a **Progress indicator** | [popover](https://component.gallery/components/popover/) | — |
-| "Reset — Undo", "Seed copied", the rebuild note | **Toast** | [toast](https://component.gallery/components/toast/) | Carbon Toast, Sonner |
 
 **Considered and not used:**
 - **Stepper** (nudger) for whole-number settings: the slider already shows the default tick.
@@ -130,8 +129,7 @@ in Tailwind like the rest of the kit. The same pieces can be copied into `river-
 - The section header shows a cyan count badge, e.g. `(2)`, when that many settings in it differ
   from the defaults.
 - There is one reset, *Reset all*, at the end of the panel (a per-section reset was tried and
-  dropped: two reset buttons in a row read as a duplicate). It is followed by a toast:
-  **"Settings reset · Undo"** (4.8).
+  dropped: two reset buttons in a row read as a duplicate).
 
 ### 4.5 Timeline: Progress indicator and speed control
 
@@ -221,16 +219,7 @@ in Tailwind like the rest of the kit. The same pieces can be copied into `river-
 - `WorldView` has `flyTo(preset)`, `setViewHandler`, `select`, `setFollowing`,
   `setFollowHandler` and `selectionOnScreen` (for the card to sit beside).
 
-### 4.8 Toasts
-
-- One toast region (`aria-live="polite"`) is placed at the top center, clear of the open panel.
-- The existing "Rebuilding the city…" pill becomes a toast with a spinner, so all notes share
-  one place and one look.
-- New toasts:
-  - "Settings reset · Undo" (Undo restores the previous params, for 6 s);
-  - "Seed copied" (when the seed is copied with a new copy button next to the dice).
-
-### 4.9 Help: shortcut Modal and first-visit tour (built 2026-11-11)
+### 4.8 Help: shortcut Modal and first-visit tour (built 2026-11-11)
 
 - **?** (the last button on the camera toolbar, or the `?` key) opens a sheet of shortcuts
   (`ui/Help.tsx`):
@@ -265,7 +254,7 @@ in Tailwind like the rest of the kit. The same pieces can be copied into `river-
 
 | File | Change |
 |---|---|
-| `world/ui/kit.tsx` | Add `Tabs`, `Segmented`, `useHoverTip`, `Tooltip`, `Badge`, `Meter`, `Popover` (positioning only), `Toast` + `useToast`, `Modal`. `Row` uses `useHoverTip`. |
+| `world/ui/kit.tsx` | Add `Tabs`, `Segmented`, `useHoverTip`, `Tooltip`, `Badge`, `Meter`, `Popover` (positioning only), `Modal`. `Row` uses `useHoverTip`. |
 | `world/ui/TerrainPanel.tsx` | Split into `BuildTab` and `LayersTab`; section badges and resets. |
 | `world/ui/PrintBar.tsx` | Phase names, click to jump, `Segmented` speed control. |
 | `world/ui/Inspector.tsx` *(new)* | The card or drawer for agents and buildings. |
@@ -274,8 +263,7 @@ in Tailwind like the rest of the kit. The same pieces can be copied into `river-
 | `world/state.ts` | `groundTint` replaces `showDistricts`, `showClaims` and the tint part of `showNetwork`; `selected`. |
 | `world/render/WorldView.ts` | `setGroundTint`, `setPickHandler`, `flyTo`, `follow`, selection ring. |
 | `world/render/life.ts` | `pick(ray)`. |
-| `world/index.tsx` | Mount Inspector, CameraBar, Help and the toast region. |
-| `site/STYLE_GUIDE.md` | Add the new components and their rules. |
+| `world/index.tsx` | Mount Inspector, CameraBar and Help. |
 | `world/README.md` | Log entry with screenshots. |
 
 ---
@@ -286,9 +274,8 @@ in Tailwind like the rest of the kit. The same pieces can be copied into `river-
 2. **Timeline:** phase names, jump to phase, segmented speed control.
 3. **Cameras:** `flyTo`, the toolbar with tooltips, keys `1`–`5`, the visible Hide UI button.
 4. **Inspector:** picking, the card and drawer, need meters, selection ring, Follow.
-5. **Help and toasts:** toast region (moving the rebuild note there), Reset with Undo, shortcut
-   modal, tour.
-6. **Docs:** style guide and world README log with screenshots.
+5. **Help:** shortcut modal, tour, Space for the timeline.
+6. **Docs:** world README log with screenshots.
 
 Milestones 1–3 can be done in any order. Milestone 4 needs 3 for Follow, and 5 needs 4 for the
 last tour step.
@@ -301,7 +288,7 @@ last tour step.
   - every control works by mouse and by keyboard alone (Tab, arrows, Enter, Escape);
   - no console errors;
   - only one ground tint shows at a time;
-  - the badge counts match the changed settings, and Undo after Reset restores them;
+  - the badge counts match the changed settings;
   - clicking a person shows a `why` that changes as it moves on, and clicking a bus shows its
     route;
   - the card stays on screen at the edges;

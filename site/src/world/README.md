@@ -976,8 +976,8 @@ clear one. On km8gt7 and blueprint the Park view comes in to 70% and 55% to clea
 its far side.
 
 **What's next** (Milestones 4–6): an inspector (click a building, person or vehicle to see what it
-is and why it's doing what it does, and follow it), notices with Undo for Reset all, a
-keyboard-shortcut sheet and a short tour.
+is and why it's doing what it does, and follow it), a keyboard-shortcut sheet and a short
+tour.
 
 ## 2026-11-09: The inspector: click anything to ask what it's doing
 
@@ -1008,7 +1008,7 @@ of the ground wins.
 
 ## 2026-11-11: Shortcuts, a tour, and Space for the timeline
 
-The help half of Milestone 5 (§4.9 of the city controls plan); the notices with Undo come next.
+Milestone 5 of the city controls plan (§4.8), the last piece of it.
 
 | Shortcuts | The tour, step 1 |
 |---|---|

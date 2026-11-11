@@ -3,7 +3,7 @@ import { sameSelection, type Selection } from "../render/select";
 import { GLASS } from "./kit";
 
 /**
- * The first-visit tour (§4.9 of docs/plans/city-controls-plan.md): four small cards in turn, each
+ * The first-visit tour (§4.8 of docs/plans/city-controls-plan.md): four small cards in turn, each
  * pointing at its control. The rest of the page dims a little, leaving the control in a rounded
  * window of light (a spotlight, not an outline). Each card shows its place in the tour, with Back,
  * Next and Skip. The
