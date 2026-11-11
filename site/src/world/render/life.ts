@@ -152,7 +152,7 @@ export class LifeView {
   private readonly r = new THREE.Matrix4();
 
   constructor(
-    private readonly life: Life,
+    readonly life: Life,
     private readonly half: number,
   ) {
     const people = life.people.length;

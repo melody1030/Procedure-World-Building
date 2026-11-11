@@ -152,12 +152,13 @@ in Tailwind like the rest of the kit. The same pieces can be copied into `river-
 
 ### 4.6 Inspector: Popover card, Drawer on phones
 
-- **Picking:** `render/life.ts` already draws each kind of agent as one `InstancedMesh`, so a
-  raycast gives `instanceId`. Map it back to the agent:
-  - add `LifeLayer.pick(ray) → { kind, index } | null`;
-  - add `WorldView.setPickHandler`, using the existing `raycaster`;
-  - a click with no drag (under 4 px of movement, so orbiting does not count) picks;
-  - buildings pick through their lot (`plans`).
+- **Picking** (built in `render/select.ts`): a click with no drag (under 4 px of movement, so
+  orbiting does not count) casts a ray. Each agent is tested as a sphere round its middle,
+  padded to at least 5 px on screen so a pigeon can be hit; each building by its bounds. The
+  nearest hit in front of the ground wins, and an agent at a building's face beats the building.
+  `WorldView.setSelectHandler` tells React; `WorldView.select(null)` clears it. (Instanced-mesh
+  `instanceId`s were the first idea, but the meshes are rebuilt and reordered, so indices into
+  the Life arrays are steadier.)
 - **The card** sits beside the clicked thing and follows it each frame. It flips to stay on
   screen. On screens under 640 px it becomes a bottom drawer instead.
 - **Contents for an agent:**
@@ -168,9 +169,14 @@ in Tailwind like the rest of the kit. The same pieces can be copied into `river-
   - for people, four small meters for `needs` (thirst, rest, social, home), with the current
     `need` highlighted;
   - for vehicles, the task and the next stop.
-- **Contents for a building:** library type, district, lot size, and the street it faces.
+- **Contents for a building:** library type and category, district, size and height, and lot
+  size. (Streets have no names yet, so "the street it faces" is left out.)
+- The contents refresh four times a second, not every frame; only the card's position moves
+  every frame (set directly on the element, outside React).
 - **Actions:**
-  - **Follow** moves the camera to trail the agent (see 4.7);
+  - **Follow** moves the camera to trail the agent (see 4.7): it flies there keeping the view's
+    direction if nothing stands between, else the nearest clear side, then moves with it, still
+    free to orbit and zoom (not pan). Selecting another agent while following flies over to it;
   - **×** closes, as do Escape and clicking empty ground.
 - **Highlight:** the selected agent gets a ring on the ground so it can be found in a crowd.
 - The card refreshes about 4 times a second, not every frame, to keep React out of the render
@@ -187,9 +193,13 @@ in Tailwind like the rest of the kit. The same pieces can be copied into `river-
   - **River**: a long look up the river at a point a little past halfway down it, 108 m out
     and 27° up from downstream, turned 25° off the river's line (matched to a view set by hand
     on seed km8gt7);
-  - **Street**: down the longest main street from 70 m past its far end and 27 m up, on the line
-    of its last stretch, looking back along it toward the plaza 21.5° down (matched to a view set
-    by hand on seed km8gt7).
+  - **Street**: down a street from 70 m past one of its ends and 27 m up, on the line of its
+    last stretch, looking back along it 21.5° down (matched to a view set by hand on seed km8gt7).
+    It takes the first clear one of: the main streets, then the other streets (longest first);
+    the end away from the plaza first; the camera at its full distance, then closer (85%, 70%,
+    55%). A pose is clear when no building or hill stands between the camera and the street's end
+    and the camera stays over the island. (On blueprint the main streets end at the plaza by the
+    island's edge, among the towers, so it looks down a side street instead.)
 - Plaza and Park look from whichever of 24 sides has the clearest view: buildings and hills in
   the corridor between the whole place and the camera count against a side, and a side where the
   camera would sit inside a building or a hill is ruled out. Ties go to the overview's side.
@@ -206,8 +216,10 @@ in Tailwind like the rest of the kit. The same pieces can be copied into `river-
   panel's), on hover or keyboard focus.
 - The toolbar hides with the panels when `E` is pressed. (A visible Hide UI button was tried
   and dropped.)
-- **Follow selected** (key `6`) joins the toolbar with the inspector in Milestone 4.
-- `WorldView` has `flyTo(preset)` and `setViewHandler`; `follow(getter | null)` comes in M4.
+- **Follow** (key `6`) sits under the presets, past a thin rule. It is disabled until a
+  person, pigeon, cat or vehicle is selected, and lit while the camera follows.
+- `WorldView` has `flyTo(preset)`, `setViewHandler`, `select`, `setFollowing`,
+  `setFollowHandler` and `selectionOnScreen` (for the card to sit beside).
 
 ### 4.8 Toasts
 

@@ -12,6 +12,8 @@ import { Life } from "./life/agents";
 import { Spinner } from "./ui/icons";
 import { GLASS } from "./ui/kit";
 import { TerrainPanel } from "./ui/TerrainPanel";
+import { Inspector } from "./ui/Inspector";
+import type { Selection } from "./render/select";
 
 /**
  * Blueprint City, full screen. The seed and the settings run the terrain pipeline, and WorldView
@@ -34,6 +36,11 @@ export default function WorldPage() {
   /** The camera preset the view is at, or null once it has been moved by hand. */
   const [view, setView] = useState<CameraPreset | null>("overview");
   const flyTo = useCallback((preset: CameraPreset) => viewRef.current?.flyTo(preset), []);
+  /** What was clicked in the city (the inspector shows it), and whether the camera follows it. */
+  const [selection, setSelection] = useState<Selection | null>(null);
+  const [following, setFollowing] = useState(false);
+  const closeInspector = useCallback(() => viewRef.current?.select(null), []);
+  const setFollow = useCallback((on: boolean) => viewRef.current?.setFollowing(on), []);
 
   // The seed and settings the terrain is made for follow the requested ones two frames later, so
   // "Generating…" shows (and the slider stays where it was let go) before the work blocks the page.
@@ -76,6 +83,8 @@ export default function WorldPage() {
     const view = new WorldView(mountRef.current!);
     viewRef.current = view;
     view.setViewHandler(setView);
+    view.setSelectHandler(setSelection);
+    view.setFollowHandler(setFollowing);
     // A dropped river point replaces that point in the current path; the river rebuilds from it.
     view.setPathEditHandler((index, point) => {
       const path = terrainRef.current.river.path;
@@ -154,17 +163,33 @@ export default function WorldPage() {
     [terrain.streets, terrain.parks, river],
   );
 
+  const canFollow = !!selection && selection.kind !== "building";
+  const follow = useMemo(() => ({ can: canFollow, on: following, onToggle: () => setFollow(!following) }), [canFollow, following, setFollow]);
+
   return (
     <div className="relative h-screen w-full overflow-hidden bg-stage">
       <div ref={mountRef} className="absolute inset-0" />
       {/* The whole interface is drawn at UI_SCALE (80%), so it takes less of the view. */}
       <div className="pointer-events-none absolute inset-0" style={{ zoom: UI_SCALE }}>
         <TerrainPanel terrain={terrain} life={life} ctl={ctl} open={panelOpen} onToggle={() => setPanelOpen((v) => !v)} busy={busy} />
-        <CameraBar view={view} available={available} onFly={flyTo} shown={overlays} />
+        <CameraBar view={view} available={available} onFly={flyTo} shown={overlays} follow={follow} />
+        {overlays && (
+          <Inspector
+            view={viewRef.current}
+            selection={selection}
+            following={following}
+            life={life}
+            plans={plans}
+            lots={terrain.districts.lots}
+            scale={UI_SCALE}
+            onClose={closeInspector}
+            onFollow={setFollow}
+          />
+        )}
         {/* While the city rebuilds: a quiet note at the top of the view, over the part the panel leaves. */}
         <div
           className={"absolute top-4 flex justify-center transition-[left,opacity] duration-300 " + (busy ? "opacity-100" : "opacity-0")}
-          style={{ left: panelOpen ? "18.2rem" : "1rem", right: "4rem" }}
+          style={{ left: panelOpen ? "18.2rem" : "1rem", right: "5rem" }}
           aria-live="polite"
         >
           <div className={"flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-[12px] text-[#dce8f5] " + GLASS}>

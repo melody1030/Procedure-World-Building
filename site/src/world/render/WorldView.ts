@@ -17,6 +17,7 @@ import { buildParkModel } from "../city/parkModels";
 import { BUILD_PHASES, PAVING_FROM, PAVING_TO, type BuildUp } from "../terrain/buildup";
 import { createLookUniforms, createPrintUniforms, printDepthMaterial, printMaterial } from "./print";
 import { LifeView } from "./life";
+import { RING_PAD, SelectionMark, locate, pick, sameSelection, type PickableBuilding, type Selection } from "./select";
 import type { Life } from "../life/agents";
 
 /** Diorama framing: looking down on the whole table-top from a raised corner. */
@@ -64,6 +65,13 @@ const PLAZA_DISTANCE = voxels(95);
 const PLAZA_ELEVATION = THREE.MathUtils.degToRad(36);
 /** The Park preset looks down more steeply, from as far as the park needs to fill the view. */
 const PARK_ELEVATION = THREE.MathUtils.degToRad(43);
+/** Following a selection: how far the camera trails it, and between which heights (elevation) it looks down. */
+const FOLLOW_DISTANCE = voxels(22);
+const FOLLOW_ELEVATION_MIN = THREE.MathUtils.degToRad(20);
+const FOLLOW_ELEVATION_MAX = THREE.MathUtils.degToRad(55);
+/** A building not built yet, for picking (never visible). */
+const EMPTY_GROUP = Object.assign(new THREE.Group(), { visible: false });
+const EMPTY_BOX = new THREE.Box3();
 /**
  * How the Plaza and Park views turn from their clearest side, set by eye: the plaza 45°
  * counterclockwise (seen from above), the park 10° clockwise.
@@ -75,11 +83,14 @@ const PARK_TURN = THREE.MathUtils.degToRad(-10);
 const RIVER_DISTANCE = voxels(108);
 const RIVER_ELEVATION = THREE.MathUtils.degToRad(27);
 const RIVER_TURN = THREE.MathUtils.degToRad(25);
-/** The Street preset, matched to a view set by hand on seed km8gt7: 70 m out past the end of
- * the longest main street and 27 m above it, looking back along it 21.5° down. */
+/** The Street preset, matched to a view set by hand on seed km8gt7: 70 m out past the end of a
+ * street and 27 m above it, looking back along it 21.5° down (see streetPose for which street). */
 const STREET_BACK = voxels(70);
 const STREET_HEIGHT = voxels(27);
 const STREET_ELEVATION = THREE.MathUtils.degToRad(21.5);
+/** A street's last stretch, the line the Street camera stands on (curve samples), and how far in from the island's edge it must stay. */
+const STREET_RUN = 20;
+const ISLAND_MARGIN = voxels(4);
 /** How much closer the camera may come when the turned side is blocked (fractions of its distance). */
 const CLOSER = [1, 0.85, 0.7, 0.55];
 /** A side score at or above this has the camera inside a building or a hill. */
@@ -142,11 +153,13 @@ export class WorldView {
    * phase (`delay` 0–RAISE_SPREAD, the Landmark first, then outward from the plaza). */
   private readonly city = new THREE.Group();
   private cityItems: { group: THREE.Group; delay: number; print: PrintableBuilding }[] = [];
+  /** The buildings by plan (null until built), with their bounds, for picking. */
+  private pickable: (PickableBuilding | null)[] = [];
   /** The buildings' plans, so the Plaza preset can look from the side with the fewest in the way. */
   private plans: BuildingPlan[] = [];
   /** The parks, for the Park preset. */
   private parkData: Parks | null = null;
-  private cityQueue: { plan: BuildingPlan; delay: number }[] = [];
+  private cityQueue: { plan: BuildingPlan; index: number; delay: number }[] = [];
   private cityFrame = 0;
   /** The parks' props, grown out of the ground in turn as `raise` passes each one's start (see setParks). */
   private readonly parks = new THREE.Group();
@@ -170,6 +183,14 @@ export class WorldView {
   /** The flight to a preset under way, if any. */
   private flight: { from: Pose; to: Pose; start: number } | null = null;
   private onView: ((preset: CameraPreset | null) => void) | null = null;
+  /** What is selected (clicked), its mark, and whether the camera follows it. */
+  private selection: Selection | null = null;
+  private onSelect: ((selection: Selection | null) => void) | null = null;
+  private readonly mark = new SelectionMark();
+  private following = false;
+  private onFollow: ((on: boolean) => void) | null = null;
+  /** Where a press began, to tell a click (pick) from a drag (orbit). */
+  private press: { x: number; y: number; id: number } | null = null;
 
   constructor(private readonly mount: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
@@ -207,7 +228,7 @@ export class WorldView {
     this.scene.add(hemi, sun, sun.target);
 
     const half = WORLD_SIZE / 2;
-    this.scene.add(buildPlinth(half), this.city, this.parks);
+    this.scene.add(buildPlinth(half), this.city, this.parks, this.mark.group);
 
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(mount);
@@ -227,14 +248,16 @@ export class WorldView {
     const loop = () => {
       this.frame = requestAnimationFrame(loop);
       this.easeInset();
-      this.fly();
-      this.controls.update();
-      this.fitNear();
       const dt = this.clock.getDelta();
       if (this.life) {
         this.life.group.visible = this.lifeShown && this.built;
         if (this.life.group.visible) this.life.update(dt);
       }
+      this.track();
+      this.fly();
+      this.controls.update();
+      this.fitNear();
+      this.mark.update(this.selection, this.lifeNow(), this.buildingsNow(), WORLD_SIZE / 2, this.clock.elapsedTime);
       this.renderer.render(this.scene, this.camera);
     };
     loop();
@@ -319,8 +342,153 @@ export class WorldView {
     this.onView = handler;
   }
 
+  /** Tells React what was clicked (null: empty ground, or the selection went away). */
+  setSelectHandler(handler: (selection: Selection | null) => void) {
+    this.onSelect = handler;
+  }
+
+  /** Tells React whether the camera follows the selection. */
+  setFollowHandler(handler: (on: boolean) => void) {
+    this.onFollow = handler;
+  }
+
+  /** Selects something (or nothing), from React (the inspector's close button, Escape). */
+  select(selection: Selection | null) {
+    if (sameSelection(selection, this.selection)) return;
+    this.selection = selection;
+    if (!selection || selection.kind === "building") this.setFollowing(false);
+    else if (this.following) {
+      // Following someone else: fly over to them rather than jump.
+      this.following = false;
+      this.setFollowing(true);
+    }
+    this.onSelect?.(selection);
+  }
+
+  private clearSelection() {
+    this.select(null);
+  }
+
+  private lifeNow(): Life | null {
+    return this.life && this.life.group.visible ? this.life.life : null;
+  }
+
+  private buildingsNow(): PickableBuilding[] {
+    return this.pickable.map((b) => b ?? { group: EMPTY_GROUP, box: EMPTY_BOX });
+  }
+
+  /**
+   * Follows the selected agent with the camera (or stops): the camera flies to it, keeping the
+   * view's direction, then trails it, still free to orbit and zoom round it (not to pan).
+   */
+  setFollowing(on: boolean) {
+    const sel = this.selection;
+    const can = !!sel && sel.kind !== "building";
+    on = on && can;
+    if (on === this.following) return;
+    this.following = on;
+    this.controls.enablePan = !on;
+    this.onFollow?.(on);
+    if (!on) return;
+    this.onView?.(null);
+    const at = this.followPoint();
+    if (!at) return;
+    const offset = this.camera.position.clone().sub(this.controls.target);
+    const elevation = THREE.MathUtils.clamp(Math.asin(offset.y / offset.length()), FOLLOW_ELEVATION_MIN, FOLLOW_ELEVATION_MAX);
+    const distance = sel!.kind === "vehicle" ? FOLLOW_DISTANCE * 1.4 : FOLLOW_DISTANCE;
+    // Keep the view's direction if nothing stands between, else the nearest side that is clear
+    // (the first of 0, +15°, −15°, +30°… with nothing in the way), else the least blocked.
+    const half = WORLD_SIZE / 2;
+    const place = { x: at.x + half - 0.5, z: at.z + half - 0.5 };
+    const from = Math.atan2(offset.x, offset.z);
+    let azimuth = from;
+    let best = Infinity;
+    for (let i = 0; i < 24 && best > 0; i++) {
+      const a = from + (fan(i) * Math.PI) / 12;
+      const s = this.sideScore(place, voxels(1), at.y, distance, elevation, 0, a);
+      if (s < best) {
+        best = s;
+        azimuth = a;
+      }
+    }
+    this.flight = { from: { position: this.camera.position.clone(), target: this.controls.target.clone() }, to: { target: at, position: orbit(at, distance, elevation, azimuth) }, start: performance.now() };
+  }
+
+  /** The point the camera follows: a little above the selection's feet (null if it can't be seen). */
+  private followPoint(): THREE.Vector3 | null {
+    if (!this.selection) return null;
+    const at = locate(this.selection, this.lifeNow(), this.buildingsNow(), WORLD_SIZE / 2);
+    return at ? new THREE.Vector3(at.x, at.y + Math.min(at.height, voxels(1.5)), at.z) : null;
+  }
+
+  /** Each frame while following: the target and camera move with the agent (mid-flight, the flight's end does). */
+  private track() {
+    if (!this.following) return;
+    const at = this.followPoint();
+    if (!at) return;
+    if (this.flight) {
+      const offset = this.flight.to.position.clone().sub(this.flight.to.target);
+      this.flight.to.target.copy(at);
+      this.flight.to.position.copy(at).add(offset);
+      return;
+    }
+    const step = at.sub(this.controls.target);
+    this.controls.target.add(step);
+    this.camera.position.add(step);
+  }
+
+  /**
+   * Where the selection is on screen (client pixels): a point just above it, for the inspector to
+   * sit beside, and how wide it (with its ring) is there, so the card keeps clear of it. Null when
+   * it can't be seen or is behind the camera.
+   */
+  selectionOnScreen(): { x: number; y: number; reach: number } | null {
+    if (!this.selection) return null;
+    const at = locate(this.selection, this.lifeNow(), this.buildingsNow(), WORLD_SIZE / 2);
+    if (!at) return null;
+    // Above an agent; halfway up a building, whose top may be far out of view.
+    const top = new THREE.Vector3(at.x, at.y + (this.selection.kind === "building" ? at.height / 2 : at.height), at.z);
+    const v = top.clone().project(this.camera);
+    if (v.z > 1) return null;
+    const right = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 0);
+    const side = top.addScaledVector(right, at.radius + RING_PAD).project(this.camera);
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    return { x: rect.left + ((v.x + 1) / 2) * rect.width, y: rect.top + ((1 - v.y) / 2) * rect.height, reach: (Math.abs(side.x - v.x) / 2) * rect.width };
+  }
+
+  /** What is under the pointer (see render/select.ts), or null. */
+  private pickAt(e: PointerEvent): Selection | null {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const ndc = new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
+    this.raycaster.setFromCamera(ndc, this.camera);
+    const ray = this.raycaster.ray;
+    // How wide a pixel is per unit of distance, to pad small things by a few pixels.
+    const pixel = (2 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2))) / rect.height;
+    const buildings = this.city.visible && this.built ? this.buildingsNow() : null;
+    return pick(ray, this.lifeNow(), buildings, WORLD_SIZE / 2, pixel, this.groundAlong(ray));
+  }
+
+  /** How far along the ray it first meets the ground (Infinity if it doesn't), marching a voxel at a time. */
+  private groundAlong(ray: THREE.Ray): number {
+    const height = this.heightAt;
+    if (!height) return Infinity;
+    const half = WORLD_SIZE / 2;
+    const p = new THREE.Vector3();
+    for (let t = 0; t < EXTENT * 8; t += 1) {
+      ray.at(t, p);
+      if (p.y > this.terrainTop + 2) continue;
+      if (Math.abs(p.x) > half || Math.abs(p.z) > half) {
+        if (p.y < BASE) return t;
+        continue;
+      }
+      if (p.y <= height(p.x + half - 0.5, p.z + half - 0.5)) return t;
+    }
+    return Infinity;
+  }
+
   /** Flies the camera to a preset, easing in and out. Does nothing if the preset has nothing to show. */
   flyTo(preset: CameraPreset) {
+    this.setFollowing(false);
     const to = this.poseFor(preset);
     if (!to) return;
     this.flight = { from: { position: this.camera.position.clone(), target: this.controls.target.clone() }, to, start: performance.now() };
@@ -465,19 +633,54 @@ export class WorldView {
       const downstream = Math.atan2(down.x - up.x, down.z - up.z);
       return { target, position: orbit(target, RIVER_DISTANCE, RIVER_ELEVATION, downstream + RIVER_TURN) };
     }
-    // Street: down the longest main street from beyond its far end (it grows from the plaza), on
-    // the line of its last stretch and above the rooftops, looking back along it toward the plaza.
-    // The target is where that look meets the street's level, so the view orbits round it.
-    const streets = this.streetData?.streets.filter((st) => st.kind === "main") ?? [];
-    const street = streets.reduce<(typeof streets)[number] | null>((best, st) => (!best || st.curve.length > best.curve.length ? st : best), null);
-    if (!street || street.curve.length < 20) return null;
-    const n = street.curve.length;
-    const end = street.curve[n - 1];
-    const from = street.curve[n - 21];
-    const out = Math.atan2(end.x - from.x, end.z - from.z);
+    // Street: down a street from beyond one of its ends, on the line of its last stretch and above
+    // the rooftops, looking back along it. The target is where that look meets the street's level,
+    // so the view orbits round it.
+    return this.streetPose(at);
+  }
+
+  /**
+   * The Street preset's pose: the first clear one of these, in order: the main streets (longest
+   * first), then the other streets (longest first); of each, the end away from the plaza first
+   * (looking back toward it); from each end, the camera at its full distance, then closer
+   * (CLOSER). A pose is clear when no building or hill stands between the camera and the street's
+   * end (sideScore), and the camera stays over the island. With none clear, the least blocked.
+   */
+  private streetPose(at: (q: { x: number; z: number }, y: number) => THREE.Vector3): Pose | null {
+    const data = this.streetData;
+    if (!data) return null;
+    const plaza = data.plazas[0];
+    const fromPlaza = (q: { x: number; z: number }) => (plaza ? Math.hypot(q.x - plaza.x, q.z - plaza.z) : 0);
+    const streets = data.streets
+      .filter((st) => st.curve.length > 2 * STREET_RUN)
+      .sort((a, b) => Number(b.kind === "main") - Number(a.kind === "main") || b.curve.length - a.curve.length);
     const ahead = STREET_BACK - STREET_HEIGHT / Math.tan(STREET_ELEVATION);
-    const target = at({ x: end.x + Math.sin(out) * ahead, z: end.z + Math.cos(out) * ahead }, street.level[n - 1]);
-    return { target, position: orbit(target, STREET_HEIGHT / Math.sin(STREET_ELEVATION), STREET_ELEVATION, out) };
+    const distance = STREET_HEIGHT / Math.sin(STREET_ELEVATION);
+    const inside = (v: number) => v > ISLAND_MARGIN && v < WORLD_SIZE - ISLAND_MARGIN;
+    let best: Pose | null = null;
+    let bestScore = Infinity;
+    for (const st of streets) {
+      const n = st.curve.length;
+      const ends = fromPlaza(st.curve[0]) > fromPlaza(st.curve[n - 1]) ? [0, n - 1] : [n - 1, 0];
+      for (const e of ends) {
+        const end = st.curve[e];
+        const from = st.curve[e === 0 ? STREET_RUN : n - 1 - STREET_RUN];
+        const out = Math.atan2(end.x - from.x, end.z - from.z);
+        const place = { x: end.x + Math.sin(out) * ahead, z: end.z + Math.cos(out) * ahead };
+        for (const k of CLOSER) {
+          const reach = distance * k * Math.cos(STREET_ELEVATION);
+          if (!inside(place.x + Math.sin(out) * reach) || !inside(place.z + Math.cos(out) * reach)) continue;
+          const score = this.sideScore(place, st.width / 2, st.level[e], distance * k, STREET_ELEVATION, 0, out);
+          if (score < bestScore) {
+            bestScore = score;
+            const target = at(place, st.level[e]);
+            best = { target, position: orbit(target, distance * k, STREET_ELEVATION, out) };
+          }
+          if (score === 0) return best;
+        }
+      }
+    }
+    return best;
   }
 
   private remove(mesh: THREE.Mesh | null) {
@@ -529,6 +732,8 @@ export class WorldView {
    */
   setBuildings(plans: BuildingPlan[], n: number) {
     this.plans = plans;
+    this.pickable = plans.map(() => null);
+    this.clearSelection();
     cancelAnimationFrame(this.cityFrame);
     for (const { group, print } of this.cityItems) {
       print.dispose();
@@ -540,15 +745,17 @@ export class WorldView {
     const plaza = plans.find((p) => p.archetype === "landmark-tower");
     const far = Math.max(1, ...plans.map((p) => (plaza ? Math.hypot(p.x - plaza.x, p.z - plaza.z) : 0)));
     this.cityQueue = plans
-      .map((plan) => ({ plan, delay: plan.archetype === "landmark-tower" || !plaza ? 0 : RAISE_SPREAD * (Math.hypot(plan.x - plaza.x, plan.z - plaza.z) / far) }))
+      .map((plan, index) => ({ plan, index, delay: plan.archetype === "landmark-tower" || !plaza ? 0 : RAISE_SPREAD * (Math.hypot(plan.x - plaza.x, plan.z - plaza.z) / far) }))
       .sort((a, b) => a.delay - b.delay);
     this.lotDelay = new Map(this.cityQueue.map(({ plan, delay }) => [plan.lot, delay]));
     const step = () => {
       const start = performance.now();
       while (this.cityQueue.length && performance.now() - start < 10) {
-        const { plan, delay } = this.cityQueue.shift()!;
+        const { plan, index, delay } = this.cityQueue.shift()!;
         // All of it within its lot, less a gap all round.
         const group = buildingObject(fitBuilding(plan));
+        // Its bounds in its own frame (before it is placed), for picking.
+        this.pickable[index] = { group, box: new THREE.Box3().setFromObject(group) };
         group.position.set(plan.x - half, plan.base, plan.z - half);
         group.rotation.y = plan.rotation;
         this.city.add(group);
@@ -630,6 +837,7 @@ transformed = aGrow.xyz + (transformed - aGrow.xyz) * popped;`,
 
   /** Replaces the inhabitants. */
   setLife(life: Life | null) {
+    this.clearSelection();
     if (this.life) {
       this.scene.remove(this.life.group);
       this.life.dispose();
@@ -979,7 +1187,11 @@ transformed = aGrow.xyz + (transformed - aGrow.xyz) * popped;`,
 
   private onPointerDown(e: PointerEvent) {
     const i = this.pickDot(e);
-    if (i < 0) return;
+    if (i < 0) {
+      // Maybe a click: picked on release if the pointer hardly moved.
+      this.press = e.button === 0 ? { x: e.clientX, y: e.clientY, id: e.pointerId } : null;
+      return;
+    }
     e.stopImmediatePropagation();
     this.controls.enabled = false;
     this.dragging = i;
@@ -991,7 +1203,8 @@ transformed = aGrow.xyz + (transformed - aGrow.xyz) * popped;`,
   private onPointerMove(e: PointerEvent) {
     const canvas = this.renderer.domElement;
     if (this.dragging < 0) {
-      canvas.style.cursor = this.pickDot(e) >= 0 ? "grab" : "";
+      // Over something that can be clicked: a pointer (not while a button is down, orbiting).
+      canvas.style.cursor = this.pickDot(e) >= 0 ? "grab" : e.buttons === 0 && e.pointerType === "mouse" && this.pickAt(e) ? "pointer" : "";
       return;
     }
     // Move the dot across a flat plane at its own height; the river is rebuilt on release.
@@ -1006,7 +1219,13 @@ transformed = aGrow.xyz + (transformed - aGrow.xyz) * popped;`,
   }
 
   private onPointerUp(e: PointerEvent) {
-    if (this.dragging < 0) return;
+    if (this.dragging < 0) {
+      const press = this.press;
+      this.press = null;
+      // A click (moved under 4 px): select what is under it, or nothing.
+      if (e.type === "pointerup" && press && press.id === e.pointerId && Math.hypot(e.clientX - press.x, e.clientY - press.y) < 4) this.select(this.pickAt(e));
+      return;
+    }
     const i = this.dragging;
     this.dragging = -1;
     this.controls.enabled = true;
@@ -1082,6 +1301,7 @@ transformed = aGrow.xyz + (transformed - aGrow.xyz) * popped;`,
 
   dispose() {
     cancelAnimationFrame(this.frame);
+    this.mark.dispose();
     this.setLife(null);
     cancelAnimationFrame(this.cityFrame);
     for (const [type, handler, capture] of this.pointerHandlers) this.renderer.domElement.removeEventListener(type, handler as EventListener, capture);

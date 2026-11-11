@@ -963,7 +963,7 @@ by hand on seed km8gt7:
 | **Plaza** `2` | 95 m out, 36° down onto the paving and the Landmark's base, from the clearest side turned 45° counterclockwise |
 | **Park** `3` | 43° down into the park with the most in it (a full park before a flower garden), 40–60 m out by its size, from the clearest side turned 10° clockwise |
 | **River** `4` | a long look up the river at a point a little past halfway down it: 108 m out and 27° up from downstream, turned 25° off the river's line |
-| **Street** `5` | 70 m past the far end of the longest main street and 27 m up, looking back along it toward the plaza, 21.5° down |
+| **Street** `5` | 70 m past the end of a street and 27 m up, looking back along it, 21.5° down: the first clear one, main streets and the end away from the plaza first, coming closer if it must |
 
 **The clearest side.** A tower in front of the plaza or the camera inside a building made the
 first versions useless on some seeds. The Plaza and Park views now score 24 directions round the
@@ -978,3 +978,30 @@ its far side.
 **What's next** (Milestones 4–6): an inspector (click a building, person or vehicle to see what it
 is and why it's doing what it does, and follow it), notices with Undo for Reset all, a
 keyboard-shortcut sheet and a short tour.
+
+## 2026-11-09: The inspector: click anything to ask what it's doing
+
+Milestone 4 of the city controls plan (docs/plans/city-controls-plan.md, §4.6). Clicking a
+person, pigeon, cat, vehicle or building opens a card beside it (ui/Inspector.tsx) and rings it
+on the ground in cyan, pulsing gently so it can be found in a crowd.
+
+- **What it says.** A person: their activity and motion as badges ("Talking", "standing"), the
+  state machine's reason in quotes ("joined a circle") and for how long, and four meters for
+  thirst, rest, company and home, each full when that need is due, with the one being met lit
+  in amber. A bus: its route, what it is doing and what holds it back ("people in the way"),
+  the next stop ("2 of 6") and its riders. A building: its type from the library, district,
+  size, height and lot.
+- **Where it sits.** Beside the selection, moved every frame and kept clear of the ring; it
+  flips to the left near the right edge and waits at the top right while its agent is out of
+  sight (riding a bus, indoors). The words refresh four times a second. Under 640 px it is a
+  drawer at the bottom.
+- **Closing.** ×, Escape, or a click on empty ground.
+- **Follow** (the card's button, or the toolbar's new sixth button, key `6`). The camera flies to
+  the agent and trails it, still free to orbit and zoom. It keeps the view's direction if
+  nothing is in the way, else it takes the nearest clear side, scored the same way as the Plaza
+  and Park views; the first try sat behind the Landmark. Selecting someone else while following
+  flies over to them.
+
+Picking (render/select.ts) tests each agent as a sphere round its middle, padded to 5 px on
+screen so a pigeon can be clicked, and each building by its bounds; whatever is nearest in front
+of the ground wins.
