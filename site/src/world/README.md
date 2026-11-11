@@ -1005,3 +1005,22 @@ on the ground in cyan, pulsing gently so it can be found in a crowd.
 Picking (render/select.ts) tests each agent as a sphere round its middle, padded to 5 px on
 screen so a pigeon can be clicked, and each building by its bounds; whatever is nearest in front
 of the ground wins.
+
+## 2026-11-11: Shortcuts, a tour, and Space for the timeline
+
+The help half of Milestone 5 (§4.9 of the city controls plan); the notices with Undo come next.
+
+- **Shortcuts** (ui/Help.tsx). A **?** button at the bottom of the camera toolbar, or the `?`
+  key, opens a sheet listing every key and mouse gesture, with a button to take the tour. It is
+  a native modal dialog, so the page behind can't be reached until it closes, and keys pressed
+  in it don't reach the page: Escape closes the sheet, not the inspector behind it.
+- **Space** plays or pauses the build, from anywhere but a control that Space already presses.
+- **The tour** (ui/Tour.tsx). On a first visit, once the city has finished building, four cards
+  point in turn at the seed, the Build tab, the Layers tab, and then the city itself ("Click
+  anyone in the city"); the last ends when the inspector opens, so the tour hands over to it.
+  The page dims round each step's control, leaving it lit like a spotlight (a glowing cyan
+  outline came first and didn't fit the panel's quiet glass), and the card sits beside it with
+  a progress bar, Back and Next. The first version covered the
+  panel's collapse button and, for the Build tab, the Layers tab next to it, so the cards now
+  keep below the button and clear of the whole tab row. On a phone the cards sit below their
+  controls, and the panel closes again for the last step. It shows once per browser.

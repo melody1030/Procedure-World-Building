@@ -189,6 +189,7 @@ export function Tabs<T extends string>({ tabs, value, onChange, label }: { tabs:
               ref={(el) => (refs.current[i] = el)}
               type="button"
               role="tab"
+              data-tab={t.id}
               id={`${base}-tab-${t.id}`}
               aria-selected={on}
               aria-controls={`${base}-panel-${t.id}`}

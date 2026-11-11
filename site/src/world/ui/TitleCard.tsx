@@ -44,6 +44,7 @@ export function TitleBlock({ seed, onSeed }: { seed: string; onSeed: (seed: stri
       <h1 className="mt-1.5 truncate font-display text-xl font-bold tracking-wide text-white">Blueprint City</h1>
 
       <form
+        data-tour="seed"
         className="mt-3 flex gap-1.5"
         onSubmit={(e) => {
           e.preventDefault();

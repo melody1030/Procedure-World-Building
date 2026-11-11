@@ -230,26 +230,34 @@ in Tailwind like the rest of the kit. The same pieces can be copied into `river-
   - "Settings reset · Undo" (Undo restores the previous params, for 6 s);
   - "Seed copied" (when the seed is copied with a new copy button next to the dice).
 
-### 4.9 Help: shortcut Modal and first-visit tour
+### 4.9 Help: shortcut Modal and first-visit tour (built 2026-11-11)
 
-- **?** opens a modal that lists the shortcuts:
-  - `E`: hide UI;
-  - `Space`: play or pause;
-  - `1`–`5`: cameras;
-  - `Esc`: close the inspector;
-  - click: inspect;
-  - drag: orbit;
-  - scroll: zoom.
+- **?** (the last button on the camera toolbar, or the `?` key) opens a sheet of shortcuts
+  (`ui/Help.tsx`):
+  - keys: `E` hide or show the panels; `Space` play or pause the build; `1`–`5` the camera
+    places; `6` Follow; `Esc` close the inspector (or the sheet); `?` the sheet;
+  - mouse: click to inspect, drag to orbit, right-drag to pan, scroll to zoom;
+  - a note on touch.
 
-  It also has a **Take the tour** button. The modal traps focus and returns it to **?** on close.
-- **Tour:** on the first visit, after the build finishes, show four popover steps in turn,
-  each pointing at its control, with "2 of 4", *Next* and *Skip*:
+  It also has a **Take the tour** button. It is a native modal `<dialog>`: the page behind is
+  inert, Tab stays inside, Escape and a click on the backdrop close it, and focus goes back to
+  what opened it. Keys pressed inside stop there, so Escape doesn't also close the inspector and
+  `1` doesn't fly the camera.
+- **Space** plays or pauses the timeline from anywhere, except on a control where Space already
+  does something (a button, a tab, a checkbox, a text field).
+- **Tour** (`ui/Tour.tsx`): on the first visit, a moment after the first build finishes, four
+  cards in turn, each with a four-part progress bar and "2 of 4", *Back*, *Next* and *Skip tour*,
+  and an arrow pointing at its control. The rest of the page dims and the control stays lit in a
+  rounded window (a spotlight; a glowing cyan outline was tried first and looked out of place):
   1. the seed;
   2. the Build tab;
   3. the Layers tab;
-  4. "click anyone in the city".
+  4. "Click anyone in the city", which ends when something is selected.
 
-  Whether the tour has been seen is remembered in `localStorage`, so it shows only once.
+  The card sits to the right of its control (for the tabs, right of the whole tab row, so it
+  doesn't cover the other tab), or below it when there's no room (phones). It opens the panel
+  for steps 1–3 and, on a phone, closes it again for step 4. Escape skips the tour. Whether it
+  has been seen is remembered in `localStorage` (`world.tourSeen`), so it shows only once.
 
 ---
 

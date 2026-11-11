@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { GLASS, Segmented } from "./kit";
 import { BUILD_PHASES, BUILD_SECONDS } from "../terrain/buildup";
 
@@ -40,8 +40,9 @@ function PauseIcon() {
  * It plays by itself when a new seed loads (`replayKey` changes); the slider scrubs it and the
  * button plays or pauses, and the speed control sets the playback speed (it applies at once, even
  * mid-play). Under the scrubber, the phases are named as steps (done, current, to come), each
- * under its stretch of the track; clicking one plays the build from the start of that phase. It owns its own time, so only this bar
- * re-renders while it plays.
+ * under its stretch of the track; clicking one plays the build from the start of that phase. Space
+ * plays or pauses it from anywhere on the page (unless a control that Space works on has focus).
+ * It owns its own time, so only this bar re-renders while it plays.
  */
 export function PrintBar({ replayKey, onChange }: { replayKey: string; onChange: (t: number) => void }) {
   const [t, setT] = useState(0);
@@ -78,6 +79,35 @@ export function PrintBar({ replayKey, onChange }: { replayKey: string; onChange:
     return () => cancelAnimationFrame(frame);
   }, [playing]);
 
+  const playingRef = useRef(playing);
+  playingRef.current = playing;
+  /** Play, pause, or (once built) print again from the start. */
+  const toggle = useCallback(() => {
+    if (playingRef.current) setPlaying(false);
+    else {
+      if (tRef.current >= 1) setT(0);
+      setPlaying(true);
+    }
+  }, []);
+
+  // Space plays or pauses, except where Space already does something: a button, a link, a
+  // checkbox, a text field (the timeline's own slider is fine).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== " " || e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
+      const target = e.target;
+      if (target instanceof HTMLElement) {
+        if (target.isContentEditable || target instanceof HTMLButtonElement || target instanceof HTMLAnchorElement || target instanceof HTMLSelectElement || target instanceof HTMLTextAreaElement) return;
+        if (target instanceof HTMLInputElement && target.type !== "range") return;
+        if (target.getAttribute("role") === "button" || target.getAttribute("role") === "tab") return;
+      }
+      e.preventDefault();
+      toggle();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [toggle]);
+
   const phase = t >= 1 ? BUILD_PHASES.length : BUILD_PHASES.findIndex((p) => t < p.end);
 
   // The step names sit under their stretches, which are as long as the phases take. When the bar
@@ -98,15 +128,10 @@ export function PrintBar({ replayKey, onChange }: { replayKey: string; onChange:
   return (
     <div className={"pointer-events-auto flex w-[44rem] max-w-full items-center gap-3 rounded-2xl border px-3 py-2.5 " + GLASS}>
       <button
-        onClick={() => {
-          if (playing) setPlaying(false);
-          else {
-            if (t >= 1) setT(0);
-            setPlaying(true);
-          }
-        }}
+        onClick={toggle}
         aria-label={playing ? "Pause printing" : "Play printing"}
-        title={playing ? "Pause" : t >= 1 ? "Print again" : "Play"}
+        aria-keyshortcuts="Space"
+        title={(playing ? "Pause" : t >= 1 ? "Print again" : "Play") + " (Space)"}
         className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#5ad8ff]/60 bg-[#5ad8ff]/15 text-[#5ad8ff] transition-colors hover:bg-[#5ad8ff]/25"
       >
         {playing ? <PauseIcon /> : <PlayIcon />}

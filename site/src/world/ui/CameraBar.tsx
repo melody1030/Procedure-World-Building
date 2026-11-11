@@ -53,6 +53,14 @@ const FOLLOW_ICON = (
   </svg>
 );
 
+const HELP_ICON = (
+  <svg {...iconProps}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M9.5 9.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6" />
+    <circle cx="12" cy="17" r="0.6" fill="currentColor" />
+  </svg>
+);
+
 export const PRESETS: { id: CameraPreset; label: string; key: string }[] = [
   { id: "overview", label: "Overview", key: "1" },
   { id: "plaza", label: "Plaza", key: "2" },
@@ -97,6 +105,7 @@ export function CameraBar({
   onFly,
   shown,
   follow,
+  onHelp,
 }: {
   view: CameraPreset | null;
   available: Record<CameraPreset, boolean>;
@@ -104,11 +113,19 @@ export function CameraBar({
   shown: boolean;
   /** Follow: whether something that moves is selected, whether the camera trails it, and the toggle. */
   follow: { can: boolean; on: boolean; onToggle: () => void };
+  /** Opens the shortcuts sheet (also the ? key). */
+  onHelp: () => void;
 }) {
-  // Keys 1–5 fly to the presets and 6 toggles Follow (not while typing, e.g. in the seed field).
+  // Keys 1–5 fly to the presets, 6 toggles Follow and ? opens the shortcuts (not while typing,
+  // e.g. in the seed field).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.repeat || e.metaKey || e.ctrlKey || e.altKey || isTextEntry(e.target)) return;
+      if (e.key === "?") {
+        e.preventDefault();
+        onHelp();
+        return;
+      }
       if (e.key === "6") {
         if (!follow.can) return;
         e.preventDefault();
@@ -122,7 +139,7 @@ export function CameraBar({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [available, onFly, follow]);
+  }, [available, onFly, follow, onHelp]);
 
   if (!shown) return null;
 
@@ -133,6 +150,8 @@ export function CameraBar({
       ))}
       <span aria-hidden className="mx-1.5 my-0.5 h-px bg-[#7db4e6]/20" />
       <ToolButton label={follow.can ? (follow.on ? "Stop following" : "Follow") : "Follow (select someone first)"} keyName="6" icon={FOLLOW_ICON} active={follow.on} disabled={!follow.can} onClick={follow.onToggle} />
+      <span aria-hidden className="mx-1.5 my-0.5 h-px bg-[#7db4e6]/20" />
+      <ToolButton label="Shortcuts" keyName="?" icon={HELP_ICON} onClick={onHelp} />
     </div>
   );
 }

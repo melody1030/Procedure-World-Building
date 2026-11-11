@@ -13,6 +13,8 @@ import { Spinner } from "./ui/icons";
 import { GLASS } from "./ui/kit";
 import { TerrainPanel } from "./ui/TerrainPanel";
 import { Inspector } from "./ui/Inspector";
+import { HelpDialog } from "./ui/Help";
+import { Tour, tourSeen } from "./ui/Tour";
 import type { Selection } from "./render/select";
 
 /**
@@ -98,9 +100,12 @@ export default function WorldPage() {
 
   // Where the print timeline is (0–1), kept outside React state so playing re-renders only the bar.
   const printRef = useRef(0);
+  /** The first build has played to the end (the tour waits for it). */
+  const [built, setBuilt] = useState(false);
   const setPrint = useCallback((t: number) => {
     printRef.current = t;
     viewRef.current?.setPrint(t);
+    if (t >= 1) setBuilt(true);
   }, []);
 
   // Re-upload only when the mesh itself changed: a look-only change keeps the same mesh object.
@@ -163,6 +168,19 @@ export default function WorldPage() {
     [terrain.streets, terrain.parks, river],
   );
 
+  // The shortcuts sheet, and the tour: on a first visit it starts a moment after the city is built.
+  const [helpOpen, setHelpOpen] = useState(false);
+  const openHelp = useCallback(() => setHelpOpen(true), []);
+  const [touring, setTouring] = useState(false);
+  const tourOffered = useRef(false);
+  useEffect(() => {
+    if (!built || busy || tourOffered.current) return;
+    tourOffered.current = true;
+    if (tourSeen()) return;
+    const timer = setTimeout(() => setTouring(true), 900);
+    return () => clearTimeout(timer);
+  }, [built, busy]);
+
   const canFollow = !!selection && selection.kind !== "building";
   const follow = useMemo(() => ({ can: canFollow, on: following, onToggle: () => setFollow(!following) }), [canFollow, following, setFollow]);
 
@@ -172,7 +190,7 @@ export default function WorldPage() {
       {/* The whole interface is drawn at UI_SCALE (80%), so it takes less of the view. */}
       <div className="pointer-events-none absolute inset-0" style={{ zoom: UI_SCALE }}>
         <TerrainPanel terrain={terrain} life={life} ctl={ctl} open={panelOpen} onToggle={() => setPanelOpen((v) => !v)} busy={busy} />
-        <CameraBar view={view} available={available} onFly={flyTo} shown={overlays} follow={follow} />
+        <CameraBar view={view} available={available} onFly={flyTo} shown={overlays} follow={follow} onHelp={openHelp} />
         {overlays && (
           <Inspector
             view={viewRef.current}
@@ -186,6 +204,7 @@ export default function WorldPage() {
             onFollow={setFollow}
           />
         )}
+        {overlays && touring && <Tour selection={selection} scale={UI_SCALE} panelOpen={panelOpen} setPanelOpen={setPanelOpen} onClose={() => setTouring(false)} />}
         {/* While the city rebuilds: a quiet note at the top of the view, over the part the panel leaves. */}
         <div
           className={"absolute top-4 flex justify-center transition-[left,opacity] duration-300 " + (busy ? "opacity-100" : "opacity-0")}
@@ -205,6 +224,8 @@ export default function WorldPage() {
           <PrintBar replayKey={terrain.seed} onChange={setPrint} />
         </div>
       </div>
+      {/* Outside the zoom: a modal dialog in the top layer takes clicks in the wrong place under it. */}
+      <HelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} onTour={() => setTouring(true)} />
     </div>
   );
 }
