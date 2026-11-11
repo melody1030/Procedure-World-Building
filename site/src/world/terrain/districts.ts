@@ -64,6 +64,10 @@ import type { Columns } from "./voxelize";
  * 6. Small lots: a lot narrower than MERGE_BELOW is merged with the neighbor beside it on the same
  *    frontage (across their alley); one still narrower than MIN_PLOT is given up, its ground left
  *    free (see mergeSmallLots).
+ * 7. Frontage: each lot records what it fronts. Its street is an avenue (a main street, or the
+ *    plaza) or a side street: the street walk knows its own; a corner lot reads the paving out
+ *    from its front edge. Its frontage is its front edge's length. It is a corner lot if a side
+ *    edge fronts paving too, a through lot if its back edge does (see frontedEdges).
  */
 
 export const DISTRICT = { core: 0, commercial: 1, megablock: 2, industrial: 3, wealthy: 4 } as const;
@@ -159,6 +163,34 @@ export interface Lot {
   high: number;
   /** The level its site is graded to (the median of its ground: as much cut as fill), its building's floor. */
   floor: number;
+  /** What its front faces: an avenue (a main street, or the plaza) or a side street. */
+  street: Frontage;
+  /** Length of its front edge, in meters. */
+  frontage: number;
+  /** It fronts paving on its front and one side too: a corner lot. */
+  corner: boolean;
+  /** It fronts paving at its back too: a through lot, the whole depth of a thin block. */
+  through: boolean;
+}
+
+export type Frontage = "avenue" | "side";
+
+/**
+ * The kinds of frontage the Frontage tint shows, one per lot: a corner lot first (it fronts two
+ * streets), then a through lot, then by the street its front faces. Names and colors for the legend.
+ */
+export const FRONTAGE_KINDS: { name: string; color: number }[] = [
+  { name: "Avenue", color: 0xf59e0b },
+  { name: "Side street", color: 0x38bdf8 },
+  { name: "Corner", color: 0xf472b6 },
+  { name: "Through", color: 0xa3e635 },
+];
+
+/** A lot's index in FRONTAGE_KINDS. */
+export function frontageKind(lot: Lot): number {
+  if (lot.corner) return 2;
+  if (lot.through) return 3;
+  return lot.street === "avenue" ? 0 : 1;
 }
 
 export interface Districts {
@@ -741,7 +773,7 @@ export function buildDistricts(seed: number, cols: Columns, streets: Streets, hu
           ];
           for (const k of rasterize(ring, n, false)) gap[k] = 1;
           const centerCell = cellOf((corners[0].x + corners[2].x) / 2, (corners[0].z + corners[2].z) / 2);
-          lots.push({ id, corners, facing: Math.atan2(-mz, -mx), district: d as District, density: density[centerCell], area: columns.length * VOXEL_M * VOXEL_M, low, high, floor: low });
+          lots.push({ id, corners, facing: Math.atan2(-mz, -mx), district: d as District, density: density[centerCell], area: columns.length * VOXEL_M * VOXEL_M, low, high, floor: low, street: st.kind === "main" ? "avenue" : "side", frontage: 0, corner: false, through: false });
           placed = w;
         }
         s += placed ? placed + voxels(ALLEY) : voxels(1);
@@ -806,6 +838,50 @@ export function buildDistricts(seed: number, cols: Columns, streets: Streets, hu
     }
     return [north, east, south, west];
   };
+  // Which street a corner lot's front faces (the street walk knows its own): the paving straight
+  // out from its front edge, an avenue if it lies along a main street or is the plaza.
+  const nearMain = new Uint8Array(n * n);
+  for (const st of streets.streets) {
+    if (st.kind !== "main") continue;
+    const r = st.width / 2 + voxels(VERGE) + 1.5;
+    const ri = Math.ceil(r);
+    for (const q of st.curve) {
+      const cx = Math.round(q.x);
+      const cz = Math.round(q.z);
+      for (let dz = -ri; dz <= ri; dz++) {
+        for (let dx = -ri; dx <= ri; dx++) {
+          const x = cx + dx;
+          const z = cz + dz;
+          if (x >= 0 && z >= 0 && x < n && z < n && dx * dx + dz * dz <= r * r) nearMain[z * n + x] = 1;
+        }
+      }
+    }
+  }
+  const frontStreet = (corners: P2[]): Frontage => {
+    const [a, b, , d] = corners;
+    const len = Math.hypot(b.x - a.x, b.z - a.z);
+    const deep = Math.hypot(d.x - a.x, d.z - a.z) || 1;
+    // Outward: from the back toward the front.
+    const ox = (a.x - d.x) / deep;
+    const oz = (a.z - d.z) / deep;
+    let avenueVotes = 0;
+    let sideVotes = 0;
+    for (let u = 1; u < len - 1; u += 2) {
+      const px = a.x + ((b.x - a.x) * u) / len;
+      const pz = a.z + ((b.z - a.z) * u) / len;
+      for (let i = 1; i <= voxels(VERGE + FORECOURT) + 4; i++) {
+        const X = Math.round(px + ox * i);
+        const Z = Math.round(pz + oz * i);
+        if (X < 0 || Z < 0 || X >= n || Z >= n) break;
+        const what = claim[Z * n + X];
+        if (what !== CLAIM.verge && what !== CLAIM.road && what !== CLAIM.plaza) continue;
+        if (what === CLAIM.plaza || nearMain[Z * n + X]) avenueVotes++;
+        else sideVotes++;
+        break;
+      }
+    }
+    return avenueVotes > sideVotes ? "avenue" : "side";
+  };
   const taken = new Uint8Array(n * n);
   const stride = voxels(0.5);
   const minSide = voxels(MIN_PLOT);
@@ -860,7 +936,7 @@ export function buildDistricts(seed: number, cols: Columns, streets: Streets, hu
         }
         for (let z = Math.max(0, z0 - alley); z < Math.min(n, z1 + alley); z++) taken.fill(1, z * n + Math.max(0, x0 - alley), z * n + Math.min(n, x1 + alley));
         const center = cellOf((x0 + x1) / 2, (z0 + z1) / 2);
-        lots.push({ id, corners, facing, district: d, density: density[center], area: w * dd * VOXEL_M * VOXEL_M, low, high, floor: low });
+        lots.push({ id, corners, facing, district: d, density: density[center], area: w * dd * VOXEL_M * VOXEL_M, low, high, floor: low, street: frontStreet(corners), frontage: 0, corner: false, through: false });
         break;
       }
     }
@@ -868,6 +944,15 @@ export function buildDistricts(seed: number, cols: Columns, streets: Streets, hu
 
   // 6. Small lots: merged with a neighbor, else given up.
   const kept = mergeSmallLots(lots, lotId, claim, height, n);
+
+  // 7. Frontage, on the lots as they are now: the front edge's length, and which other edges
+  // front paving too (a side: a corner lot; the back: a through lot).
+  for (const lot of kept) {
+    const [front, right, back, left] = frontedEdges(lot, claim, n);
+    lot.frontage = frame(lot).width * VOXEL_M;
+    lot.corner = front && (left || right);
+    lot.through = front && back;
+  }
 
   // Shares of the land.
   const counts = DISTRICTS.map(() => 0);
@@ -893,6 +978,53 @@ function frame(lot: Lot) {
   const width = Math.hypot(b.x - a.x, b.z - a.z);
   const depth = Math.hypot(d.x - a.x, d.z - a.z);
   return { a, t: { x: (b.x - a.x) / width, z: (b.z - a.z) / width }, m: { x: (d.x - a.x) / depth, z: (d.z - a.z) / depth }, width, depth };
+}
+
+/** How far out from a lot's edge paving still counts as fronting it (meters): past a verge, or an alley short of the far sidewalk. */
+const FRONT_REACH = 2;
+/** The share of an edge that must front paving for the edge to count. */
+const FRONT_SHARE = 0.25;
+
+/**
+ * Which of a lot's edges front paving (road, verge or plaza within FRONT_REACH along at least
+ * FRONT_SHARE of the edge): front, right, back, left, as seen from the street.
+ */
+function frontedEdges(lot: Lot, claim: Uint8Array, n: number): boolean[] {
+  const [a, b, c, d] = lot.corners;
+  const reach = voxels(FRONT_REACH);
+  const edge = (p: P2, q: P2, other: P2) => {
+    const len = Math.hypot(q.x - p.x, q.z - p.z);
+    if (len < 2) return false;
+    // Outward: away from the opposite edge.
+    const mx = (p.x + q.x) / 2;
+    const mz = (p.z + q.z) / 2;
+    let ox = -(q.z - p.z) / len;
+    let oz = (q.x - p.x) / len;
+    if (ox * (other.x - mx) + oz * (other.z - mz) > 0) {
+      ox = -ox;
+      oz = -oz;
+    }
+    let samples = 0;
+    let hits = 0;
+    for (let u = 1; u < len - 1; u++) {
+      samples++;
+      const px = p.x + ((q.x - p.x) * u) / len;
+      const pz = p.z + ((q.z - p.z) * u) / len;
+      for (let i = 1; i <= reach; i++) {
+        const X = Math.round(px + ox * i);
+        const Z = Math.round(pz + oz * i);
+        if (X < 0 || Z < 0 || X >= n || Z >= n) break;
+        const what = claim[Z * n + X];
+        if (what === CLAIM.road || what === CLAIM.verge || what === CLAIM.plaza) {
+          hits++;
+          break;
+        }
+      }
+    }
+    return samples > 0 && hits >= samples * FRONT_SHARE;
+  };
+  // Each edge with a point on the far side, to tell outward from inward.
+  return [edge(a, b, d), edge(b, c, a), edge(c, d, a), edge(d, a, b)];
 }
 
 /**
@@ -973,7 +1105,14 @@ function mergeSmallLots(lots: Lot[], lotId: Int32Array, claim: Uint8Array, heigh
         claim[k] = CLAIM.lot;
       }
       columns[i] = best.m.columns;
-      Object.assign(p, { corners: best.m.corners, low: best.m.low, high: best.m.high, area: best.m.columns.length * VOXEL_M * VOXEL_M, density: Math.max(p.density, q.density) });
+      Object.assign(p, {
+        corners: best.m.corners,
+        low: best.m.low,
+        high: best.m.high,
+        area: best.m.columns.length * VOXEL_M * VOXEL_M,
+        density: Math.max(p.density, q.density),
+        street: p.street === "avenue" || q.street === "avenue" ? "avenue" : "side",
+      });
       changed = true;
     }
   }

@@ -5,10 +5,10 @@ export const DEFAULT_SEED = "blueprint";
 export const MAX_SEED_LENGTH = 32;
 
 /**
- * The ground tints: by district, by what owns each column (river, bank, roads…), or by how well
- * each column suits a city center.
+ * The ground tints: by district, by what each lot fronts (avenue, side street, corner, through),
+ * by what owns each column (river, bank, roads…), or by how well each column suits a city center.
  */
-export const GROUND_TINTS = ["none", "districts", "claims", "suitability"] as const;
+export const GROUND_TINTS = ["none", "districts", "frontage", "claims", "suitability"] as const;
 export type GroundTint = (typeof GROUND_TINTS)[number];
 
 export interface WorldState {

@@ -1028,3 +1028,23 @@ Milestone 5 of the city controls plan (§4.8), the last piece of it.
   panel's collapse button and, for the Build tab, the Layers tab next to it, so the cards now
   keep below the button and clear of the whole tab row. On a phone the cards sit below their
   controls, and the panel closes again for the last step. It shows once per browser.
+
+## 2026-11-11: Frontage: what each lot faces
+
+Milestone 1 of the city morphology plan (docs/plans/city-morphology-plan.md, §2.1 and §2.3). Lots
+now record what they front (terrain/districts.ts, step 7), and a new ground tint shows it. No lot
+or building changed: the same seeds cut the same lots.
+
+- **What a lot records.** `street`: an avenue (a main street, or the plaza) or a side street.
+  The street walk knows its own street; a corner-pass lot reads the paving straight out from its
+  front edge. `frontage`: its front edge's length in meters. `corner` and `through`: whether a side
+  edge, or the back edge, also fronts paving (road, verge or plaza within 2 m along at least a
+  quarter of the edge). Merged lots front an avenue if either half did.
+- **The Frontage tint** (Layers → Ground color). Each lot is filled by its kind, a corner first,
+  then a through lot, then by its street: avenue amber, side street sky blue, corner pink,
+  through lime. A 1.5 m strip along the front edge is drawn brighter, so you can see which way
+  each lot faces. The legend gives each kind's share of the lots.
+- **What it shows.** The 20 m street tiles make small blocks, so many lots front two streets:
+  on `blueprint`, 107 lots are 4% avenue, 40% side street, 37% corner and 19% through. Avenues
+  are few (three, about 7% of the street length there), so avenue lots are too; `harbor` has six,
+  and 7 of its 22 lots show as avenue.

@@ -5,7 +5,7 @@ import { Button, GLASS, Legend, Note, Row, RULE, Section, Segmented, Select, Sli
 import type { GroundTint, WorldController } from "../state";
 import { DEFAULT_PARAMS, PARAM_SPECS, RIVER_VISIBLE, type ParamKey, type ParamSpec, type RangeSpec, type TerrainParams } from "../terrain/params";
 import { CLAIM_COLORS } from "../terrain/claims";
-import { DISTRICTS } from "../terrain/districts";
+import { DISTRICTS, FRONTAGE_KINDS, frontageKind } from "../terrain/districts";
 import type { Terrain } from "../terrain/pipeline";
 import { NoiseIcon, ResetIcon, RiverIcon, ShapingIcon, Spinner, SurfaceIcon, TerraceIcon } from "./icons";
 import { TitleBlock } from "./TitleCard";
@@ -95,6 +95,7 @@ function savedTab(): Tab {
 const TINT_OPTIONS: { value: GroundTint; label: string }[] = [
   { value: "none", label: "None" },
   { value: "districts", label: "Districts" },
+  { value: "frontage", label: "Frontage" },
   { value: "claims", label: "Claims" },
   { value: "suitability", label: "Suitability" },
 ];
@@ -245,6 +246,14 @@ function BuildTab({ ctl, busy }: { ctl: WorldController; busy: boolean }) {
   );
 }
 
+/** Each frontage kind with its share of the lots. */
+function frontageLegend(terrain: Terrain): [string, number][] {
+  const { lots } = terrain.districts;
+  const counts = FRONTAGE_KINDS.map(() => 0);
+  for (const lot of lots) counts[frontageKind(lot)]++;
+  return FRONTAGE_KINDS.map((k, i) => [`${k.name} ${lots.length ? Math.round((counts[i] / lots.length) * 100) : 0}%`, k.color]);
+}
+
 /** Everything that only changes what is drawn: one ground tint, then the layers on top. */
 function LayersTab({ terrain, life, ctl }: { terrain: Terrain; life: Life | null; ctl: WorldController }) {
   const { state } = ctl;
@@ -252,11 +261,12 @@ function LayersTab({ terrain, life, ctl }: { terrain: Terrain; life: Life | null
   return (
     <>
       <div className="flex flex-col gap-2.5">
-        <Subheading info="Color the ground by one thing at a time. Districts: which kind of neighborhood each column belongs to. Claims: what owns each column (river, bank, road…); later stages only build on free ground. Suitability: how well each column suits the city center.">
+        <Subheading info="Color the ground by one thing at a time. Districts: which kind of neighborhood each column belongs to. Frontage: what each lot faces (an avenue or a side street, or two streets at a corner or through a thin block), its front edge bright. Claims: what owns each column (river, bank, road…); later stages only build on free ground. Suitability: how well each column suits the city center.">
           Ground color
         </Subheading>
         <Segmented label="Ground color" options={TINT_OPTIONS} value={tint} onChange={ctl.setGroundTint} />
         {tint === "districts" && <Legend items={DISTRICTS.map((d, i) => [`${d.name} ${Math.round(terrain.districts.shares[i] * 100)}%`, d.color])} />}
+        {tint === "frontage" && <Legend items={frontageLegend(terrain)} />}
         {tint === "claims" && <Legend items={CLAIM_LEGEND} />}
         {tint === "suitability" && (
           <div className="flex flex-col gap-1">
