@@ -3,8 +3,9 @@ import type { BuildingModel } from "../buildings/config";
 import { findClashes, findOverlaps } from "../buildings/overlaps";
 import { hash2 } from "../rng";
 import { VOXEL_M } from "../scale";
-import { DISTRICT, type Districts, type Lot } from "../terrain/districts";
+import type { Districts, Lot } from "../terrain/districts";
 import type { Streets } from "../terrain/streets";
+import type { Zoning } from "./zoning";
 
 /**
  * Which building stands on which lot, and how big (pure: no three.js). Each lot gets one building
@@ -17,8 +18,9 @@ import type { Streets } from "../terrain/streets";
  *   balconies, signs), is kept within it (see `fitBuilding`): so every building stands back from
  *   the sidewalk and its neighbors on a strip of its lot's concrete; width runs along the street,
  *   depth away from it;
- * - the height: the district's range, higher with the lot's density (nearer the plaza, busier),
- *   but at most SLENDER times the footprint's narrower side, so small lots get no needles;
+ * - the height: the zoning map's limit for the lot (see zoning.ts: the district's range, the
+ *   skyline falling off from the plaza, slow variety, the avenue bonus and the open-edge cap), but
+ *   at most SLENDER times the footprint's narrower side, so small lots get no needles;
  * - the facing: the entrance side (the model's +z) turned toward the street;
  * - the base: the lot's floor, the level its site is graded to (see gradeLots).
  *
@@ -36,6 +38,9 @@ export interface BuildingPlan {
   width: number;
   depth: number;
   height: number;
+  /** The zoning map's limit for its lot (meters), and what held the height below the district's own: the open edge, the slender rule, or nothing. */
+  limit: number;
+  cap: "none" | "edge" | "slender";
   /** Center of the footprint, in columns. */
   x: number;
   z: number;
@@ -57,14 +62,8 @@ const SLENDER = 8;
 /** The Landmark's footprint on the plaza, and the paving it leaves around it, in meters. */
 const LANDMARK_SIZE = 18;
 const LANDMARK_RING = 3;
-/** Height range per district (meters): low at density 0, high at density 1. */
-const HEIGHTS: Record<number, [number, number]> = {
-  [DISTRICT.core]: [55, 140],
-  [DISTRICT.commercial]: [28, 75],
-  [DISTRICT.megablock]: [24, 55],
-  [DISTRICT.industrial]: [20, 50],
-  [DISTRICT.wealthy]: [14, 30],
-};
+/** No building is lower than this (meters). */
+const MIN_HEIGHT = 12;
 /** The smallest footprint side (meters) each archetype still reads well at. */
 const MIN_SIDE: Record<string, number> = {
   "corporate-megatower": 12,
@@ -93,7 +92,7 @@ function lotFrame(lot: Lot) {
   return { width, depth, x, z };
 }
 
-export function planBuildings(districts: Districts, streets: Streets, seed: number): BuildingPlan[] {
+export function planBuildings(districts: Districts, streets: Streets, zoning: Zoning, seed: number): BuildingPlan[] {
   const plans: BuildingPlan[] = [];
   const plaza = streets.plazas[0];
   const fits = (id: string, w: number, d: number) => Math.min(w, d) >= (MIN_SIDE[id] ?? 10);
@@ -127,9 +126,10 @@ export function planBuildings(districts: Districts, streets: Streets, seed: numb
           : slimmest(all);
     if (!pool.length) continue;
     const archetype = pool[Math.floor(r(1) * pool.length)].id;
-    const [lo, hi] = HEIGHTS[lot.district] ?? [20, 40];
-    const wanted = lo + (hi - lo) * Math.min(1, Math.max(0, lot.density)) * (0.75 + 0.25 * r(2));
-    const height = Math.round(Math.max(12, Math.min(wanted, SLENDER * Math.min(width, depth))));
+    const zone = zoning.lots[lot.id];
+    const slender = SLENDER * Math.min(width, depth);
+    const height = Math.round(Math.max(MIN_HEIGHT, Math.min(zone.limit, slender)));
+    const cap = slender < zone.limit ? "slender" : zone.cap;
     tallest = Math.max(tallest, height);
     plans.push({
       lot: lot.id,
@@ -139,6 +139,8 @@ export function planBuildings(districts: Districts, streets: Streets, seed: numb
       width,
       depth,
       height,
+      limit: zone.limit,
+      cap,
       x,
       z,
       rotation: Math.PI / 2 - lot.facing,
@@ -157,6 +159,8 @@ export function planBuildings(districts: Districts, streets: Streets, seed: numb
         width: side,
         depth: side,
         height: Math.min(200, Math.max(170, tallest + LANDMARK_LEAD)),
+        limit: 200,
+        cap: "none",
         x: plaza.x,
         z: plaza.z,
         rotation: 0,

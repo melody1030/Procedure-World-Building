@@ -20,6 +20,7 @@ import { LifeView } from "./life";
 import { RING_PAD, SelectionMark, locate, pick, sameSelection, type PickableBuilding, type Selection } from "./select";
 import type { Life } from "../life/agents";
 import type { GroundTint } from "../state";
+import { HEIGHT_TINT_ENCODE, type Zoning } from "../city/zoning";
 
 /** Diorama framing: looking down on the whole table-top from a raised corner. */
 const VIEW_AZIMUTH = THREE.MathUtils.degToRad(38);
@@ -1151,6 +1152,40 @@ transformed = aGrow.xyz + (transformed - aGrow.xyz) * popped;`,
     this.look.uParks.value = upload(parks, this.look.uParks.value);
   }
 
+  /**
+   * The Height limit tint's texture, one texel per column: each lot's limit on its columns (plus
+   * 128), and the zoning map's cell limit, fainter, on the unclaimed land between them. Limits are
+   * 1–127 for 0–HEIGHT_TINT_ENCODE m; 0 where there is none (paving, water, parks).
+   */
+  setZoning(zoning: Zoning, districts: Districts) {
+    const { lotId } = districts;
+    const claim = districts.claims.claim;
+    const n = districts.claims.n;
+    const cell = n / zoning.cells;
+    const code = (m: number) => 1 + Math.round((Math.min(m, HEIGHT_TINT_ENCODE) / HEIGHT_TINT_ENCODE) * 126);
+    const lotCodes = zoning.lots.map((z) => 128 + code(z.limit));
+    const data = new Uint8Array(n * n);
+    for (let z = 0; z < n; z++) {
+      const row = Math.floor(z / cell) * zoning.cells;
+      for (let x = 0; x < n; x++) {
+        const k = z * n + x;
+        const id = lotId[k];
+        if (id) data[k] = lotCodes[id - 1];
+        else if (claim[k] === CLAIM.free) {
+          const m = zoning.limit[row + Math.floor(x / cell)];
+          if (m > 0) data[k] = code(m);
+        }
+      }
+    }
+    this.look.uHeights.value?.dispose();
+    const texture = new THREE.DataTexture(data, n, n, THREE.RedFormat, THREE.UnsignedByteType);
+    texture.magFilter = THREE.NearestFilter;
+    texture.minFilter = THREE.NearestFilter;
+    texture.unpackAlignment = 1;
+    texture.needsUpdate = true;
+    this.look.uHeights.value = texture;
+  }
+
   setShowParks(on: boolean) {
     this.look.uShowParks.value = on ? 1 : 0;
   }
@@ -1159,6 +1194,7 @@ transformed = aGrow.xyz + (transformed - aGrow.xyz) * popped;`,
   setGroundTint(tint: GroundTint) {
     this.look.uShowDistricts.value = tint === "districts" ? 1 : 0;
     this.look.uShowFrontage.value = tint === "frontage" ? 1 : 0;
+    this.look.uShowHeights.value = tint === "heights" ? 1 : 0;
     this.look.uShowClaims.value = tint === "claims" ? 1 : 0;
     this.look.uShowSuit.value = tint === "suitability" ? 1 : 0;
   }

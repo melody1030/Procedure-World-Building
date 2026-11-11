@@ -1077,3 +1077,53 @@ default city is the same (107 lots on `blueprint`, as before).
   Alley 3 m: 97. Lot depth 0.5, no alleys, merging under 16 m and no corner lots: 72. Avenue
   lot width 0.5 changes nothing there (its avenue lots are already one cell wide); on `harbor`
   it cuts two 24 m avenue lots to 16 m.
+
+## 2026-11-11: The height map
+
+Milestone 3 of the city morphology plan (§3.1 and §3.3). How tall a building may stand used to
+be worked out lot by lot inside `planBuildings`: its district's range, its density, and a random
+factor of its own. It now comes from a zoning map, `city/zoning.ts`: one height limit per 2 m
+cell, built after the districts, which `planBuildings` reads.
+
+```
+limit = scale · (lo + (hi − lo) · density · skyline · variety)    the district's range
+        · avenue bonus (on a lot fronting an avenue)
+        then at most the edge cap near the river and the parks
+```
+
+- **The skyline** is 1 at the plaza and halves every 220 m along the streets (`falloff`). The
+  old density fell off linearly to half at the city's reach (about 220 m on every seed tried),
+  so the two agree at both ends.
+- **Variety** is slow noise in patches about 48 m across, `1 − 0.25 · (1 − noise)`: the same
+  0.75–1 range the old per-lot random factor had, but neighbors now rise and fall together.
+- **One 3 × 3 smoothing pass** over the cells, so district borders step rather than jump.
+- **The open edge** is the one new rule: within 12 m of the river bank or a park the limit is
+  30 m, and the cap doubles every 12 m beyond, so the city steps down toward open ground.
+- **A building's height** is still the smaller of its limit and 8 × its narrower side, at least 12 m.
+  Each plan now records its limit and what held it down (`cap`: the edge, the slender rule, or
+  nothing), for the inspector later.
+
+The settings (`ZoningParams`: peak 140 m, falloff 220 m, avenue bonus 1, edge cap 30 m,
+variety 0.25) are fixed defaults for now; milestone 5 puts them on the panel.
+
+**Matched to the old skyline.** The old heights were recomputed on the same lots and compared
+with the new, first with the edge cap off. Mean height (m), old → new:
+
+| Seed | Lots | Edge cap off | Edge cap on | Lots held down |
+|---|---|---|---|---|
+| `blueprint` | 107 | 40 → 39 | 40 → 36 | 26 |
+| `harbor` | 22 | 67 → 68 | 67 → 54 | 11 |
+| `neon` | 59 | 42 → 43 | 42 → 38 | 14 |
+| `42` | 85 | 45 → 43 | 45 → 40 | 22 |
+| `kowloon` | 48 | 46 → 48 | 46 → 42 | 16 |
+
+With the cap off the histograms keep their shape (the tallest building and the 90th percentile
+within a few meters on every seed). With it on, the change is where it should be: `harbor`,
+whose core sits on the river, loses its riverfront towers (core mean 77 → 59 m) and now steps up
+from the water.
+
+**The Height tint.** Layers → Ground color gains **Height**: a heat map of each lot's limit, from
+navy through violet and rose to amber, on a log scale from 12 to 140 m so the mid-rise band most
+lots sit in gets most of the color. The land between lots shows the cell map, fainter. The legend
+marks the tiers (low under 20 m, mid to 60 m, high above) and says how many lots the edge cap
+holds down. With six tints the segmented control no longer fit in one row; it is now a 3 × 2 grid.

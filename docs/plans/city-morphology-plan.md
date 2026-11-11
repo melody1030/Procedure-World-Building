@@ -96,26 +96,24 @@ A new pure module, `city/zoning.ts`, builds two maps per 2 m cell after the dist
 
 ### 3.1 Height map: the height limit
 
-The limit at each cell, in meters, comes from four terms:
+The limit at each cell, in meters (as built):
 
 ```
-limit = clamp(district range,
-              peak · falloff(access)          the skyline: highest at the plaza
-              · (avenue frontage ? avenueBonus : 1)
-              · (1 ± variety · slow noise))
-        then at most edgeCap within EDGE m of the river bank or a park
-        then smoothed, so neighbors step rather than jump
+limit = scale · (lo + (hi − lo) · density · skyline · variety)    the district's range
+        · (avenue frontage ? avenueBonus : 1)
+        then at most the edge cap near the river and the parks
 ```
 
-- **The skyline:** `zoning.peak` at the plaza, falling off along the streets (access, not straight-line distance). It halves every `zoning.falloff` meters.
-- **District range:** today's `HEIGHTS` table stays, as the floor and ceiling of each district.
-- **Avenues:** avenue frontage may build `zoning.avenueBonus` times higher.
-- **Open edges:** within EDGE of the river bank or a park, the limit is at most `zoning.edgeCap`. This steps the city down toward open ground and makes the riverfront readable.
-- **Variety:** slow noise replaces today's per-lot random factor, so heights vary in patches, not lot by lot.
+- **District range:** the old `HEIGHTS` table (now in `city/zoning.ts`) is the floor and ceiling of each district. `density` is the district's base density, so busy districts reach further up their range. `scale` is `zoning.peak` over 140 m, so every range follows the center height.
+- **The skyline:** 1 at the plaza, halving every `zoning.falloff` meters along the streets (access, not straight-line distance). Far out, a district builds near its floor.
+- **Variety:** slow noise in patches about 48 m across, `1 − variety · (1 − noise)`. At 0.25 it spans the same 0.75–1 as the old per-lot random factor, but heights now vary in patches, not lot by lot.
+- **Smoothing:** one 3 × 3 pass over the cells with a district, so neighbors step rather than jump.
+- **Avenues:** a lot fronting an avenue may build `zoning.avenueBonus` times higher.
+- **Open edges:** within EDGE (12 m) of the river bank or a park, the limit is at most `zoning.edgeCap`; beyond, the cap doubles every 12 m. This steps the city down toward open ground and makes the riverfront readable.
 
-A building's height is the smaller of the limit at its lot's center and SLENDER × its narrower side.
+A lot's limit is its center cell's. A building's height is the smaller of that limit and SLENDER × its narrower side, and at least 12 m. Each plan records its limit and what held it down (the edge, the slender rule, or nothing).
 
-Defaults are matched in milestone 3, so that the default city keeps today's skyline. The edge cap is the one new rule.
+**Defaults, matched in milestone 3:** peak 140 m, falloff 220 m (the old density fell off linearly to half at the city's reach, about 220 m on every seed tried), avenue bonus 1, variety 0.25, edge cap 30 m. With the edge cap off, mean heights on five seeds stay within 2 m of the old ones. The edge cap is the one new rule: it holds down 20–50% of lots and lowers mean heights by 4–13 m on five seeds, most on `harbor`, whose core sits on the river.
 
 ### 3.2 Use map: district plus height tier
 
@@ -152,11 +150,11 @@ With `zoning.mix` above 0, that share of the lots near a district border may als
 
 The table shows the gaps the library leaves: industrial low-rise and wealthy mid-rise. Lots there fall back to step 2 or 3, and the inspector says so (§5).
 
-### 3.3 Tint: Height limit
+### 3.3 Tint: Height
 
-A new ground tint, **Height limit**, is a heat map from navy (low) to amber (high). Its legend gives the scale in meters and marks the three tiers.
+A ground tint, **Height**, is a heat map of each lot's limit from navy through violet and rose to amber, on a log scale from 12 to 140 m so the mid-rise band gets most of the color. The land between lots shows the cell map, fainter. Its legend marks the three tiers and says how many lots the edge cap holds down.
 
-Districts stays as the tint for use. Tints remain one at a time:
+Districts stays as the tint for use. Tints remain one at a time, and the control is a 3 × 2 grid:
 
 ```ts
 GROUND_TINTS = ["none", "districts", "frontage", "heights", "claims", "suitability"]
@@ -186,10 +184,10 @@ The verge itself is painted by the streets stage (1.5 m), so it is not a lot set
 
 | Key | Label | Range | Default |
 |---|---|---|---|
-| `peak` | Center height (m) | 40–200 | matched to today (≈140) |
-| `falloff` | Falloff (m) | 40–400 | matched to today |
+| `peak` | Center height (m) | 40–200 | 140 |
+| `falloff` | Falloff (m) | 40–400 | 220 |
 | `avenueBonus` | Avenue bonus | 1–1.5 | 1 |
-| `edgeCap` | Waterfront and park cap (m) | 10–80 | set in milestone 3 |
+| `edgeCap` | Waterfront and park cap (m) | 10–80 | 30 |
 | `variety` | Variety | 0–1 | 0.25 |
 | `mix` | Mixed use | 0–0.5 | 0 |
 
@@ -231,7 +229,7 @@ The building card (`ui/Inspector.tsx`, `describe`) gains three lines. They tell 
 
 1. **Frontage data** (built 2026-11-11): `Lot` records its frontage; the Frontage tint. No lot or building changes.
 2. **Lot parameters** (built 2026-11-11): constants → the Lots section; avenue lots cut finer.
-3. **Height map:** `city/zoning.ts`; placement reads it; the Height limit tint. Defaults matched to today's skyline.
+3. **Height map** (built 2026-11-11): `city/zoning.ts`; placement reads it; the Height tint. Defaults matched to the old skyline.
 4. **Type by tier:** `tiers` in the registry, checked in `/buildings`; the new pick; `mix`.
 5. **Zoning parameters:** the Zoning section.
 6. **Inspector:** the frontage, height and type lines.

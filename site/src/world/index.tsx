@@ -7,6 +7,7 @@ import { finishTerrain, generateTerrain, type Terrain } from "./terrain/pipeline
 import { PrintBar } from "./ui/PrintBar";
 import { buildUp } from "./terrain/buildup";
 import { planBuildings } from "./city/placement";
+import { buildZoning } from "./city/zoning";
 import { hashSeed } from "./rng";
 import { Life } from "./life/agents";
 import { Spinner } from "./ui/icons";
@@ -130,7 +131,9 @@ export default function WorldPage() {
   useEffect(() => viewRef.current?.setShowLots(state.showLots), [state.showLots]);
   useEffect(() => viewRef.current?.setShowParks(state.showParks), [state.showParks]);
   useEffect(() => viewRef.current?.setShowBuildings(state.showBuildings), [state.showBuildings]);
-  const plans = useMemo(() => planBuildings(terrain.districts, terrain.streets, hashSeed(terrain.seed)), [terrain.districts, terrain.streets, terrain.seed]);
+  const zoning = useMemo(() => buildZoning(terrain.districts, hashSeed(terrain.seed)), [terrain.districts, terrain.seed]);
+  useEffect(() => viewRef.current?.setZoning(zoning, terrain.districts), [zoning, terrain.districts]);
+  const plans = useMemo(() => planBuildings(terrain.districts, terrain.streets, zoning, hashSeed(terrain.seed)), [terrain.districts, terrain.streets, zoning, terrain.seed]);
   useEffect(() => viewRef.current?.setBuildings(plans, terrain.columns.n), [plans, terrain.columns.n]);
   // The inhabitants, once the parks (and so the finished ground) are there.
   const life = useMemo(
@@ -189,7 +192,7 @@ export default function WorldPage() {
       <div ref={mountRef} className="absolute inset-0" />
       {/* The whole interface is drawn at UI_SCALE (80%), so it takes less of the view. */}
       <div className="pointer-events-none absolute inset-0" style={{ zoom: UI_SCALE }}>
-        <TerrainPanel terrain={terrain} life={life} ctl={ctl} open={panelOpen} onToggle={() => setPanelOpen((v) => !v)} busy={busy} />
+        <TerrainPanel terrain={terrain} zoning={zoning} life={life} ctl={ctl} open={panelOpen} onToggle={() => setPanelOpen((v) => !v)} busy={busy} />
         <CameraBar view={view} available={available} onFly={flyTo} shown={overlays} follow={follow} onHelp={openHelp} />
         {overlays && (
           <Inspector

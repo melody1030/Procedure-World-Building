@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { BLUEPRINT, URBAN_GROUND } from "../palette";
 import { CLAIM_COLORS } from "../terrain/claims";
 import { DISTRICTS, FRONTAGE_KINDS } from "../terrain/districts";
+import { HEIGHT_TINT_BOTTOM, HEIGHT_TINT_COLORS, HEIGHT_TINT_ENCODE, HEIGHT_TINT_TOP } from "../city/zoning";
 
 /**
  * The print animation: the terrain is "printed" layer by layer from the plinth up, as in the
@@ -61,6 +62,12 @@ export interface LookUniforms {
   uShowFrontage: { value: number };
   /** Tint per frontage kind (FRONTAGE_KINDS). */
   uFrontageColors: { value: THREE.Color[] };
+  /** The height limit, one texel per column: 1–127 for 0–HEIGHT_TINT_ENCODE m, plus 128 on a lot; 0 where there is none. */
+  uHeights: { value: THREE.Texture | null };
+  /** 1 tints the ground by height limit (the Height limit tint), 0 off. */
+  uShowHeights: { value: number };
+  /** The tint's four stops, low to high (HEIGHT_TINT_COLORS). */
+  uHeightColors: { value: THREE.Color[] };
   /** The parks, one texel per column: 1 inside a park, 2 on its edge, 0 elsewhere. */
   uParks: { value: THREE.Texture | null };
   /** 1 tints the parks (Show parks), 0 off. */
@@ -81,7 +88,7 @@ export interface LookUniforms {
 
 export function createLookUniforms(): LookUniforms {
   const colors = [0, ...Object.values(CLAIM_COLORS)].map((c) => new THREE.Color(c));
-  return { uLookGrid: { value: 0.35 }, uLookStrata: { value: 7 }, uClaims: { value: null }, uClaimSize: { value: 1 }, uShowClaims: { value: 0 }, uClaimColors: { value: colors }, uSuit: { value: null }, uShowSuit: { value: 0 }, uDistricts: { value: null }, uShowDistricts: { value: 0 }, uDistrictColors: { value: DISTRICTS.map((d) => new THREE.Color(d.color)) }, uLots: { value: null }, uShowLots: { value: 0 }, uFrontage: { value: null }, uShowFrontage: { value: 0 }, uFrontageColors: { value: FRONTAGE_KINDS.map((k) => new THREE.Color(k.color)) }, uParks: { value: null }, uShowParks: { value: 0 }, uParkColor: { value: new THREE.Color(CLAIM_COLORS.park) }, uBuild: { value: null }, uBuildT: { value: 2 }, uUnbuilt: { value: new THREE.Color(URBAN_GROUND.concrete) }, uGrassHigh: { value: new THREE.Color(URBAN_GROUND.concrete) }, uGroundTop: { value: 1 }, uBuildGlow: { value: new THREE.Color(BLUEPRINT.cyan) } };
+  return { uLookGrid: { value: 0.35 }, uLookStrata: { value: 7 }, uClaims: { value: null }, uClaimSize: { value: 1 }, uShowClaims: { value: 0 }, uClaimColors: { value: colors }, uSuit: { value: null }, uShowSuit: { value: 0 }, uDistricts: { value: null }, uShowDistricts: { value: 0 }, uDistrictColors: { value: DISTRICTS.map((d) => new THREE.Color(d.color)) }, uLots: { value: null }, uShowLots: { value: 0 }, uFrontage: { value: null }, uShowFrontage: { value: 0 }, uFrontageColors: { value: FRONTAGE_KINDS.map((k) => new THREE.Color(k.color)) }, uHeights: { value: null }, uShowHeights: { value: 0 }, uHeightColors: { value: HEIGHT_TINT_COLORS.map((c) => new THREE.Color(c)) }, uParks: { value: null }, uShowParks: { value: 0 }, uParkColor: { value: new THREE.Color(CLAIM_COLORS.park) }, uBuild: { value: null }, uBuildT: { value: 2 }, uUnbuilt: { value: new THREE.Color(URBAN_GROUND.concrete) }, uGrassHigh: { value: new THREE.Color(URBAN_GROUND.concrete) }, uGroundTop: { value: 1 }, uBuildGlow: { value: new THREE.Color(BLUEPRINT.cyan) } };
 }
 
 const LOOK_FRAGMENT = /* glsl */ `
@@ -149,6 +156,18 @@ const LOOK_FRAGMENT = /* glsl */ `
         for (int i = 1; i < FRONTAGE_COUNT; i++) if (abs(k - float(i)) < 0.5) tint = uFrontageColors[i];
         float front = step(64.0, v);
         diffuseColor.rgb = mix(diffuseColor.rgb, mix(tint, vec3(1.0), 0.55 * front), mix(0.45, 1.0, front));
+      }
+    }
+    // Height limit: a heat map of how tall each column's lot may build (the land between lots fainter).
+    if (uShowHeights > 0.5) {
+      vec2 column = floor(p.xz - vLookNormal.xz * 0.5 + uClaimSize * 0.5);
+      float v = floor(texture2D(uHeights, (column + 0.5) / uClaimSize).r * 255.0 + 0.5);
+      if (v > 0.5) {
+        float lot = step(128.0, v);
+        float meters = (mod(v, 128.0) - 1.0) / 126.0 * ${HEIGHT_TINT_ENCODE.toFixed(1)};
+        float s = clamp(log(max(meters, 0.001) / ${HEIGHT_TINT_BOTTOM.toFixed(1)}) / ${Math.log(HEIGHT_TINT_TOP / HEIGHT_TINT_BOTTOM).toFixed(5)}, 0.0, 1.0) * 3.0;
+        vec3 heat = s < 1.0 ? mix(uHeightColors[0], uHeightColors[1], s) : s < 2.0 ? mix(uHeightColors[1], uHeightColors[2], s - 1.0) : mix(uHeightColors[2], uHeightColors[3], s - 2.0);
+        diffuseColor.rgb = mix(diffuseColor.rgb, heat, mix(0.35, 0.8, lot));
       }
     }
     // Show claims: tint each column by what owns it. Sides look half a voxel back along their
@@ -266,7 +285,7 @@ export function printMaterial(uniforms: PrintUniforms, options: THREE.MeshStanda
           "#include <project_vertex>\nvLookPos = (modelMatrix * vec4(transformed, 1.0)).xyz;\nvLookNormal = normalize((modelMatrix * vec4(objectNormal, 0.0)).xyz);",
         );
       shader.fragmentShader = shader.fragmentShader
-        .replace("#include <common>", `#include <common>\nuniform float uLookGrid;\nuniform float uLookStrata;\nuniform sampler2D uClaims;\nuniform float uClaimSize;\nuniform float uShowClaims;\nuniform sampler2D uSuit;\nuniform float uShowSuit;\nuniform sampler2D uDistricts;\nuniform float uShowDistricts;\nuniform sampler2D uLots;\nuniform float uShowLots;\nuniform sampler2D uFrontage;\nuniform float uShowFrontage;\nuniform sampler2D uParks;\nuniform float uShowParks;\nuniform vec3 uParkColor;\nuniform sampler2D uBuild;\nuniform float uBuildT;\nuniform vec3 uUnbuilt;\nuniform vec3 uGrassHigh;\nuniform float uGroundTop;\nuniform vec3 uBuildGlow;\n#define DISTRICT_COUNT ${look.uDistrictColors.value.length}\nuniform vec3 uDistrictColors[DISTRICT_COUNT];\n#define FRONTAGE_COUNT ${look.uFrontageColors.value.length}\nuniform vec3 uFrontageColors[FRONTAGE_COUNT];\n#define CLAIM_COUNT ${look.uClaimColors.value.length}\nuniform vec3 uClaimColors[CLAIM_COUNT];\nvarying vec3 vLookPos;\nvarying vec3 vLookNormal;`)
+        .replace("#include <common>", `#include <common>\nuniform float uLookGrid;\nuniform float uLookStrata;\nuniform sampler2D uClaims;\nuniform float uClaimSize;\nuniform float uShowClaims;\nuniform sampler2D uSuit;\nuniform float uShowSuit;\nuniform sampler2D uDistricts;\nuniform float uShowDistricts;\nuniform sampler2D uLots;\nuniform float uShowLots;\nuniform sampler2D uFrontage;\nuniform float uShowFrontage;\nuniform sampler2D uHeights;\nuniform float uShowHeights;\nuniform vec3 uHeightColors[4];\nuniform sampler2D uParks;\nuniform float uShowParks;\nuniform vec3 uParkColor;\nuniform sampler2D uBuild;\nuniform float uBuildT;\nuniform vec3 uUnbuilt;\nuniform vec3 uGrassHigh;\nuniform float uGroundTop;\nuniform vec3 uBuildGlow;\n#define DISTRICT_COUNT ${look.uDistrictColors.value.length}\nuniform vec3 uDistrictColors[DISTRICT_COUNT];\n#define FRONTAGE_COUNT ${look.uFrontageColors.value.length}\nuniform vec3 uFrontageColors[FRONTAGE_COUNT];\n#define CLAIM_COUNT ${look.uClaimColors.value.length}\nuniform vec3 uClaimColors[CLAIM_COUNT];\nvarying vec3 vLookPos;\nvarying vec3 vLookNormal;`)
         .replace("#include <color_fragment>", "#include <color_fragment>\n" + LOOK_FRAGMENT);
     }
     if (extras.plain) return;

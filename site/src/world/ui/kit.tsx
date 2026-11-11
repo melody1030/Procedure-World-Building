@@ -216,10 +216,16 @@ export function Tabs<T extends string>({ tabs, value, onChange, label }: { tabs:
  * A segmented control: a few mutually exclusive options side by side. Built on native radio
  * buttons, so arrow keys move the choice and the group reads as one question.
  */
-export function Segmented<T extends string>({ options, value, onChange, label }: { options: { value: T; label: string }[]; value: T; onChange: (v: T) => void; label: string }) {
+/** One of a few options, side by side; with `columns`, laid out in rows of that many. */
+export function Segmented<T extends string>({ options, value, onChange, label, columns }: { options: { value: T; label: string }[]; value: T; onChange: (v: T) => void; label: string; columns?: number }) {
   const name = useId();
   return (
-    <div role="radiogroup" aria-label={label} className="flex rounded-lg border border-[#7db4e6]/20 bg-[#0e1c30]/70 p-0.5">
+    <div
+      role="radiogroup"
+      aria-label={label}
+      className={(columns ? "grid gap-0.5" : "flex") + " rounded-lg border border-[#7db4e6]/20 bg-[#0e1c30]/70 p-0.5"}
+      style={columns ? { gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` } : undefined}
+    >
       {options.map((o) => (
         <label key={o.value} className="min-w-0 flex-auto cursor-pointer">
           <input type="radio" name={name} value={o.value} checked={o.value === value} onChange={() => onChange(o.value)} className="peer sr-only" />
