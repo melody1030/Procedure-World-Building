@@ -66,7 +66,7 @@ corner: boolean;
 through: boolean;
 ```
 
-The street walk knows each lot's street. A corner-pass lot reads the paving straight out from its front edge: an avenue if that paving lies along a main street or is the plaza. An edge fronts paving when road, verge or plaza lies within 2 m of it along at least a quarter of its length (`frontedEdges`). A corner lot has a side edge that fronts paving; a through lot, its back edge. A merged lot fronts an avenue if either half did.
+The street walk knows each lot's street. A corner-pass lot reads the paving straight out from its front edge: an avenue if that paving lies along a main street or is the plaza. An edge fronts paving when road, verge or plaza lies within 2 m of it (plus the setback) along at least a quarter of its length (`frontedEdges`). A corner lot has a side edge that fronts paving; a through lot, its back edge. A merged lot fronts an avenue if either half did.
 
 ### 2.2 Busy frontage is cut finer
 
@@ -74,7 +74,9 @@ Lots on avenues are narrower than the district's own width; side-street lots kee
 - shops crowd the avenues and the commercial strips;
 - the side streets get wider, calmer plots.
 
-Width in cells: `max(1, round(district width × lots.avenueWidth))` on avenues, and the district width elsewhere. Depth still grows to the district's depth while the block allows it, scaled by `lots.depth`.
+Width in cells: `max(1, round(walk width × lots.avenueWidth))` on avenues, where the walk width is the district's or one more (seeded); the district's elsewhere. An avenue lot cut narrower this way is not merged back, as long as it is at least one cell wide. Depth still grows to the district's depth while the block allows it, scaled by `lots.depth`.
+
+Only the street walk's lots along main streets are narrowed. How much it shows depends on the seed: on `harbor`, at 0.5, two 24 m avenue lots become 16 m; on `blueprint`, the avenue lots are already one cell wide, so nothing changes.
 
 ### 2.3 Tint: Frontage
 
@@ -166,7 +168,9 @@ GROUND_TINTS = ["none", "districts", "frontage", "heights", "claims", "suitabili
 
 Two new Build sections after Surfaces, each with a description in `terrain/params.ts` like the others. Every default equals today's constant, so the default city keeps its form until a slider moves. The only exception is `edgeCap`.
 
-**Lots** (group `lots`): read by the districts stage, so a change re-cuts the lots, regrades them, lays out the parks and redraws the ground.
+**Lots** (group `lots`): read by the districts stage, so a change re-cuts the lots, regrades them, lays out the parks and redraws the ground (2–5 s in development). Sliders apply when released.
+
+The verge itself is painted by the streets stage (1.5 m), so it is not a lot setting. In its place, **Setback** keeps lots that far back from the verge, corner lots included.
 
 | Key | Label | Range | Default | Today |
 |---|---|---|---|---|
@@ -174,7 +178,7 @@ Two new Build sections after Surfaces, each with a description in `terrain/param
 | `avenueWidth` | Avenue lot width | 0.5–1 | 1 | — |
 | `depth` | Lot depth | 0.5–1.5 | 1 | district depths |
 | `alley` | Alley (m) | 0–4 | 1 | ALLEY |
-| `verge` | Verge (m) | 0.5–4 | 1.5 | VERGE |
+| `setback` | Setback (m) | 0–4 | 0 | — |
 | `merge` | Merge lots under (m) | 6–16 | 10 | MERGE_BELOW |
 | `corners` | Corner lots | on/off | on | always |
 
@@ -226,7 +230,7 @@ The building card (`ui/Inspector.tsx`, `describe`) gains three lines. They tell 
 ## 7. Milestones
 
 1. **Frontage data** (built 2026-11-11): `Lot` records its frontage; the Frontage tint. No lot or building changes.
-2. **Lot parameters:** constants → the Lots section; avenue lots cut finer.
+2. **Lot parameters** (built 2026-11-11): constants → the Lots section; avenue lots cut finer.
 3. **Height map:** `city/zoning.ts`; placement reads it; the Height limit tint. Defaults matched to today's skyline.
 4. **Type by tier:** `tiers` in the registry, checked in `/buildings`; the new pick; `mix`.
 5. **Zoning parameters:** the Zoning section.
@@ -239,7 +243,7 @@ The building card (`ui/Inspector.tsx`, `describe`) gains three lines. They tell 
 
 - **Defaults keep the city.** On five seeds (`blueprint` and four others), compare the default city with today's: lot count and each district's share within 5%, and a building height histogram of the same shape. Then turn the edge cap on and compare again.
 - **Sweeps.** Each parameter at its minimum and maximum on two seeds. Check that:
-  - every lot still touches a verge;
+  - every lot still fronts a street (within the setback);
   - no lot overlaps a park or another lot;
   - `findClashes` stays at zero;
   - the console stays clean.

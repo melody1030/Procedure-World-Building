@@ -7,7 +7,7 @@ import { DEFAULT_PARAMS, PARAM_SPECS, RIVER_VISIBLE, type ParamKey, type ParamSp
 import { CLAIM_COLORS } from "../terrain/claims";
 import { DISTRICTS, FRONTAGE_KINDS, frontageKind } from "../terrain/districts";
 import type { Terrain } from "../terrain/pipeline";
-import { NoiseIcon, ResetIcon, RiverIcon, ShapingIcon, Spinner, SurfaceIcon, TerraceIcon } from "./icons";
+import { LotsIcon, NoiseIcon, ResetIcon, RiverIcon, ShapingIcon, Spinner, SurfaceIcon, TerraceIcon } from "./icons";
 import { TitleBlock } from "./TitleCard";
 
 /**
@@ -62,6 +62,19 @@ const SECTIONS: { title: string; icon: ReactNode; keys: ParamKey[] }[] = [
       ["surfaces", "ledgeDrop"],
       ["surfaces", "stairSlope"],
       ["look", "grid"],
+    ],
+  },
+  {
+    title: "Lots",
+    icon: <LotsIcon />,
+    keys: [
+      ["lots", "unit"],
+      ["lots", "avenueWidth"],
+      ["lots", "depth"],
+      ["lots", "alley"],
+      ["lots", "setback"],
+      ["lots", "merge"],
+      ["lots", "corners"],
     ],
   },
 ];

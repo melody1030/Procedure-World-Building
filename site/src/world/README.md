@@ -1048,3 +1048,32 @@ or building changed: the same seeds cut the same lots.
   on `blueprint`, 107 lots are 4% avenue, 40% side street, 37% corner and 19% through. Avenues
   are few (three, about 7% of the street length there), so avenue lots are too; `harbor` has six,
   and 7 of its 22 lots show as avenue.
+
+## 2026-11-11: The lots' settings
+
+Milestone 2 of the city morphology plan (§2.2 and §4). How the land is cut into lots, until now a
+set of constants in terrain/districts.ts, is a new Build section, **Lots** (`params.lots`), read by
+the districts stage: a change re-cuts the lots, regrades them, lays out the parks again and
+redraws the ground, about 2–5 s in development. Every default is the old constant, so the
+default city is the same (107 lots on `blueprint`, as before).
+
+| Setting | Range | Default | What it does |
+|---|---|---|---|
+| Frontage unit | 6–12 m | 8 m | The zone cell lot widths and depths are counted in (ZONE) |
+| Avenue lot width | 0.5–1 | 1 | Avenue lots' width as a share of their district's, in whole cells |
+| Lot depth | 0.5–1.5 | 1 | How deep lots may grow, as a share of their district's depth |
+| Alley | 0–4 m | 1 m | The gap between lots (ALLEY) |
+| Setback | 0–4 m | 0 m | How far lots stand back from the verge |
+| Merge lots under | 6–16 m | 10 m | Narrower lots are merged with a neighbor (MERGE_BELOW) |
+| Corner lots | on/off | on | Pack what the street walk leaves with corner lots |
+
+- **Setback, not verge.** The plan had a verge width here, but the verge is painted by the
+  streets stage, which runs earlier; the lots can only stand back from it. Setback keeps every
+  free column within that distance of paving clear of lots, so corner lots keep it too.
+- **Narrow avenue lots stay narrow.** At first an avenue width under 1 changed nothing: the
+  8 m lots it cut were under the 10 m merge threshold and were merged straight back. An avenue
+  lot cut narrow on purpose, at least one cell wide, is now left alone.
+- **What changes, on `blueprint`.** Frontage unit 6 m: 111 lots; 12 m: 89. Setback 2 m: 100.
+  Alley 3 m: 97. Lot depth 0.5, no alleys, merging under 16 m and no corner lots: 72. Avenue
+  lot width 0.5 changes nothing there (its avenue lots are already one cell wide); on `harbor`
+  it cuts two 24 m avenue lots to 16 m.

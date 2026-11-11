@@ -50,7 +50,7 @@ const STEPS: Step[] = [
     target: '[role="tablist"][aria-label="Panel"] [data-tab="build"]',
     beside: '[role="tablist"][aria-label="Panel"]',
     title: "Build",
-    text: "The terrain's settings, in the order the city is made: noise, shaping, terraces, the river and surfaces. Change one and the city rebuilds.",
+    text: "The settings, in the order the city is made: noise, shaping, terraces, the river, surfaces and lots. Change one and the city rebuilds.",
   },
   {
     target: '[role="tablist"][aria-label="Panel"] [data-tab="layers"]',

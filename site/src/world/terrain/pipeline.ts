@@ -96,8 +96,9 @@ export const STAGES: Stage[] = [
   // mesh is redone from all of it. `columns` stays ungraded, the ground the lots were laid out on.
   {
     id: "districts",
+    params: "lots",
     run: (t, seed) => {
-      t.districts = buildDistricts(seed, t.columns!, t.streets!, t.hubs!, t.streets!.claims);
+      t.districts = buildDistricts(seed, t.columns!, t.streets!, t.hubs!, t.streets!.claims, t.params.lots);
       t.grading = gradeLots(t.columns!, t.districts);
       t.parks = planParks(t.districts, t.grading?.ground ?? t.columns!, t.streets!.plazas[0], seed, t.grading?.dugBy ?? null);
       t.urban = paintCity(t.surfaces!, t.districts, t.grading, t.parks, t.columns!);

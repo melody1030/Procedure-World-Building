@@ -31,6 +31,15 @@ export const SurfaceIcon = () => (
   </svg>
 );
 
+export const LotsIcon = () => (
+  <svg {...props}>
+    <path d="M3 20h18" />
+    <rect x="3" y="5" width="5" height="11" rx="1" />
+    <rect x="10" y="8" width="5" height="8" rx="1" />
+    <rect x="17" y="5" width="4" height="11" rx="1" />
+  </svg>
+);
+
 export const RiverIcon = () => (
   <svg {...props}>
     <path d="M7 3c0 5 6 5 6 9s-6 4-6 9" />
