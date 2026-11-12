@@ -1253,3 +1253,21 @@ Gone with their code:
 
 Without the cap, `blueprint` keeps its 107 lots. The 26 lots it held down build to their
 district's limit again, so the mean height goes from 36 to 39 m and the high-rise lots from 3 to 5.
+
+## 2026-11-12: Clicks pick agents only
+
+A click selects a person, a pigeon, a cat or a vehicle, and no longer a building. Buildings still
+hide what stands behind them: the click stops at the nearest building or ground along the ray.
+The inspector's building card is gone with it. So is the milestone that would have added lines
+about frontage, height and type to that card.
+
+Two bugs came out while looking at it:
+- **Every click showed person 353.** `move` clamps a point off the grid to the edge cell, so a
+  step past the diorama's edge looked like staying put and was allowed. A walker a cell outside
+  then read the ground at a negative index and its height became NaN for good (9 people and a cat
+  after a few minutes). Every test in `pick` compares false against NaN, so the last such walker
+  won every click. Walkers now stay on the grid, the ground lookup clamps, and `pick` skips any
+  agent whose position isn't a number.
+- **Buildings were picked by boxes at the origin.** Each building's bounds were taken before it
+  was moved onto its lot, so only the Landmark, near the origin, could be hit. They are now taken
+  once it is placed. These are the boxes that hide agents.

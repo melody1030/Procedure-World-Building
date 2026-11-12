@@ -17,7 +17,7 @@ import { buildParkModel } from "../city/parkModels";
 import { BUILD_PHASES, PAVING_FROM, PAVING_TO, type BuildUp } from "../terrain/buildup";
 import { createLookUniforms, createPrintUniforms, printDepthMaterial, printMaterial } from "./print";
 import { LifeView } from "./life";
-import { RING_PAD, SelectionMark, locate, pick, sameSelection, type PickableBuilding, type Selection } from "./select";
+import { RING_PAD, SelectionMark, locate, pick, sameSelection, type Selection } from "./select";
 import type { Life } from "../life/agents";
 import type { GroundTint } from "../state";
 import { HEIGHT_TINT_ENCODE, type Zoning } from "../city/zoning";
@@ -74,8 +74,6 @@ const FOLLOW_DISTANCE = voxels(22);
 const FOLLOW_ELEVATION_MIN = THREE.MathUtils.degToRad(20);
 const FOLLOW_ELEVATION_MAX = THREE.MathUtils.degToRad(55);
 /** A building not built yet, for picking (never visible). */
-const EMPTY_GROUP = Object.assign(new THREE.Group(), { visible: false });
-const EMPTY_BOX = new THREE.Box3();
 /**
  * How the Plaza and Park views turn from their clearest side, set by eye: the plaza 45°
  * counterclockwise (seen from above), the park 10° clockwise.
@@ -158,7 +156,8 @@ export class WorldView {
   private readonly city = new THREE.Group();
   private cityItems: { group: THREE.Group; delay: number; print: PrintableBuilding }[] = [];
   /** The buildings by plan (null until built), with their bounds, for picking. */
-  private pickable: (PickableBuilding | null)[] = [];
+  /** Each building's bounds in the scene, once built: they hide the agents behind them from a click. */
+  private buildingBoxes: (THREE.Box3 | null)[] = [];
   /** The buildings' plans, so the Plaza preset can look from the side with the fewest in the way. */
   private plans: BuildingPlan[] = [];
   /** The parks, for the Park preset. */
@@ -261,7 +260,7 @@ export class WorldView {
       this.fly();
       this.controls.update();
       this.fitNear();
-      this.mark.update(this.selection, this.lifeNow(), this.buildingsNow(), WORLD_SIZE / 2, this.clock.elapsedTime);
+      this.mark.update(this.selection, this.lifeNow(), WORLD_SIZE / 2, this.clock.elapsedTime);
       this.renderer.render(this.scene, this.camera);
     };
     loop();
@@ -360,7 +359,7 @@ export class WorldView {
   select(selection: Selection | null) {
     if (sameSelection(selection, this.selection)) return;
     this.selection = selection;
-    if (!selection || selection.kind === "building") this.setFollowing(false);
+    if (!selection) this.setFollowing(false);
     else if (this.following) {
       // Following someone else: fly over to them rather than jump.
       this.following = false;
@@ -377,17 +376,13 @@ export class WorldView {
     return this.life && this.life.group.visible ? this.life.life : null;
   }
 
-  private buildingsNow(): PickableBuilding[] {
-    return this.pickable.map((b) => b ?? { group: EMPTY_GROUP, box: EMPTY_BOX });
-  }
-
   /**
    * Follows the selected agent with the camera (or stops): the camera flies to it, keeping the
    * view's direction, then trails it, still free to orbit and zoom round it (not to pan).
    */
   setFollowing(on: boolean) {
     const sel = this.selection;
-    const can = !!sel && sel.kind !== "building";
+    const can = !!sel;
     on = on && can;
     if (on === this.following) return;
     this.following = on;
@@ -421,7 +416,7 @@ export class WorldView {
   /** The point the camera follows: a little above the selection's feet (null if it can't be seen). */
   private followPoint(): THREE.Vector3 | null {
     if (!this.selection) return null;
-    const at = locate(this.selection, this.lifeNow(), this.buildingsNow(), WORLD_SIZE / 2);
+    const at = locate(this.selection, this.lifeNow(), WORLD_SIZE / 2);
     return at ? new THREE.Vector3(at.x, at.y + Math.min(at.height, voxels(1.5)), at.z) : null;
   }
 
@@ -448,10 +443,10 @@ export class WorldView {
    */
   selectionOnScreen(): { x: number; y: number; reach: number } | null {
     if (!this.selection) return null;
-    const at = locate(this.selection, this.lifeNow(), this.buildingsNow(), WORLD_SIZE / 2);
+    const at = locate(this.selection, this.lifeNow(), WORLD_SIZE / 2);
     if (!at) return null;
-    // Above an agent; halfway up a building, whose top may be far out of view.
-    const top = new THREE.Vector3(at.x, at.y + (this.selection.kind === "building" ? at.height / 2 : at.height), at.z);
+    // Just above the agent.
+    const top = new THREE.Vector3(at.x, at.y + at.height, at.z);
     const v = top.clone().project(this.camera);
     if (v.z > 1) return null;
     const right = new THREE.Vector3().setFromMatrixColumn(this.camera.matrixWorld, 0);
@@ -468,8 +463,13 @@ export class WorldView {
     const ray = this.raycaster.ray;
     // How wide a pixel is per unit of distance, to pad small things by a few pixels.
     const pixel = (2 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2))) / rect.height;
-    const buildings = this.city.visible && this.built ? this.buildingsNow() : null;
-    return pick(ray, this.lifeNow(), buildings, WORLD_SIZE / 2, pixel, this.groundAlong(ray));
+    // The nearest solid thing along the ray: the ground, or a building in front of it.
+    let wall = this.groundAlong(ray);
+    if (this.city.visible && this.built) {
+      const hit = new THREE.Vector3();
+      for (const box of this.buildingBoxes) if (box && ray.intersectBox(box, hit)) wall = Math.min(wall, hit.distanceTo(ray.origin));
+    }
+    return pick(ray, this.lifeNow(), WORLD_SIZE / 2, pixel, wall);
   }
 
   /** How far along the ray it first meets the ground (Infinity if it doesn't), marching a voxel at a time. */
@@ -736,7 +736,7 @@ export class WorldView {
    */
   setBuildings(plans: BuildingPlan[], n: number) {
     this.plans = plans;
-    this.pickable = plans.map(() => null);
+    this.buildingBoxes = plans.map(() => null);
     this.clearSelection();
     cancelAnimationFrame(this.cityFrame);
     for (const { group, print } of this.cityItems) {
@@ -758,10 +758,12 @@ export class WorldView {
         const { plan, index, delay } = this.cityQueue.shift()!;
         // All of it within its lot, less a gap all round.
         const group = buildingObject(fitBuilding(plan));
-        // Its bounds in its own frame (before it is placed), for picking.
-        this.pickable[index] = { group, box: new THREE.Box3().setFromObject(group) };
         group.position.set(plan.x - half, plan.base, plan.z - half);
         group.rotation.y = plan.rotation;
+        // Its bounds in the scene, once placed, so it hides what stands behind it from a click
+        // (the city group stays at the origin).
+        group.updateMatrixWorld(true);
+        this.buildingBoxes[index] = new THREE.Box3().setFromObject(group);
         this.city.add(group);
         this.cityItems.push({ group, delay, print: makePrintable(group) });
       }

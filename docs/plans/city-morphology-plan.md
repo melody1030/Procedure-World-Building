@@ -1,5 +1,7 @@
 # Plan: Blueprint City's morphology, from frontage lots and zoning maps
 
+**Closed 2026-11-12**, with all five milestones built.
+
 ## Context
 
 Class 09 (PWB) described a city's form as the work of a few layers:
@@ -14,11 +16,9 @@ Blueprint City (`/world`) already has most of these layers. Each one is a consta
 - `city/placement.ts` sets a building's height from its district's range times the lot's density. Density comes from distance to the plaza. You can't see that map, and nothing tells you why a building is tall.
 - The building type is a seeded pick among the archetypes that list the district and fit the lot. A 14 m lot in the core can be given a tower made for 140 m.
 
-**Goal:** the city's form reads from two maps that you can see in Layers, tune in Build, and ask about in the inspector:
+**Goal:** the city's form reads from two maps that you can see in Layers and tune in Build:
 - **frontage**: how the land is cut along the streets;
 - **zoning**: how tall each place may build and what kind of building goes there.
-
-Every building can say why it is that tall and that kind.
 
 **Scope:** `/world` only. The streets stay as they are: this plan reads the WFC network and does not change it. The building library gets no new archetypes. Each archetype only learns which height tiers it suits.
 
@@ -38,7 +38,6 @@ Every building can say why it is that tall and that kind.
 What the viewer gets today:
 - the Districts tint;
 - lot outlines;
-- in the inspector, a building's type, district, size and lot.
 
 **What is missing:**
 1. A lot doesn't record its frontage. It doesn't know whether it faces an avenue, a side street or two streets, or whether it is a corner.
@@ -136,7 +135,7 @@ Three changes from the proposal, all from the measurements:
 3. tier ∧ fits, any district; else the slimmest of those within 1.5 m of fitting;
 4. the old slimmest fallback, among the archetypes that can build that low.
 
-Each plan records its tier and how it was picked, for the inspector (§5).
+Each plan records its tier and how it was picked.
 
 ### 3.3 Tint: Height
 
@@ -171,17 +170,7 @@ Center height comes first, because it only re-plans the buildings; lot size come
 
 ---
 
-## 5. The inspector
-
-The building card (`ui/Inspector.tsx`, `describe`) gains three lines. They tell the building's story from the maps:
-
-- **Frontage:** "12 m on an avenue · corner".
-- **Height:** "48 of 62 m allowed". When something capped it, the line says what: "capped: slender lot".
-- **Type:** "mid-rise in Megablocks". When the pick fell back, it says so: "no low-rise industrial type; nearest fit".
-
----
-
-## 6. Files
+## 5. Files
 
 | File | Change |
 |---|---|
@@ -195,24 +184,21 @@ The building card (`ui/Inspector.tsx`, `describe`) gains three lines. They tell 
 | `state.ts` | ground tints `frontage` and `heights` |
 | `ui/TerrainPanel.tsx` | the Zoning section; the two tints and their legends |
 | `render/WorldView.ts`, `render/print.ts` | draw the two tints and the brighter front edges |
-| `ui/Inspector.tsx` | the three lines in §5 |
-| `site/src/world/README.md` | dev log entry with screenshots |
+| `site/src/world/README.md` | dev log entries |
 
 ---
 
-## 7. Milestones
+## 6. Milestones
 
 1. **Frontage data** (built 2026-11-11): `Lot` records its frontage; the Frontage tint. No lot or building changes.
 2. **Lot size** (built 2026-11-11): ZONE becomes a setting.
 3. **Height map** (built 2026-11-11): `city/zoning.ts`; placement reads it; the Height tint. Defaults matched to the old skyline.
 4. **Type by tier** (built 2026-11-11): `tiers` in the registry, checked in `/buildings`; the new pick.
 5. **Zoning settings** (built 2026-11-12): one Zoning section with two settings, center height and lot size.
-6. **Inspector:** the frontage, height and type lines.
-7. **Docs:** the world README dev log, with before/after screenshots and the two tints.
 
 ---
 
-## 8. Verification
+## 7. Verification
 
 - **Defaults keep the city.** On five seeds (`blueprint` and four others), compare the default city with today's: lot count and each district's share within 5%, and a building height histogram of the same shape.
 - **Sweeps.** Each parameter at its minimum and maximum on two seeds. Check that:
@@ -222,5 +208,4 @@ The building card (`ui/Inspector.tsx`, `describe`) gains three lines. They tell 
   - the console stays clean.
 - **Speed.** A Zoning change skips the terrain entirely; time its re-plan and building rebuild. A lot size change costs no more than today's districts stage (`Terrain.timings`).
 - **Tints** read on desktop, with their legends.
-- **The inspector's three lines** are right on a corner lot, an avenue lot, a slender-capped lot and a fallback lot.
 - `npm run build` passes.

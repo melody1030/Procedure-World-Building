@@ -2,9 +2,8 @@ import * as THREE from "three";
 import type { Life } from "../life/agents";
 
 /**
- * What a click can select in the city, and the ring that marks it (Milestone 4 of
- * docs/plans/city-controls-plan.md). Agents are found by index in their Life arrays; a building by
- * its plan's index. Everything here works in scene units (voxels), with the agents' columns moved
+ * What a click can select in the city (its people, pigeons, cats and vehicles, not its buildings),
+ * and the ring that marks it. Agents are found by index in their Life arrays. Everything here works in scene units (voxels), with the agents' columns moved
  * by `half` to the scene's center, as render/life.ts draws them.
  */
 
@@ -12,14 +11,7 @@ export type Selection =
   | { kind: "person"; index: number }
   | { kind: "pigeon"; index: number }
   | { kind: "cat"; index: number }
-  | { kind: "vehicle"; index: number }
-  | { kind: "building"; index: number };
-
-/** A building as it can be picked: its model, and its bounds in the scene. */
-export interface PickableBuilding {
-  group: THREE.Object3D;
-  box: THREE.Box3;
-}
+  | { kind: "vehicle"; index: number };
 
 /** Where a selection stands (scene units): its feet, how tall it is, and how far it reaches round. */
 export interface Located {
@@ -45,15 +37,8 @@ export function sameSelection(a: Selection | null, b: Selection | null): boolean
   return a.kind === b.kind && a.index === b.index;
 }
 
-/** Where the selection is now, or null if it can't be seen (a person riding or away, a vehicle off the island, a building not built). */
-export function locate(sel: Selection, life: Life | null, buildings: PickableBuilding[], half: number): Located | null {
-  if (sel.kind === "building") {
-    const b = buildings[sel.index];
-    if (!b || !b.group.visible || b.box.isEmpty()) return null;
-    const c = b.box.getCenter(new THREE.Vector3());
-    const size = b.box.getSize(new THREE.Vector3());
-    return { x: c.x, y: b.box.min.y, z: c.z, height: size.y, radius: Math.max(size.x, size.z) / 2 };
-  }
+/** Where the selection is now, or null if it can't be seen (a person riding or away, a vehicle off the island). */
+export function locate(sel: Selection, life: Life | null, half: number): Located | null {
   if (!life) return null;
   if (sel.kind === "person") {
     const p = life.people[sel.index];
@@ -74,45 +59,35 @@ export function locate(sel: Selection, life: Life | null, buildings: PickableBui
 }
 
 /**
- * What the ray hits first: an agent (tested as a sphere round its middle, padded to a few pixels
- * so small ones can be clicked) or a building (its bounds), in front of the ground (`ground`: how
- * far along the ray the ground is). `pixel` is how wide a pixel is per unit of distance.
+ * The agent the ray hits first (tested as a sphere round its middle, padded to a few pixels so
+ * small ones can be clicked), in front of anything solid (`wall`: how far along the ray the ground
+ * or a building is). `pixel` is how wide a pixel is per unit of distance. Buildings can't be
+ * selected; they only hide what stands behind them.
  */
-export function pick(ray: THREE.Ray, life: Life | null, buildings: PickableBuilding[] | null, half: number, pixel: number, ground: number): Selection | null {
+export function pick(ray: THREE.Ray, life: Life | null, half: number, pixel: number, wall: number): Selection | null {
+  if (!life) return null;
   let best: Selection | null = null;
   let bestT = Infinity;
   const center = new THREE.Vector3();
   const closest = new THREE.Vector3();
-  const tryAgent = (sel: Selection, at: Located | null) => {
-    if (!at) return;
+  const tryAgent = (sel: Selection) => {
+    const at = locate(sel, life, half);
+    // (A position that isn't a number would pass every test below: NaN compares false.)
+    if (!at || !Number.isFinite(at.x + at.y + at.z)) return;
     center.set(at.x, at.y + at.height / 2, at.z);
     const t = ray.closestPointToPoint(center, closest).distanceTo(ray.origin);
     if (t <= 0 || t >= bestT) return;
     const reach = Math.max(at.radius, at.height / 2, PAD_PIXELS * pixel * t);
     if (closest.distanceTo(center) > reach) return;
-    // Hidden behind a hill: the ground comes first (it may pass a little under the agent's feet).
-    if (t - reach > ground + 1) return;
+    // Hidden behind a hill or a building (the ground may pass a little under the agent's feet).
+    if (t - reach > wall + 1) return;
     best = sel;
     bestT = t;
   };
-  if (life) {
-    life.people.forEach((_, index) => tryAgent({ kind: "person", index }, locate({ kind: "person", index }, life, [], half)));
-    life.pigeons.forEach((_, index) => tryAgent({ kind: "pigeon", index }, locate({ kind: "pigeon", index }, life, [], half)));
-    life.cats.forEach((_, index) => tryAgent({ kind: "cat", index }, locate({ kind: "cat", index }, life, [], half)));
-    life.traffic.vehicles.forEach((_, index) => tryAgent({ kind: "vehicle", index }, locate({ kind: "vehicle", index }, life, [], half)));
-  }
-  if (buildings) {
-    const hit = new THREE.Vector3();
-    buildings.forEach((b, index) => {
-      if (!b.group.visible || b.box.isEmpty() || !ray.intersectBox(b.box, hit)) return;
-      const t = hit.distanceTo(ray.origin);
-      // An agent in front of the building, or just at its face, wins.
-      if (t < bestT - 2 && t < ground + 1) {
-        best = { kind: "building", index };
-        bestT = t;
-      }
-    });
-  }
+  life.people.forEach((_, index) => tryAgent({ kind: "person", index }));
+  life.pigeons.forEach((_, index) => tryAgent({ kind: "pigeon", index }));
+  life.cats.forEach((_, index) => tryAgent({ kind: "cat", index }));
+  life.traffic.vehicles.forEach((_, index) => tryAgent({ kind: "vehicle", index }));
   return best;
 }
 
@@ -131,12 +106,12 @@ export class SelectionMark {
     this.group.visible = false;
   }
 
-  update(sel: Selection | null, life: Life | null, buildings: PickableBuilding[], half: number, time: number) {
-    const at = sel ? locate(sel, life, buildings, half) : null;
+  update(sel: Selection | null, life: Life | null, half: number, time: number) {
+    const at = sel ? locate(sel, life, half) : null;
     this.group.visible = !!at;
     if (!at) return;
     const pulse = 1 + 0.08 * Math.sin(time * 4);
-    const r = (at.radius + (sel!.kind === "building" ? 3 : RING_PAD)) * pulse;
+    const r = (at.radius + RING_PAD) * pulse;
     this.ring.position.set(at.x, at.y + 0.2, at.z);
     this.ring.scale.setScalar(r);
     this.material.opacity = 0.65 + 0.2 * Math.sin(time * 4);

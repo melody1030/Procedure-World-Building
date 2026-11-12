@@ -675,7 +675,7 @@ export class Life {
     const { n } = this.map;
     if (!p.need && p.timer <= 0) this.decide(p, "strolling on", false);
     const field = this.field(p.goal);
-    const k = Math.min(n - 1, p.z | 0) * n + Math.min(n - 1, p.x | 0);
+    const k = Math.min(n - 1, Math.max(0, p.z | 0)) * n + Math.min(n - 1, Math.max(0, p.x | 0));
     if (!field) return;
     if (field[k] <= ARRIVE || field[k] === FAR) {
       this.reach(p, field[k] === FAR);
@@ -811,7 +811,7 @@ export class Life {
   /** After a step: settle on the ground. */
   private walked(p: Person, dt: number, speed: number) {
     const { n, y } = this.map;
-    const k = Math.min(n - 1, p.z | 0) * n + Math.min(n - 1, p.x | 0);
+    const k = Math.min(n - 1, Math.max(0, p.z | 0)) * n + Math.min(n - 1, Math.max(0, p.x | 0));
     p.y += (y[k] - p.y) * Math.min(1, dt * 12);
     p.moving = true;
     p.phase += speed * dt * 1.4;
@@ -870,6 +870,9 @@ export class Life {
     while (r > 0.05 && !body(p.x, p.z, r)) r -= radius / 4;
     r = Math.max(0, r);
     const ok = (x: number, z: number) => {
+      // Never off the grid: `at` clamps to the edge cell, so a step past the edge would look like
+      // staying put.
+      if (x < 0 || z < 0 || x >= n || z >= n) return false;
       const j = at(x, z);
       if (j !== k && !canStep(this.map, k, (j % n) - (k % n), ((j / n) | 0) - ((k / n) | 0), step, open)) return false;
       return !r || body(x, z, r);
@@ -1017,7 +1020,7 @@ export class Life {
   /** A stroll whose field reaches the walker's column (from a random one on), or "wander". */
   private reachableStroll(p: Person): string {
     const { n } = this.map;
-    const k = Math.min(n - 1, p.z | 0) * n + Math.min(n - 1, p.x | 0);
+    const k = Math.min(n - 1, Math.max(0, p.z | 0)) * n + Math.min(n - 1, Math.max(0, p.x | 0));
     const from = this.rng.int(0, STROLLS - 1);
     for (let i = 0; i < STROLLS; i++) {
       const name = `stroll${(from + i) % STROLLS}`;
@@ -1133,7 +1136,7 @@ export class Life {
       if (c.x === bx && c.z === bz) c.heading += this.rng.range(1, 2.5);
       c.phase += c.speed * dt * 2.2;
     }
-    c.y += (y[Math.min(n - 1, c.z | 0) * n + Math.min(n - 1, c.x | 0)] - c.y) * Math.min(1, dt * 14);
+    c.y += (y[Math.min(n - 1, Math.max(0, c.z | 0)) * n + Math.min(n - 1, Math.max(0, c.x | 0))] - c.y) * Math.min(1, dt * 14);
   }
 
   /** The nearest grounded pigeon the cat sees: in its cone, in range, nothing in the way. */

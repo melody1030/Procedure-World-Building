@@ -2,10 +2,6 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 import { isTextEntry } from "../../components/SidePanel";
 import type { Life, Need, Person } from "../life/agents";
 import type { Vehicle } from "../life/traffic";
-import type { BuildingPlan } from "../city/placement";
-import type { Lot } from "../terrain/districts";
-import { DISTRICTS } from "../terrain/districts";
-import { ARCHETYPES } from "../buildings/registry";
 import type { WorldView } from "../render/WorldView";
 import type { Selection } from "../render/select";
 import { GLASS } from "./kit";
@@ -98,20 +94,7 @@ function title(kind: string, n: number) {
 }
 
 /** What the card says about the selection, or null if it is gone. */
-function describe(sel: Selection, life: Life | null, plans: BuildingPlan[], lots: Lot[]): { name: string; badges: string[]; why?: string; since?: number; body?: ReactNode } | null {
-  if (sel.kind === "building") {
-    const plan = plans[sel.index];
-    if (!plan) return null;
-    const type = ARCHETYPES.find((a) => a.id === plan.archetype);
-    const category = type?.category ?? "building";
-    const lot = plan.lot >= 0 ? lots.find((l) => l.id === plan.lot) : undefined;
-    const rows: [string, string][] = [
-      ["District", lot ? (DISTRICTS[lot.district]?.name ?? "—") : "The plaza"],
-      ["Size", `${Math.round(plan.width)} × ${Math.round(plan.depth)} m, ${Math.round(plan.height)} m tall`],
-    ];
-    if (lot) rows.push(["Lot", `${Math.round(lot.area)} m²`]);
-    return { name: type?.name ?? plan.archetype, badges: [category[0].toUpperCase() + category.slice(1)], body: <Facts rows={rows} /> };
-  }
+function describe(sel: Selection, life: Life | null): { name: string; badges: string[]; why?: string; since?: number; body?: ReactNode } | null {
   if (!life) return null;
   if (sel.kind === "person") {
     const p = life.people[sel.index];
@@ -184,8 +167,6 @@ export function Inspector({
   selection,
   following,
   life,
-  plans,
-  lots,
   scale,
   onClose,
   onFollow,
@@ -194,8 +175,6 @@ export function Inspector({
   selection: Selection | null;
   following: boolean;
   life: Life | null;
-  plans: BuildingPlan[];
-  lots: Lot[];
   /** The interface's zoom (UI_SCALE), to place the card in screen pixels. */
   scale: number;
   onClose: () => void;
@@ -262,9 +241,8 @@ export function Inspector({
   }, [selection, phone, view, scale]);
 
   if (!selection) return null;
-  const info = describe(selection, life, plans, lots);
+  const info = describe(selection, life);
   if (!info) return null;
-  const canFollow = selection.kind !== "building";
 
   return (
     <div
@@ -306,21 +284,19 @@ export function Inspector({
         </p>
       )}
       {info.body && <div className="mt-3">{info.body}</div>}
-      {canFollow && (
-        <button
-          type="button"
-          onClick={() => onFollow(!following)}
-          aria-pressed={following}
-          aria-keyshortcuts="6"
-          className={
-            "mt-3.5 flex w-full items-center justify-center gap-2 rounded-lg border py-1.5 text-[12px] transition-colors " +
-            (following ? "border-[#5ad8ff]/50 bg-[#5ad8ff]/20 text-[#5ad8ff]" : "border-[#5ad8ff]/30 text-[#5ad8ff] hover:bg-[#5ad8ff]/10")
-          }
-        >
-          {following ? "Following · stop" : "Follow"}
-          <kbd className="rounded bg-[#ffd27a]/10 px-1 font-mono text-[10px] text-[#ffd27a]">6</kbd>
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={() => onFollow(!following)}
+        aria-pressed={following}
+        aria-keyshortcuts="6"
+        className={
+          "mt-3.5 flex w-full items-center justify-center gap-2 rounded-lg border py-1.5 text-[12px] transition-colors " +
+          (following ? "border-[#5ad8ff]/50 bg-[#5ad8ff]/20 text-[#5ad8ff]" : "border-[#5ad8ff]/30 text-[#5ad8ff] hover:bg-[#5ad8ff]/10")
+        }
+      >
+        {following ? "Following · stop" : "Follow"}
+        <kbd className="rounded bg-[#ffd27a]/10 px-1 font-mono text-[10px] text-[#ffd27a]">6</kbd>
+      </button>
     </div>
   );
 }

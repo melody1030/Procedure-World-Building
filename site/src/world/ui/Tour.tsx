@@ -61,7 +61,7 @@ const STEPS: Step[] = [
   {
     target: null,
     title: "Click anyone in the city",
-    text: "A person, a pigeon, a bus or a building: a card tells you what it is doing and why. Try it now.",
+    text: "A person, a pigeon, a cat or a bus: a card tells you what it is doing and why. Try it now.",
   },
 ];
 

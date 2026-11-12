@@ -52,7 +52,7 @@ in Tailwind like the rest of the kit. The same pieces can be copied into `river-
 | Explanations you can find (3) | **Tooltip** beside the panel | [tooltip](https://component.gallery/components/tooltip/) | Primer Tooltip |
 | Name and jump to the build phases (5) | **Progress indicator** (steps) | [progress-indicator](https://component.gallery/components/progress-indicator/) | Carbon Progress indicator |
 | Playback speed (5) | **Segmented control** | [segmented-control](https://component.gallery/components/segmented-control/) | — |
-| Inspect a person, animal, vehicle or building (6) | **Popover** in a **Card**; **Drawer** on phones | [popover](https://component.gallery/components/popover/), [card](https://component.gallery/components/card/), [drawer](https://component.gallery/components/drawer/) | Radix Popover, Material bottom sheet |
+| Inspect a person, animal or vehicle (6) | **Popover** in a **Card**; **Drawer** on phones | [popover](https://component.gallery/components/popover/), [card](https://component.gallery/components/card/), [drawer](https://component.gallery/components/drawer/) | Radix Popover, Material bottom sheet |
 | An agent's needs (6) | **Progress bar** (meter) | [progress-bar](https://component.gallery/components/progress-bar/) | — |
 | The agent's state (6) | **Badge** | [badge](https://component.gallery/components/badge/) | — |
 | Camera presets, help, hide UI (7) | **Button group** (toolbar) with **Tooltip**s | [button-group](https://component.gallery/components/button-group/) | Figma-style vertical toolbar |
@@ -257,7 +257,7 @@ in Tailwind like the rest of the kit. The same pieces can be copied into `river-
 | `world/ui/kit.tsx` | Add `Tabs`, `Segmented`, `useHoverTip`, `Tooltip`, `Badge`, `Meter`, `Popover` (positioning only), `Modal`. `Row` uses `useHoverTip`. |
 | `world/ui/TerrainPanel.tsx` | Split into `BuildTab` and `LayersTab`; section badges and resets. |
 | `world/ui/PrintBar.tsx` | Phase names, click to jump, `Segmented` speed control. |
-| `world/ui/Inspector.tsx` *(new)* | The card or drawer for agents and buildings. |
+| `world/ui/Inspector.tsx` *(new)* | The card or drawer for agents. |
 | `world/ui/CameraBar.tsx` *(new)* | Toolbar, presets, keys. |
 | `world/ui/Help.tsx` *(new)* | Shortcut modal and tour. |
 | `world/state.ts` | `groundTint` replaces `showDistricts`, `showClaims` and the tint part of `showNetwork`; `selected`. |

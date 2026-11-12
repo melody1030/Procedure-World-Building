@@ -37,7 +37,7 @@ const KEYS: [ReactNode, string][] = [
 ];
 
 const POINTER: [ReactNode, string][] = [
-  ["Click", "Inspect anyone, or any building"],
+  ["Click", "Inspect a person, pigeon, cat or vehicle"],
   ["Drag", "Orbit round the city"],
   ["Right-drag", "Pan"],
   ["Scroll", "Zoom"],

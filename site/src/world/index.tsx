@@ -185,7 +185,7 @@ export default function WorldPage() {
     return () => clearTimeout(timer);
   }, [built, busy]);
 
-  const canFollow = !!selection && selection.kind !== "building";
+  const canFollow = !!selection;
   const follow = useMemo(() => ({ can: canFollow, on: following, onToggle: () => setFollow(!following) }), [canFollow, following, setFollow]);
 
   return (
@@ -201,8 +201,6 @@ export default function WorldPage() {
             selection={selection}
             following={following}
             life={life}
-            plans={plans}
-            lots={terrain.districts.lots}
             scale={UI_SCALE}
             onClose={closeInspector}
             onFollow={setFollow}
