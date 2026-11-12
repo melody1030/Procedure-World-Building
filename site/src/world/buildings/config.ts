@@ -34,6 +34,13 @@ export interface BuildingConfig {
 
 export type Category = "skyscraper" | "residential";
 
+/** Height tiers: low-rise under 20 m, mid-rise 20–60 m, high-rise above. */
+export type Tier = "low" | "mid" | "high";
+export const TIERS: Tier[] = ["low", "mid", "high"];
+/** Where low-rise ends and mid-rise ends, in meters. */
+export const TIER_TOPS = [20, 60] as const;
+export const tierOf = (height: number): Tier => (height < TIER_TOPS[0] ? "low" : height <= TIER_TOPS[1] ? "mid" : "high");
+
 export interface Archetype {
   id: string;
   name: string;
@@ -42,6 +49,12 @@ export interface Archetype {
   summary: string;
   /** The city districts it belongs in, for placing it on lots. */
   districts: (keyof typeof DISTRICT)[];
+  /** The height tiers it reads well at (checked in /buildings at 16, 40 and 90 m on a 15 × 22 m footprint). */
+  tiers: Tier[];
+  /** The smallest footprint side (meters) it still reads well at. */
+  minSide: number;
+  /** The lowest it builds, whatever height is asked (meters), where that is well above its tiers' floor. */
+  minHeight?: number;
   defaults: BuildingConfig;
   /** Places the building's boxes into the kit, footprint from (0, 0) to (width, depth) in voxels. */
   build: (k: Kit, c: BuildingConfig) => void;

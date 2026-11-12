@@ -31,12 +31,12 @@ export const SurfaceIcon = () => (
   </svg>
 );
 
-export const LotsIcon = () => (
+/** Zoning: a skyline rising to the center under its height limit (dashed). */
+export const ZoningIcon = () => (
   <svg {...props}>
     <path d="M3 20h18" />
-    <rect x="3" y="5" width="5" height="11" rx="1" />
-    <rect x="10" y="8" width="5" height="8" rx="1" />
-    <rect x="17" y="5" width="4" height="11" rx="1" />
+    <path d="M3 9c3-5 15-5 18 0" strokeDasharray="2 2" />
+    <path d="M5 20v-5h3v5M10.5 20V9h3v11M16 20v-7h3v7" />
   </svg>
 );
 

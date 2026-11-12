@@ -1,5 +1,5 @@
 import { ARCHETYPES, buildBuilding } from "../buildings/registry";
-import type { BuildingModel } from "../buildings/config";
+import { TIER_TOPS, TIERS, tierOf, type Archetype, type BuildingModel, type Tier } from "../buildings/config";
 import { findClashes, findOverlaps } from "../buildings/overlaps";
 import { hash2 } from "../rng";
 import { VOXEL_M } from "../scale";
@@ -11,15 +11,20 @@ import type { Zoning } from "./zoning";
  * Which building stands on which lot, and how big (pure: no three.js). Each lot gets one building
  * from the library, picked by its district and sized to it:
  *
- * - the archetype: seeded among those that suit the lot's district and fit its footprint (each
- *   archetype has a smallest side it still reads well at); the Landmark is never picked here;
+ * - the archetype: seeded among those that suit the lot's district and its height tier (low-rise
+ *   under 20 m, mid-rise to 60 m, high-rise above) and fit its footprint (each archetype has the
+ *   tiers and the smallest side it still reads well at, and some a height they never build under);
+ *   in order: its district's for its tier; its district's for a lower tier, the height brought down
+ *   to it; any district's for its tier; the slimmest fallback (of those that can build that low).
+ *   Where none fits, the slimmest within SQUEEZE of fitting is taken at each step.
+ *   The Landmark is never picked here;
  * - the footprint: the room is the lot less GAP all round (lots already keep an alley between
  *   them), and the whole building, with everything that sticks out of its walls (awnings, porches,
  *   balconies, signs), is kept within it (see `fitBuilding`): so every building stands back from
  *   the sidewalk and its neighbors on a strip of its lot's concrete; width runs along the street,
  *   depth away from it;
  * - the height: the zoning map's limit for the lot (see zoning.ts: the district's range, the
- *   skyline falling off from the plaza, slow variety, the avenue bonus and the open-edge cap), but
+ *   skyline falling off from the plaza and slow variety), but
  *   at most SLENDER times the footprint's narrower side, so small lots get no needles;
  * - the facing: the entrance side (the model's +z) turned toward the street;
  * - the base: the lot's floor, the level its site is graded to (see gradeLots).
@@ -38,9 +43,12 @@ export interface BuildingPlan {
   width: number;
   depth: number;
   height: number;
-  /** The zoning map's limit for its lot (meters), and what held the height below the district's own: the open edge, the slender rule, or nothing. */
+  /** The zoning map's limit for its lot (meters), and what held the height below it: the slender rule, a lower tier (no building of its district for its own), or nothing. */
   limit: number;
-  cap: "none" | "edge" | "slender";
+  cap: "none" | "slender" | "tier";
+  /** Its height tier, and how its archetype was picked (see planBuildings): its district's for its tier; its district's for a lower tier; any district's for its tier; or the slimmest fallback. */
+  tier: Tier;
+  pick: "district" | "lower" | "tier" | "fallback";
   /** Center of the footprint, in columns. */
   x: number;
   z: number;
@@ -64,24 +72,15 @@ const LANDMARK_SIZE = 18;
 const LANDMARK_RING = 3;
 /** No building is lower than this (meters). */
 const MIN_HEIGHT = 12;
-/** The smallest footprint side (meters) each archetype still reads well at. */
-const MIN_SIDE: Record<string, number> = {
-  "corporate-megatower": 12,
-  "neon-commercial-tower": 6,
-  "residential-skyscraper": 6,
-  "research-lab-tower": 12,
-  // (Narrower, a tall one's stacked modules run into each other.)
-  "modular-apartment-block": 8,
-  "twin-tower-complex": 14,
-  "stacked-megablock": 8,
-  "vertical-neighborhood": 14,
-  "terraced-residential": 10,
-  "tower-and-annex": 12,
-};
+/** An archetype with a floor (`minHeight`) may still take a lot this much (meters) lower than it. */
+const HEIGHT_SLACK = 3;
 /** The Landmark stands this much taller than the tallest other building. */
 const LANDMARK_LEAD = 25;
 
 const DISTRICT_KEYS = ["core", "commercial", "megablock", "industrial", "wealthy"] as const;
+/** Every archetype a lot can take (the Landmark only stands on the plaza). */
+const PLACEABLE = ARCHETYPES.filter((a) => a.id !== "landmark-tower");
+const slimmest = (list: Archetype[]) => list.reduce((p, q) => (q.minSide < p.minSide ? q : p));
 
 function lotFrame(lot: Lot) {
   const [a, b, , d] = lot.corners;
@@ -95,7 +94,6 @@ function lotFrame(lot: Lot) {
 export function planBuildings(districts: Districts, streets: Streets, zoning: Zoning, seed: number): BuildingPlan[] {
   const plans: BuildingPlan[] = [];
   const plaza = streets.plazas[0];
-  const fits = (id: string, w: number, d: number) => Math.min(w, d) >= (MIN_SIDE[id] ?? 10);
 
   let tallest = 0;
   for (const lot of districts.lots) {
@@ -106,30 +104,58 @@ export function planBuildings(districts: Districts, streets: Streets, zoning: Zo
     const width = lotSize.width - 2 * GAP;
     const depth = lotSize.depth - 2 * GAP;
     const r = (salt: number) => hash2(seed ^ 0x51ed, lot.id, salt);
-    const key = DISTRICT_KEYS[lot.district];
-    const suits = ARCHETYPES.filter((a) => a.id !== "landmark-tower" && a.districts.includes(key));
-    const fitting = suits.filter((a) => fits(a.id, width, depth));
-    // Nothing of the district's fits: its own slimmest if that is within SQUEEZE of fitting (so a
-    // small megablock lot still gets a residential tower, not a shop tower); else the slimmest
-    // building that does fit, of any district (those built much narrower than they read well at run
-    // their parts into each other); failing that, the slimmest of all.
-    const slimmest = (list: typeof ARCHETYPES) => [list.reduce((p, q) => ((MIN_SIDE[q.id] ?? 10) < (MIN_SIDE[p.id] ?? 10) ? q : p))];
-    const own = suits.length ? slimmest(suits) : [];
-    const anyFitting = ARCHETYPES.filter((a) => a.id !== "landmark-tower" && fits(a.id, width, depth));
-    const all = ARCHETYPES.filter((a) => a.id !== "landmark-tower");
-    const pool = fitting.length
-      ? fitting
-      : own.length && fits(own[0].id, width + SQUEEZE, depth + SQUEEZE)
-        ? own
-        : anyFitting.length
-          ? slimmest(anyFitting)
-          : slimmest(all);
-    if (!pool.length) continue;
-    const archetype = pool[Math.floor(r(1) * pool.length)].id;
     const zone = zoning.lots[lot.id];
     const slender = SLENDER * Math.min(width, depth);
-    const height = Math.round(Math.max(MIN_HEIGHT, Math.min(zone.limit, slender)));
-    const cap = slender < zone.limit ? "slender" : zone.cap;
+    let height = Math.round(Math.max(MIN_HEIGHT, Math.min(zone.limit, slender)));
+    let cap: BuildingPlan["cap"] = slender < zone.limit ? "slender" : "none";
+    const tier = tierOf(height);
+    const fits = (a: Archetype) => Math.min(width, depth) >= a.minSide;
+    const reaches = (a: Archetype, h: number) => h >= (a.minHeight ?? 0) - HEIGHT_SLACK;
+    const suits = (a: Archetype, t: Tier, h: number) => fits(a) && a.tiers.includes(t) && reaches(a, h);
+    const own = PLACEABLE.filter((a) => a.districts.includes(DISTRICT_KEYS[lot.district]));
+    let pick: BuildingPlan["pick"] = "district";
+    // 1. Its district's buildings for its tier that fit; else the slimmest of them, if that is
+    //    within SQUEEZE of fitting (so a small megablock lot still gets a residential tower, not
+    //    a shop tower).
+    let pool = own.filter((a) => suits(a, tier, height));
+    const squeezed = (list: Archetype[]) => {
+      const near = list.filter((a) => a.tiers.includes(tier) && reaches(a, height) && Math.min(width, depth) + SQUEEZE >= a.minSide);
+      return near.length ? [slimmest(near)] : [];
+    };
+    if (!pool.length) pool = squeezed(own);
+    // 2. Its district's buildings that fit a lower tier: the height comes down to that tier's top.
+    //    (Never up: that would break the limit.)
+    if (!pool.length) {
+      for (const lower of TIERS.slice(0, TIERS.indexOf(tier)).reverse()) {
+        const top = lower === "low" ? TIER_TOPS[0] - 1 : TIER_TOPS[1];
+        pool = own.filter((a) => suits(a, lower, top));
+        if (pool.length) {
+          height = top;
+          cap = "tier";
+          pick = "lower";
+          break;
+        }
+      }
+    }
+    // 3. Any district's buildings for its tier that fit; else the slimmest of them within SQUEEZE.
+    if (!pool.length) {
+      pool = PLACEABLE.filter((a) => suits(a, tier, height));
+      if (!pool.length) pool = squeezed(PLACEABLE);
+      pick = "tier";
+    }
+    // 4. Nothing for its tier: among those that can build this low (no floor far above it), its
+    //    own district's slimmest if that is within SQUEEZE of fitting; else the slimmest that does
+    //    fit, of any district (those built much narrower than they read well at run their parts into
+    //    each other); failing that, the slimmest of all.
+    if (!pool.length) {
+      pick = "fallback";
+      const low = PLACEABLE.filter((a) => reaches(a, height));
+      const ownLow = own.filter((a) => reaches(a, height));
+      const ownSlim = ownLow.length ? slimmest(ownLow) : null;
+      const anyFitting = low.filter(fits);
+      pool = ownSlim && Math.min(width, depth) + SQUEEZE >= ownSlim.minSide ? [ownSlim] : [slimmest(anyFitting.length ? anyFitting : low.length ? low : PLACEABLE)];
+    }
+    const archetype = pool[Math.floor(r(1) * pool.length)].id;
     tallest = Math.max(tallest, height);
     plans.push({
       lot: lot.id,
@@ -141,6 +167,8 @@ export function planBuildings(districts: Districts, streets: Streets, zoning: Zo
       height,
       limit: zone.limit,
       cap,
+      tier: tierOf(height),
+      pick,
       x,
       z,
       rotation: Math.PI / 2 - lot.facing,
@@ -161,6 +189,8 @@ export function planBuildings(districts: Districts, streets: Streets, zoning: Zo
         height: Math.min(200, Math.max(170, tallest + LANDMARK_LEAD)),
         limit: 200,
         cap: "none",
+        tier: "high",
+        pick: "district",
         x: plaza.x,
         z: plaza.z,
         rotation: 0,

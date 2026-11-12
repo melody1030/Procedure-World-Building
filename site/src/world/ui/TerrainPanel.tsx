@@ -1,15 +1,15 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { SidePanel } from "../../components/SidePanel";
 import type { Life } from "../life/agents";
-import { Button, GLASS, Legend, Note, Row, RULE, Section, Segmented, Select, Slider, Subheading, Switch, Tabs } from "./kit";
+import { Button, GLASS, Legend, NOTE, Note, Row, RULE, Section, Segmented, Select, Slider, Subheading, Switch, Tabs } from "./kit";
 import type { GroundTint, WorldController } from "../state";
 import { DEFAULT_PARAMS, PARAM_SPECS, RIVER_VISIBLE, type ParamKey, type ParamSpec, type RangeSpec, type TerrainParams } from "../terrain/params";
 import { CLAIM_COLORS } from "../terrain/claims";
 import { DISTRICTS, FRONTAGE_KINDS, frontageKind } from "../terrain/districts";
 import type { Terrain } from "../terrain/pipeline";
-import { LotsIcon, NoiseIcon, ResetIcon, RiverIcon, ShapingIcon, Spinner, SurfaceIcon, TerraceIcon } from "./icons";
+import { ZoningIcon, NoiseIcon, ResetIcon, RiverIcon, ShapingIcon, Spinner, SurfaceIcon, TerraceIcon } from "./icons";
 import { TitleBlock } from "./TitleCard";
-import { EDGE, HEIGHT_TIERS, HEIGHT_TINT_BOTTOM, HEIGHT_TINT_COLORS, heightTintShare, type Zoning } from "../city/zoning";
+import { HEIGHT_TIERS, HEIGHT_TINT_BOTTOM, HEIGHT_TINT_COLORS, heightTintShare } from "../city/zoning";
 
 /**
  * The world's one panel, on the left: the title and seed at the top, then two tabs. **Build** holds
@@ -66,16 +66,13 @@ const SECTIONS: { title: string; icon: ReactNode; keys: ParamKey[] }[] = [
     ],
   },
   {
-    title: "Lots",
-    icon: <LotsIcon />,
+    // Center height only re-plans the buildings (well under a second); lot size re-cuts the lots
+    // (a few seconds), so it comes last.
+    title: "Zoning",
+    icon: <ZoningIcon />,
     keys: [
+      ["zoning", "peak"],
       ["lots", "unit"],
-      ["lots", "avenueWidth"],
-      ["lots", "depth"],
-      ["lots", "alley"],
-      ["lots", "setback"],
-      ["lots", "merge"],
-      ["lots", "corners"],
     ],
   },
 ];
@@ -177,7 +174,7 @@ function ParamControl({ spec, value, fallback, onChange, pending }: { spec: Para
 const read = (params: TerrainParams, [g, key]: ParamKey) => (params[g] as unknown as Record<string, Value>)[key];
 const specOf = ([g, key]: ParamKey) => (PARAM_SPECS[g] as Record<string, ParamSpec>)[key];
 
-export function TerrainPanel({ terrain, zoning, life, ctl, open, onToggle, busy }: { terrain: Terrain; zoning: Zoning; life: Life | null; ctl: WorldController; open: boolean; onToggle: () => void; busy: boolean }) {
+export function TerrainPanel({ terrain, life, ctl, open, onToggle, busy }: { terrain: Terrain; life: Life | null; ctl: WorldController; open: boolean; onToggle: () => void; busy: boolean }) {
   const [tab, setTab] = useState<Tab>(savedTab);
   const pickTab = (next: Tab) => {
     setTab(next);
@@ -197,7 +194,7 @@ export function TerrainPanel({ terrain, zoning, life, ctl, open, onToggle, busy 
         onChange={pickTab}
         tabs={[
           { id: "build", label: "Build", panel: <BuildTab ctl={ctl} busy={busy} /> },
-          { id: "layers", label: "Layers", panel: <LayersTab terrain={terrain} zoning={zoning} life={life} ctl={ctl} /> },
+          { id: "layers", label: "Layers", panel: <LayersTab terrain={terrain} life={life} ctl={ctl} /> },
         ]}
       />
     </SidePanel>
@@ -269,10 +266,9 @@ function frontageLegend(terrain: Terrain): [string, number][] {
   return FRONTAGE_KINDS.map((k, i) => [`${k.name} ${lots.length ? Math.round((counts[i] / lots.length) * 100) : 0}%`, k.color]);
 }
 
-/** The Height limit tint's legend: the heat bar with the tiers marked, and how many lots the open-edge cap holds down. */
-function HeightLegend({ zoning }: { zoning: Zoning }) {
+/** The Height limit tint's legend: the heat bar with the tiers marked, and the tiers listed. */
+function HeightLegend() {
   const hex = (c: number) => `#${c.toString(16).padStart(6, "0")}`;
-  const capped = zoning.lots.filter((z) => z.cap === "edge").length;
   const ticks: [number, string][] = [
     [HEIGHT_TINT_BOTTOM, `${HEIGHT_TINT_BOTTOM}`],
     [HEIGHT_TIERS[0], `${HEIGHT_TIERS[0]}`],
@@ -289,33 +285,36 @@ function HeightLegend({ zoning }: { zoning: Zoning }) {
       </div>
       <div className="relative h-3.5">
         {ticks.map(([m, label]) => (
-          <span key={m} className="absolute -translate-x-1/2 first:translate-x-0 last:-translate-x-full" style={{ left: `${heightTintShare(m) * 100}%` }}>
+          <span key={m} className="absolute whitespace-nowrap -translate-x-1/2 first:translate-x-0 last:-translate-x-full" style={{ left: `${heightTintShare(m) * 100}%` }}>
             <Note>{label}</Note>
           </span>
         ))}
       </div>
-      <Note>
-        Low-rise under {HEIGHT_TIERS[0]} m, mid-rise to {HEIGHT_TIERS[1]} m, high-rise above. Within {EDGE} m of the river or a park the limit is {zoning.params.edgeCap} m
-        {capped ? `: ${capped} of ${zoning.lots.length} lots held down.` : "."}
-      </Note>
+      <ul className={"m-0 list-disc pl-4 " + NOTE}>
+        <li>Low-rise: under {HEIGHT_TIERS[0]} m</li>
+        <li>
+          Mid-rise: {HEIGHT_TIERS[0]}–{HEIGHT_TIERS[1]} m
+        </li>
+        <li>High-rise: over {HEIGHT_TIERS[1]} m</li>
+      </ul>
     </div>
   );
 }
 
 /** Everything that only changes what is drawn: one ground tint, then the layers on top. */
-function LayersTab({ terrain, zoning, life, ctl }: { terrain: Terrain; zoning: Zoning; life: Life | null; ctl: WorldController }) {
+function LayersTab({ terrain, life, ctl }: { terrain: Terrain; life: Life | null; ctl: WorldController }) {
   const { state } = ctl;
   const tint = state.groundTint;
   return (
     <>
       <div className="flex flex-col gap-2.5">
-        <Subheading info="Color the ground by one thing at a time. Districts: which kind of neighborhood each column belongs to. Frontage: what each lot faces (an avenue or a side street, or two streets at a corner or through a thin block), its front edge bright. Height: how tall each lot may build, from the zoning map: highest at the plaza, lower out along the streets and stepping down toward the river and the parks. Claims: what owns each column (river, bank, road…); later stages only build on free ground. Suitability: how well each column suits the city center.">
+        <Subheading>
           Ground color
         </Subheading>
         <Segmented label="Ground color" options={TINT_OPTIONS} value={tint} onChange={ctl.setGroundTint} columns={3} />
         {tint === "districts" && <Legend items={DISTRICTS.map((d, i) => [`${d.name} ${Math.round(terrain.districts.shares[i] * 100)}%`, d.color])} />}
         {tint === "frontage" && <Legend items={frontageLegend(terrain)} />}
-        {tint === "heights" && <HeightLegend zoning={zoning} />}
+        {tint === "heights" && <HeightLegend />}
         {tint === "claims" && <Legend items={CLAIM_LEGEND} />}
         {tint === "suitability" && (
           <div className="flex flex-col gap-1">

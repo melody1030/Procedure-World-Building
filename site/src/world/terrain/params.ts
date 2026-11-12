@@ -64,18 +64,14 @@ export interface TerrainParams {
   lots: {
     /** The zone cell lot widths and depths are counted in, in meters. */
     unit: number;
-    /** Avenue lots' width as a share of their district's (in whole cells, at least one). */
-    avenueWidth: number;
-    /** How deep lots may grow, as a share of their district's depth. */
-    depth: number;
-    /** The gap kept between lots, in meters. */
-    alley: number;
-    /** How far lots stand back from the verge, in meters. */
-    setback: number;
-    /** Lots narrower than this (meters) are merged with a neighbor. */
-    merge: number;
-    /** Pack the frontage the street walk leaves (corners, short runs) with lots too. */
-    corners: boolean;
+  };
+  /**
+   * How tall the city may build (read by the zoning map and planBuildings, not the terrain: a
+   * change re-plans the buildings and leaves the ground alone). See city/zoning.ts.
+   */
+  zoning: {
+    /** The height limit at the plaza, in meters; every district's height range scales with it. */
+    peak: number;
   };
   /** How the ground is drawn. Read by the renderer only: changing these never regenerates anything. */
   look: {
@@ -101,7 +97,8 @@ export const DEFAULT_PARAMS: TerrainParams = {
   terraces: { strength: 0.3, height: 3, wander: 0.25, slope: 10 },
   river: { enabled: true, points: 8, width: 4, depth: 1, valleyWidth: 7, valleyShape: 0.4, water: true, control: null },
   surfaces: { tones: 0.12, ledgeDrop: 0.75, stairSlope: 30 },
-  lots: { unit: 8, avenueWidth: 1, depth: 1, alley: 1, setback: 0, merge: 10, corners: true },
+  lots: { unit: 8 },
+  zoning: { peak: 140 },
   look: { grid: 0.35 },
 };
 
@@ -311,59 +308,24 @@ export const PARAM_SPECS: { [G in ParamGroup]: { [K in Exclude<keyof TerrainPara
   lots: {
     unit: {
       kind: "range",
-      label: "Frontage unit",
-      description: "The zone cell lots are measured in, as in Cities: Skylines. Each district's lots are a set number of cells wide and deep, so a smaller unit cuts smaller, more numerous lots.",
+      label: "Lot size",
+      description: "The cell lots are measured in: each district's lots are a set number of cells wide and deep. Smaller cells cut more, smaller lots. Re-cuts the lots, so it takes a few seconds.",
       min: 6,
       max: 12,
       step: 1,
       format: meters,
     },
-    avenueWidth: {
+  },
+  zoning: {
+    peak: {
       kind: "range",
-      label: "Avenue lot width",
-      description: "Avenue lots' width as a share of their district's, in whole cells. Below 1, the busiest frontage is cut into narrower lots: more shopfronts along the avenues.",
-      min: 0.5,
-      max: 1,
-      step: 0.05,
-      format: fixed(2),
-    },
-    depth: {
-      kind: "range",
-      label: "Lot depth",
-      description: "How deep lots may grow toward the back of their block, as a share of their district's depth. Lots stop halfway to the street behind either way.",
-      min: 0.5,
-      max: 1.5,
-      step: 0.05,
-      format: fixed(2),
-    },
-    alley: {
-      kind: "range",
-      label: "Alley",
-      description: "The gap kept between neighboring lots, and between lots meeting back to back.",
-      min: 0,
-      max: 4,
-      step: 0.5,
+      label: "Center height",
+      description: "The height limit at the plaza. Every district's limit scales with it; below about 60 m, low-rise types take over.",
+      min: 40,
+      max: 200,
+      step: 5,
       format: meters,
     },
-    setback: {
-      kind: "range",
-      label: "Setback",
-      description: "How far lots stand back from the verge. 0: they meet it.",
-      min: 0,
-      max: 4,
-      step: 0.5,
-      format: meters,
-    },
-    merge: {
-      kind: "range",
-      label: "Merge lots under",
-      description: "A lot narrower than this is merged with a neighbor on the same frontage; one that still can't be made 8 m wide is given up.",
-      min: 6,
-      max: 16,
-      step: 1,
-      format: meters,
-    },
-    corners: { kind: "switch", label: "Corner lots", description: "Pack the frontage the street walk leaves (rounded corners, short runs, odd pockets) with lots too." },
   },
   look: {
     grid: {

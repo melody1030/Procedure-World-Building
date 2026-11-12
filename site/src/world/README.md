@@ -1127,3 +1127,129 @@ navy through violet and rose to amber, on a log scale from 12 to 140 m so the mi
 lots sit in gets most of the color. The land between lots shows the cell map, fainter. The legend
 marks the tiers (low under 20 m, mid to 60 m, high above) and says how many lots the edge cap
 holds down. With six tints the segmented control no longer fit in one row; it is now a 3 × 2 grid.
+
+## 2026-11-11: Building types by height
+
+Milestone 4 of the city morphology plan (§3.2). A lot's building used to be picked by its
+district and footprint alone, and its height set afterward, so a building could be asked for a
+height it never builds at. Now the height comes first (the zoning map's limit, under the slender
+rule), is sorted into a tier (low-rise under 20 m, mid-rise to 60 m, high-rise above), and the
+building is picked to suit both.
+
+**Checking the library at each tier.** The `/buildings` preview takes `?h=`, `?w=` and `?d=`
+(meters) and builds the whole library at that size, so it can be looked at one tier at a time
+(16, 40 and 90 m on a 15 × 22 m footprint). A script also built every archetype at heights from
+12 to 120 m and measured what it actually reaches:
+
+- Three have a floor they never go under: the Corporate Megatower about 36 m, the Stacked
+  Megablock 32 m, the Residential Skyscraper 46 m. They record it as `minHeight`, and a lot more
+  than 3 m under it doesn't take them.
+- The Research Lab Tower follows the height down to 11 m and reads as a low lab block at 16 m, so
+  it takes low-rise too: industrial no longer has a low-rise gap. Terraced Residential steps back
+  to about 33 m and reads well at 28 m, so it takes mid-rise too: nor does wealthy.
+- At 90 m the four residential blocks read as plain slabs; Tower and Annex still reads as a tower.
+
+Each archetype's `tiers`, `minSide` (the old `MIN_SIDE`) and `minHeight` now sit in the registry.
+
+**The pick**, in order: its district's buildings for its tier that fit (else its district's
+slimmest for its tier, squeezed by up to 1.5 m); its district's for a lower tier, the height
+brought down to that tier's top (never up, which would break the limit); any district's for its
+tier; the old slimmest fallback. With `mix` above 0, that share of the lots with another district
+within 16 m try that district's buildings first. `mix` is 0 by default; at 0.5 on `blueprint`,
+20 of its 36 border lots took a neighbor's building (shop towers among the megablocks,
+residential towers in the commercial ring). Each plan records its tier, how it was picked and
+whether it was mixed, for the inspector.
+
+**What changed.** The old pick put the Residential Skyscraper on megablock lots zoned 31–35 m,
+where it builds 46 m; those lots now take the Modular Apartment Block, which builds to the height
+asked. Building counts, old → new:
+
+| Seed | Lots | Residential Skyscraper | Modular Apartment Block | Lots changed | Picked outside their district |
+|---|---|---|---|---|---|
+| `blueprint` | 107 | 61 → 10 | 7 → 51 | 62 | 3 |
+| `harbor` | 22 | 12 → 8 | 0 → 1 | 6 | 2 |
+| `neon` | 59 | 24 → 4 | 4 → 22 | 24 | 6 |
+| `42` | 85 | 33 → 7 | 9 → 25 | 34 | 3 |
+| `kowloon` | 48 | 16 → 6 | 4 → 12 | 16 | 2 |
+
+No lot needed the lower-tier step or the fallback. With the default zoning no lot is low-rise
+(the edge cap is 30 m and the districts' floors start at 14–24 m), so the low tier waits for the
+Zoning settings in milestone 5.
+
+**Clashes.** On the narrowest megablock lots (7.5 m of room) the Modular Apartment Block is
+squeezed under its 8 m and one pipe runs into its own mass, hidden in the wall; at 9.5 m it is
+clean. The Research Lab Tower's fins clash with its masses at any footprint but its own default,
+whatever the height; it stood on these lots before too.
+
+## 2026-11-12: The zoning settings
+
+Milestone 5 of the city morphology plan (§4). The zoning map's settings, fixed defaults until
+now, are a new Build section, **Zoning** (`params.zoning`), after Lots.
+
+| Setting | Range | Default | What it does |
+|---|---|---|---|
+| Center height | 40–200 m | 140 m | The tallest limit, at the plaza; every district's range scales with it |
+| Falloff | 40–400 m | 220 m | The limit halves every this many meters along the streets |
+| Avenue bonus | ×1–1.5 | ×1 | How many times higher a lot fronting an avenue may build |
+| Waterfront and park cap | 10–80 m | 30 m | The limit within 12 m of the river or a park, doubling every 12 m beyond |
+| Variety | 0–1 | 0.25 | How far slow noise pulls heights down, in patches |
+| Mixed use | 0–50% | 0% | The share of lots near another district that take its buildings |
+
+No terrain stage reads the group, so a change leaves the ground alone: `generateTerrain` hands
+back the same districts and mesh, and only the zoning map and the plans are redone. Center height
+dragged from 140 to 55 m on `blueprint` re-planned in 0.27 s (the 2–5 s of a Lots change is the
+districts stage); the buildings then refit a few per frame, as after any change.
+
+**Each setting at its ends**, on `blueprint` (107 lots) and `harbor` (22), mean height:
+
+| Setting | `blueprint` | `harbor` | Notes |
+|---|---|---|---|
+| Defaults | 36 m | 54 m | |
+| Center height 40 / 200 m | 15 / 44 m | 25 / 56 m | at 40 m, 92 of 107 lots on `blueprint` are low-rise |
+| Falloff 40 / 400 m | 30 / 38 m | 49 / 55 m | district floors and the slender rule damp it |
+| Avenue bonus ×1.5 | 36 m | 56 m | few avenue lots, most already slender-capped |
+| Cap 10 / 80 m | 26 / 39 m | 31 / 66 m | 63 / 1 lots held down on `blueprint` |
+| Variety 0 / 1 | 37 / 33 m | 55 / 51 m | |
+| Mixed use 50% | 36 m | 54 m | 20 and 3 lots take a neighbor's building |
+
+**The low tier, at last.** With the default zoning no lot is low-rise, so milestone 4's low-rise
+picks first ran here. Two fixes came out of it. At Center height 40 m, 10 narrow low-rise lots on
+`blueprint` (7 of `harbor`'s 22) found nothing for their tier and fell to the slimmest fallback,
+which could be the Residential Skyscraper: it never builds under 46 m, on a lot zoned 15 m. Now
+the any-district step also takes the slimmest within 1.5 m of fitting (a squeezed Modular
+Apartment Block), and the fallback only considers archetypes that can build that low. After
+both, no lot falls back at Center height 40 m or a 10 m cap, and no lot gets a building whose
+floor is above its height. The default city is unchanged by them.
+
+## 2026-11-12: Fewer settings, one Zoning section
+
+The Lots and Zoning sections had thirteen settings between them, and the seven lot settings each
+re-cut the lots: about 3 s for the districts stage and 7 s for the whole rebuild in development.
+They are now one Build section, **Zoning**, with two settings. The fast one comes first.
+
+| Setting | Range | Default | A change takes |
+|---|---|---|---|
+| Center height | 40–200 m | 140 m | 0.3 s (140 → 60 m re-planned in 297 ms) |
+| Lot size | 6–12 m | 8 m | 3 s for the districts stage, 7.3 s in all |
+
+Center height sets the skyline. Lot size sets the grain, from 107 lots on `blueprint` at 8 m to
+89 at 12 m. Their descriptions are now one or two sentences each. The Height legend lists the
+tiers as bullets, its "140 m" tick no longer wraps onto its text, and Ground color has no hover
+text.
+
+The rest are constants again, at the defaults they always had:
+- the alley (1 m);
+- merging lots under 10 m;
+- corner lots;
+- the district depths;
+- the skyline's falloff (220 m);
+- the variety (0.25).
+
+Gone with their code:
+- avenue lot width, the setback and the avenue bonus;
+- mixed use, which did nothing at its default of 0%;
+- the waterfront and park cap, rule and all: buildings by the river and the parks no longer step
+  down.
+
+Without the cap, `blueprint` keeps its 107 lots. The 26 lots it held down build to their
+district's limit again, so the mean height goes from 36 to 39 m and the high-rise lots from 3 to 5.

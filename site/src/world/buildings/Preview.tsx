@@ -21,7 +21,13 @@ export default function BuildingsPreview() {
   const host = useRef<HTMLDivElement>(null);
   const labelsRef = useRef<HTMLDivElement>(null);
   // The first view can come from the URL (?b=<archetype id>&seed=<n>), so a view can be linked.
+  // ?h=, ?w= and ?d= (meters) build every building shown at that height and footprint instead of
+  // its own, to check how the library reads at a height tier.
   const params = new URLSearchParams(window.location.search);
+  const [size] = useState(() => {
+    const read = (key: string) => (Number(params.get(key)) > 0 ? { [key === "h" ? "height" : key === "w" ? "width" : "depth"]: Number(params.get(key)) } : {});
+    return { ...read("h"), ...read("w"), ...read("d") } as { height?: number; width?: number; depth?: number };
+  });
   const [seed, setSeed] = useState(() => Math.max(1, Number(params.get("seed")) || 1));
   // "all", or one archetype id to look at on its own.
   const [focus, setFocus] = useState(() => (ARCHETYPES.some((a) => a.id === params.get("b")) ? params.get("b")! : "all"));
@@ -60,7 +66,7 @@ export default function BuildingsPreview() {
     let boxes = 0;
     const shown = focus === "all" ? ARCHETYPES : ARCHETYPES.filter((a) => a.id === focus);
     const rows = [shown.filter((a) => a.category === "skyscraper"), shown.filter((a) => a.category === "residential")].filter((row) => row.length);
-    const models = rows.map((row) => row.map((a) => buildBuilding(a.id, { seed, base: true })));
+    const models = rows.map((row) => row.map((a) => buildBuilding(a.id, { seed, base: true, ...size })));
     // The back row (skyscrapers) sits far enough behind the front one to stand clear of it.
     const rowGap = rows.length > 1 ? Math.max(...models[0].map((b) => b.depth)) + Math.max(...models[1].map((b) => b.depth)) + GAP * 6 : 0;
     models.forEach((row, r) => {
@@ -77,7 +83,8 @@ export default function BuildingsPreview() {
         boxes += model.solid.index.length / 36 + model.glow.index.length / 36;
       });
     });
-    setStats(`${groups.length} buildings · about ${Math.round(boxes).toLocaleString()} boxes`);
+    const sized = [size.width && `${size.width} m wide`, size.depth && `${size.depth} m deep`, size.height && `${size.height} m tall`].filter(Boolean).join(", ");
+    setStats(`${groups.length} buildings · about ${Math.round(boxes).toLocaleString()} boxes${sized ? ` · all ${sized}` : ""}`);
 
     const camera = new THREE.PerspectiveCamera(30, 1, 20, 8000);
     // Frame what is shown: the whole set, or one building close up.
@@ -141,7 +148,7 @@ export default function BuildingsPreview() {
       renderer.dispose();
       renderer.domElement.remove();
     };
-  }, [seed, focus]);
+  }, [seed, focus, size]);
 
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-[#0b0f1d]">

@@ -131,7 +131,8 @@ export default function WorldPage() {
   useEffect(() => viewRef.current?.setShowLots(state.showLots), [state.showLots]);
   useEffect(() => viewRef.current?.setShowParks(state.showParks), [state.showParks]);
   useEffect(() => viewRef.current?.setShowBuildings(state.showBuildings), [state.showBuildings]);
-  const zoning = useMemo(() => buildZoning(terrain.districts, hashSeed(terrain.seed)), [terrain.districts, terrain.seed]);
+  // The zoning map and the buildings follow the zoning settings; the terrain never reads them.
+  const zoning = useMemo(() => buildZoning(terrain.districts, hashSeed(terrain.seed), terrain.params.zoning), [terrain.districts, terrain.seed, terrain.params.zoning]);
   useEffect(() => viewRef.current?.setZoning(zoning, terrain.districts), [zoning, terrain.districts]);
   const plans = useMemo(() => planBuildings(terrain.districts, terrain.streets, zoning, hashSeed(terrain.seed)), [terrain.districts, terrain.streets, zoning, terrain.seed]);
   useEffect(() => viewRef.current?.setBuildings(plans, terrain.columns.n), [plans, terrain.columns.n]);
@@ -192,7 +193,7 @@ export default function WorldPage() {
       <div ref={mountRef} className="absolute inset-0" />
       {/* The whole interface is drawn at UI_SCALE (80%), so it takes less of the view. */}
       <div className="pointer-events-none absolute inset-0" style={{ zoom: UI_SCALE }}>
-        <TerrainPanel terrain={terrain} zoning={zoning} life={life} ctl={ctl} open={panelOpen} onToggle={() => setPanelOpen((v) => !v)} busy={busy} />
+        <TerrainPanel terrain={terrain} life={life} ctl={ctl} open={panelOpen} onToggle={() => setPanelOpen((v) => !v)} busy={busy} />
         <CameraBar view={view} available={available} onFly={flyTo} shown={overlays} follow={follow} onHelp={openHelp} />
         {overlays && (
           <Inspector
