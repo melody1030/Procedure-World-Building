@@ -825,10 +825,40 @@ export function tree(k: Kit, x: number, y: number, z: number, size = m(2), recor
   k.box(x - t / 2, y, z - t / 2, t, size * 0.6, t, PAL.trunk);
   const c = size * 0.7;
   k.box(x - c / 2, y + size * 0.5, z - c / 2, c, c * 0.8, c, k.vary(PAL.leaf, 0.12));
+  // Darker cubes poking out of the crown. Each is nudged so none of its faces lies in, or a hair
+  // off, the plane of the crown's or an earlier cube's: two faces that close flicker in two colors.
+  const xs = [x - c / 2, x + c / 2];
+  const ys = [y + size * 0.5, y + size * 0.5 + c * 0.8];
+  const zs = [z - c / 2, z + c / 2];
   for (let i = 0; i < 3; i++) {
     const s = c * k.rng.range(0.4, 0.6);
-    k.box(x - s / 2 + k.rng.range(-c, c) * 0.3, y + size * 0.5 + c * k.rng.range(0.3, 0.7), z - s / 2 + k.rng.range(-c, c) * 0.3, s, s, s, k.vary(PAL.leafDark, 0.12));
+    const bx = offFaces(x - s / 2 + k.rng.range(-c, c) * 0.3, s, xs);
+    const by = offFaces(y + size * 0.5 + c * k.rng.range(0.3, 0.7), s, ys);
+    const bz = offFaces(z - s / 2 + k.rng.range(-c, c) * 0.3, s, zs);
+    const color = k.vary(PAL.leafDark, 0.12);
+    // A cube with no clear place on some axis is left out.
+    if (bx === null || by === null || bz === null) continue;
+    k.box(bx, by, bz, s, s, s, color);
+    xs.push(bx, bx + s);
+    ys.push(by, by + s);
+    zs.push(bz, bz + s);
   }
+}
+
+/** How far apart two parallel faces must be not to flicker. */
+const FACE_GAP = 0.25;
+
+/**
+ * Where a span of `len` starting at `lo` goes so neither of its ends is within FACE_GAP of any of
+ * `faces` (other boxes' faces on that axis): the nearest of a few small shifts either way that
+ * clears them all, or null if none does.
+ */
+function offFaces(lo: number, len: number, faces: number[]): number | null {
+  const clear = (a: number) => [a, a + len].every((f) => faces.every((g) => Math.abs(f - g) >= FACE_GAP));
+  for (let i = 0; i <= 8; i++) {
+    for (const shift of i === 0 ? [0] : [i * 0.3, -i * 0.3]) if (clear(lo + shift)) return lo + shift;
+  }
+  return null;
 }
 
 /** A raised planter with a tree or a shrub. */
@@ -910,11 +940,15 @@ export function solar(k: Kit, x: number, y: number, z: number, w: number, d: num
   return true;
 }
 
-/** A rooftop garden: soil, planters and a few trees and shrubs. */
-export function garden(k: Kit, x: number, y: number, z: number, w: number, d: number) {
+/**
+ * A rooftop garden: soil, planters and a few trees and shrubs. `fill` (0–1) sets how many: 0.5 is
+ * about one per 9 m², 0 none; left out, at least one.
+ */
+export function garden(k: Kit, x: number, y: number, z: number, w: number, d: number, fill?: number) {
   k.box(x, y, z, w, m(0.25), d, PAL.leafDark);
   // Trees and shrubs, each where it has room (a few tries each), kept inside the bed.
-  const n = Math.max(1, Math.floor((w * d) / (m(3) * m(3))));
+  const per = (w * d) / (m(3) * m(3));
+  const n = fill === undefined ? Math.max(1, Math.floor(per)) : Math.floor(per * 2 * fill);
   for (let i = 0; i < n; i++) {
     for (let tries = 0; tries < 4; tries++) {
       const px = x + k.rng.range(0.15, 0.85) * w;
@@ -926,7 +960,7 @@ export function garden(k: Kit, x: number, y: number, z: number, w: number, d: nu
       if (isTree) tree(k, px, y + m(0.25), pz, size);
       else {
         k.occupy(box, "plant");
-        k.box(px - m(0.4), y + m(0.25), pz - m(0.4), m(0.8), m(0.5), m(0.8), k.vary(PAL.leaf, 0.15));
+        k.box(px - m(0.4), y + m(0.25), pz - m(0.4), 2 * m(0.4), m(0.5), 2 * m(0.4), k.vary(PAL.leaf, 0.15));
       }
       break;
     }
@@ -942,13 +976,14 @@ export function helipad(k: Kit, x: number, y: number, z: number, size: number) {
   const i = size * 0.15;
   k.light(x + i, c, z + i, size - 2 * i, 0.1, t, PAL.yellow, 0.7);
   k.light(x + i, c, z + size - i - t, size - 2 * i, 0.1, t, PAL.yellow, 0.7);
-  k.light(x + i, c, z + i, t, 0.1, size - 2 * i, PAL.yellow, 0.7);
-  k.light(x + size - i - t, c, z + i, t, 0.1, size - 2 * i, PAL.yellow, 0.7);
+  // The ring's east and west sides fit between its north and south, so no two strips overlap.
+  k.light(x + i, c, z + i + t, t, 0.1, size - 2 * i - 2 * t, PAL.yellow, 0.7);
+  k.light(x + size - i - t, c, z + i + t, t, 0.1, size - 2 * i - 2 * t, PAL.yellow, 0.7);
   const hx = x + size * 0.35;
   const hz = z + size * 0.32;
   k.light(hx, c, hz, t, 0.1, size * 0.36, PAL.white, 0.8);
   k.light(hx + size * 0.3 - t, c, hz, t, 0.1, size * 0.36, PAL.white, 0.8);
-  k.light(hx, c, hz + size * 0.18 - t / 2, size * 0.3, 0.1, t, PAL.white, 0.8);
+  k.light(hx + t, c, hz + size * 0.18 - t / 2, size * 0.3 - 2 * t, 0.1, t, PAL.white, 0.8);
   for (const [dx, dz] of [
     [0, 0],
     [size - 0.5, 0],

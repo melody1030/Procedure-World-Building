@@ -227,7 +227,9 @@ export function Segmented<T extends string>({ options, value, onChange, label, c
       style={columns ? { gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` } : undefined}
     >
       {options.map((o) => (
-        <label key={o.value} className="min-w-0 flex-auto cursor-pointer">
+        // `relative` keeps the hidden radio inside its button: placed by the panel instead, it can
+        // sit past the panel's edge, and focusing it scrolls the whole panel out of place.
+        <label key={o.value} className="relative min-w-0 flex-auto cursor-pointer">
           <input type="radio" name={name} value={o.value} checked={o.value === value} onChange={() => onChange(o.value)} className="peer sr-only" />
           <span className="block whitespace-nowrap rounded-md border border-transparent px-1 py-1 text-center text-[11px] text-[#9db2c8] transition-colors hover:text-[#dce8f5] peer-checked:border-[#5ad8ff]/40 peer-checked:bg-[#5ad8ff]/15 peer-checked:text-[#5ad8ff] peer-focus-visible:outline peer-focus-visible:outline-1 peer-focus-visible:outline-[#5ad8ff]">
             {o.label}

@@ -1271,3 +1271,210 @@ Two bugs came out while looking at it:
 - **Buildings were picked by boxes at the origin.** Each building's bounds were taken before it
   was moved onto its lot, so only the Landmark, near the origin, could be hit. They are now taken
   once it is placed. These are the boxes that hide agents.
+
+## 2026-11-12: The building grammar, M1
+
+A new page at `/grammar` builds one building from the rules in Class 09 (slide 21), and each
+slider rebuilds it live:
+
+```
+BUILDING -> BASE SHAFT TOP
+BASE     -> pier [S A]+ pier  (mirrored)
+SHAFT    -> FLOOR x n
+FLOOR    -> pier [A A]+ pier
+TOP      -> parapet + roof
+```
+
+`buildings/grammar.ts` takes the parameters (frontage, depth, floors, ground floor height, bay
+width, window size, lit share, and the upper and ground patterns) and returns the model, the
+derivation and the stats. This first cut has the Bar footprint and four bays: window (A), blank
+(B), door (C) and shop front (S). The front cuts n = floor((frontage − pier) ÷ bay width) bays and
+stretches them to fill it; with Mirror on, the right half reflects the left and an odd middle bay
+on the ground floor becomes the door. The back and the sides repeat plainer patterns.
+
+Each wall was first four boxes around every window: 46 floors on 40 × 40 m took 119 ms and 215k
+triangles. Each floor's wall is now cut into horizontal strips at the window edges, one box per
+solid stretch. That case takes 20 ms and 108k triangles; the default (12 floors on 16 × 20 m)
+takes about 2 ms and 14k triangles. Every test case, from 2 floors on 6 × 8 m to the largest,
+builds with no clashes and no overlaps.
+
+Two things made the building jolt on every slider move, and both are fixed:
+- **The facade reshuffled.** Every lit window, shop front and awning drew from one running
+  sequence, so any change that added or removed a draw reshuffled the whole building. Each bay
+  now draws from its own generator, keyed by its side, floor and place in the row (`k.rng` is
+  left for the rooftop). Changing the window size or the ground floor keeps the same windows lit,
+  and adding floors leaves the ones below as they were.
+- **The view tilted.** The camera's target jumped toward the new height while the camera stayed
+  put, so the view turned. The target and the camera now glide together, a pan plus a pull back
+  far enough to fit the whole building, and only when the height changes. Grabbing the view stops
+  the glide.
+
+## 2026-11-12: The building grammar, M2: the facade grammar
+
+The two bay patterns and the signs are drawn from the seed (`drawPatterns`, `placeSigns`), and
+one slider under **Facade** steers the building:
+- **Signs** has no slider. The upper floors' pattern (two to four letters) opens with a window,
+  then windows, service bays and blank panels by weight. Each draw then takes a sign
+  share from 0 to 30% (`SIGN_CAP`), and that share of the street front's columns, never more than
+  30% of them, become sign columns (`placeSigns`). They are set on the expanded row, not in the
+  pattern, since a two-letter pattern with one sign would make half the front signs. On a mirrored
+  front a column goes with its reflection, so the signs stay symmetric. The printout's N line
+  reads, for example, N → 2 of 7 columns · drawn 22%, at most 30%.
+- **Balconies** is a stochastic rule, A → window | balcony: each window above the ground floor
+  draws its own number and is a balcony if it falls under the share. It began as a letter in the
+  pattern, but a letter repeats across the whole front with its pattern, so the slider could only
+  add or take away whole sets of columns, and it felt like all or nothing. Drawn window by window
+  it moves smoothly: on the default building, 0, 33, 92, 136 and 286 balconies at 0, 10, 35, 50
+  and 100%.
+- Each window draws its own number, so the slider only changes the windows it reaches.
+- The ground floor's pattern (two or three letters) opens with a shop; the rest are shops,
+  windows, doors, service doors and blank walls. Four draws in five are mirrored.
+- **Randomize** draws new patterns along with the lights and the clutter. The page opens on seed
+  15, A B A over S S B, mirrored, with signs on 2 of its 7 columns, which shows windows,
+  balconies and signs at once.
+
+A letter-cell editor came first, with Mirror as a switch, but typing patterns was too much to
+ask. Drawing them keeps the grammar visible in the printout without asking anyone to write it.
+The printout's A line reads, for example, A → punched window | balcony 35%.
+
+Two bays join A, B, C and S, and A gains its balcony:
+- **Balcony:** a tall door behind a slab with a sheet-metal front, and by chance laundry on a
+  rod, an AC unit on the wall, a planter on the rail, or a neon strip under the slab.
+- **N, sign:** a blade sign standing out from the bay's left pier in front of a window, one
+  storey a piece and one color all the way up the column, so it reads as one tall sign.
+- **V, service:** two pipes down the bay's side, joining floor to floor into one line, beside a
+  louvered vent; on the ground floor, a roller shutter with a warning light.
+
+B gets a rust or grime panel now and then, sometimes with a vent. The sides read S, C and N as A;
+the back is A, V and B in turns.
+
+**Window types** set how the A bays are glazed: punched (the window's own size), ribbon (across the
+piers but for a mullion, so a floor reads as one band) and glass (the ribbon's width, floor to
+floor). Every window on a building is the one type: a glass-wall bay, G, was drawn among punched
+windows at first, and two window styles on one front looked like two buildings, so it was taken
+out of the patterns.
+
+The right panel's **Grammar** printout shows the rules as they read now (BASE → pier [S A]+ pier
+mirrored · 4.5 m, and so on) and the street front's rows they expand to.
+
+Three things came up in testing:
+- `m()` rounds to a quarter voxel, so some thin parts came out flush with their neighbors or with
+  no thickness at all: a glass wall's transom with its mullion, cloths and vent slats that
+  vanished. They are sized in voxels now. The shop shutter's
+  top slat also sat flush with an awning's underside (an M1 bug); the slats now stop short of it.
+- With ribbon and glass windows, a sliver of wall ended up inside each corner column. The walls
+  now run between the columns.
+- Two blade signs could stand on the same pier: the first bay's blade went on its right pier,
+  which is the second bay's left. A blade now always stands on its bay's left pier, and the first
+  bay, whose left pier is the corner column, is never a sign.
+
+Three sweeps found no clashes, no overlapping faces and no NaN:
+- 756 buildings with every letter and mixed patterns (N, NV, VN and others) typed in.
+- 1,656 drawn buildings after the balcony rule: 30 seeds, balconies
+  and the sign share at 0, 50% and 100% and the defaults, every window type, and sizes from 6 × 8 m
+  and 2 floors to 40 × 40 m and 46 floors.
+- 1,440 drawn buildings once the signs were drawn and made blades only: 40 seeds, balconies at 0,
+  35% and 100%, every window type, and four sizes up to 40 × 40 m and 46 floors. None had signs on
+  more than 30% of its front or on its first column; across 2,000 seeds and fronts of 1 to 26 bays
+  the most was 2 of 7.
+
+The default builds in about 3 ms. At 46 floors on 40 × 40 m: about 33 ms with no balconies, 54 ms
+at the default 35%, and 86–111 ms with every window a balcony, so dragging a slider on the
+largest building is not smooth.
+
+## 2026-11-16: The building grammar, M3: massing
+
+The building is no longer one box. `world/buildings/massing.ts` makes its plan and its stages out of
+rectangles, and the facades run along the plan's outline:
+- **Shape** (Footprint) picks the plan:
+  - Bar.
+  - L and U (a light court). These are wings of one depth (about a third of the footprint, 6 to
+    12 m) round a court at least 4 m across. A footprint too small for its court
+    is built as a bar, and the printout's PLAN line says which was built.
+  - The L and the U open their court to the street. Each wing end on the street is a front of its
+    own: its own bays, ground floor and signs (the U's FRONT line says "on each of 2 wings").
+  - Stepped: each stage steps back from the street front only, so its terraces face the street.
+    It rises in 3 stages, the floors shared evenly, each 2 m back from the one below.
+- **The outline:** where rectangles meet, their sides are left out, and what faces out is merged
+  into edges, each knowing whether its corners turn out or in.
+  - An outer corner gets a corner column.
+  - At an inner corner the bays keep 1.5 m clear, past the deepest thing a bay hangs out (a
+    balcony, 1.15 m), so the two walls' balconies never meet.
+  - Floor bands, roof lips, parapets and copings meet at every corner without overlapping: the
+    edges facing the street and the back own the corners (`reach`).
+- **Stepped's stages:** the other shapes rise in one stage; there are no sliders for stages or
+  setbacks.
+  - A stage stops stepping back where it would be under 6 m deep. A step under a meter is not
+    taken there, so a terrace is never too narrow for its parapet.
+  - Each step leaves a terrace: the stage's roof slab with a parapet along the open edges. The
+    first floor above a terrace has no balconies, and its floor band sits on the slab.
+- **Top:**
+  - **Roof:** gear, a garden, a billboard facing the street on two posts with the gear behind
+    it, or a helipad. The billboard is one size, 8 m wide and 4 m high, centered near the front;
+    a roof under 11 m wide gets gear instead. A roof too small for a pad or a billboard gets gear, and the printout says
+    so.
+  - Under it, the chosen roof's sliders:
+    - **Fill** (gear, garden, billboard; 0.5 by default): how much gear or planting. At 0 only
+      the stair hut stands. The other wings' gear follows it too.
+      - Gear: about one piece per 30 m² at 1, so 8 on the default roof. The kinds are dealt from a
+        shuffled deck, so each comes up once before any comes round again; antennas and dishes go up
+        once at most. Every piece keeps 0.75 m clear round it, and they spread over the whole roof.
+      - Garden: about one tree or shrub per 9 m² at 0.5, twice that at 1.
+    - **Pad size** (helipad, 8 to 16 m, 16 by default), or as large as the roof allows.
+  - **Parapet** (0.5 to 2 m, 0.75 by default) on the top and every terrace.
+  - The Top group's controls carry no hover notes.
+  - Every roof keeps its stair hut in the back corner on the right:
+    - The garden plants the whole roof but for a 1 m path along the parapet: one bed in front of
+      the hut and one beside it. (`rooftop`'s garden, which `/world` uses, plants only the front
+      half.) Benches stand in the path, backs to the parapet, about every 5 m and clear of the
+      corners, the hut and where a wing meets the roof. A cap's top tier, with no parapet, has
+      none.
+    - The helipad sets the hut's strip aside, along the back or the right side, whichever leaves
+      the larger pad, and centers the pad in the rest.
+  - The grammar lays out its own gear and garden roofs from the library's parts. `garden` in
+    `parts.ts` takes the fill as an optional last argument; `/world` leaves it out, and its roofs
+    (`rooftop`) are built as before.
+  - **Crown:** none, a neon band round the parapet, or a stepped cap: two tiers, the lower ringed
+    in neon, with the roof on top of it.
+
+The printout gains PLAN, STAGE (each stage's floors and how far it steps in), ROOF (with the pad's size,
+or the fill) and CROWN lines, and TOP shows the parapet's height.
+
+Things that came up in testing:
+- The corner columns reached a quarter voxel past the core and the walls behind them. Their tops
+  shared a plane with the core's, which only the roof slab's underside had hidden. They now stop
+  at the wall line.
+- A stage's band at a stage join shared its underside with the slab below. Over a terrace the
+  band now sits on the slab, and so do the service pipes.
+- A setback cut short at a stage's limit could leave a terrace half a meter deep, which put the
+  next stage's pipes through the parapet. Steps under a meter are not taken now.
+- Two library parts (`parts.ts`) had faces sharing a plane, which showed once the grammar's roofs
+  used them: the helipad's light strips overlapped at its corners, and a garden shrub was drawn a
+  quarter voxel wider than the space it took. Both are fixed; neither changes how they look.
+
+A sweep of 840 buildings found no clashes and no NaN. It covered:
+- 30 seeds and every shape;
+- seven sizes, from 6 × 8 m on 2 floors to 40 × 40 m on 46;
+- the roofs, crowns, balcony shares, window types and roof sliders, taken in turn.
+
+Each stage stood inside the one below, the floors added up, and no front had signs on more than
+30% of its columns. A second sweep built every roof with every crown at both ends of Fill,
+Parapet and Pad size (4,608 buildings), with no clashes.
+
+No two faces shared a plane in either sweep.
+
+Two fixes outside the grammar came out of this:
+- **Trees flickered.** The library's tree (`tree` in `parts.ts`) put three darker cubes on its
+  crown at random, and a cube's face could land in, or a hair off, the plane of the crown's or
+  another cube's, so the two greens flickered. A full garden roof, with twice the trees, showed it
+  plainly. Each cube now takes the nearest small shift that keeps its faces at least a quarter
+  voxel off the others, or is left out. The trees in `/world`'s parks and roof gardens get the
+  fix too; they draw the same numbers, so they stand where they did.
+- **The panel jumped.** Picking a Roof or a Crown scrolled the whole left panel up and left it
+  blank below. The Segmented buttons (`ui/kit.tsx`) hide a radio inside each label, absolutely
+  placed. With no positioned label, it was placed by the panel and sat past the panel's bottom,
+  and focusing it scrolled the panel, which clips but still scrolls. Each label is now
+  `relative`, so the radio stays inside its button.
+
+The default still builds in about 3 ms. The largest (46 floors on 40 × 40 m, Stepped)
+builds in up to about 170 ms.
