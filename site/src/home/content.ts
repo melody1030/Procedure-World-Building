@@ -35,11 +35,11 @@ export const TECHNIQUES = [
   { title: "Terrain", image: smoothed, text: "Noise, slope-scaled terraces and a river on 0.25 m voxels; streets cut and fill, blocks are smoothed between them, lots are graded flat.", doc: `${REPO}docs/techniques/terrain.md`, studios: ["week02", "week03", "week05"] },
   { title: "Shader", image: concreteBuild, text: "The voxel look on merged faces, data-texture overlays, and the build timeline, with nothing rebuilt per frame.", doc: `${REPO}docs/techniques/shader.md`, studios: ["week04"] },
   { title: "Agents", image: inhabitants, text: "People driven by needs on flow fields, boid pigeons, cats with a cone of vision, and traffic that yields to people.", doc: `${REPO}docs/techniques/agents.md`, studios: [] },
-  { title: "Building morphology", image: library, text: "Eleven cyberpunk archetypes built from reusable parts, picked by district and sized to their lots.", doc: `${REPO}docs/techniques/building-morphology.md`, studios: ["buildings"] },
+  { title: "Building morphology", image: library, text: "Eleven cyberpunk archetypes built from reusable parts, picked by district and sized to their lots, and a shape grammar that derives a building rule by rule.", doc: `${REPO}docs/techniques/building-morphology.md`, studios: ["buildings", "grammar"] },
   { title: "Network", image: wfc, text: "A street network by wave function collapse, districts and lots zoned along it, and the graphs agents move on.", doc: `${REPO}docs/techniques/network.md`, studios: ["week05"] },
 ];
 
-/** The studios: each week's in-class workshop, and the building library. */
+/** The studios: each week's in-class workshop, the building library and the building grammar. */
 export const STUDIOS: { id: string; number: string; title: string; description: string; path: string; icon: "cube" | "mountain" | "voxel" | "shader" | "scatter" | "building" }[] = [
   { id: "week01", number: "01", title: "Geometry", description: "Three.js basics: shapes, materials, lighting.", path: "/week01", icon: "cube" },
   { id: "week02", number: "02", title: "Terrain", description: "Noise grids, shaping, hydraulic erosion.", path: "/week02", icon: "mountain" },
@@ -47,6 +47,7 @@ export const STUDIOS: { id: string; number: string; title: string; description: 
   { id: "week04", number: "04", title: "Shader Studio", description: "Stack, isolate and read shader techniques.", path: "/week04", icon: "shader" },
   { id: "week05", number: "05", title: "Scatter & Paths", description: "Scattering rules, spline roads and rivers, particles in a wind field.", path: "/week05", icon: "scatter" },
   { id: "buildings", number: "City", title: "Building library", description: "The eleven buildings the city places on its lots, one at a time or all together.", path: "/buildings", icon: "building" },
+  { id: "grammar", number: "City", title: "Building grammar", description: "A building derived rule by rule from a few parameters, then a district of them on lots, with a height map setting how tall each grows.", path: "/grammar", icon: "building" },
 ];
 
 export const MILESTONES = [

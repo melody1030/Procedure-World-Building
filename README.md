@@ -63,7 +63,7 @@ code it lives in and the log entries behind it.
 | <img src="site/src/world/screenshots/2026-10-28-smoothed-blocks.webp" alt="Terrain" width="220"> | **[Terrain](docs/techniques/terrain.md)** | Noise, slope-scaled terraces and a river on 0.25 m voxels (928 × 928 columns); streets cut and fill, blocks are smoothed between them, lots are graded flat |
 | <img src="site/src/world/screenshots/2026-10-27-concrete-build.webp" alt="Shader" width="220"> | **[Shader](docs/techniques/shader.md)** | The voxel look on merged faces, data-texture overlays, and the build timeline: terrain printed, streets paved, buildings raised storey by storey, with nothing rebuilt per frame |
 | <img src="site/src/world/screenshots/2026-10-27-inhabitants.webp" alt="Agents" width="220"> | **[Agents](docs/techniques/agents.md)** | People driven by needs on flow fields, boid pigeons, cats with a cone of vision, and traffic that yields to people, stops at bus shelters and picks up fares |
-| <img src="site/src/world/screenshots/2026-10-13-building-library.webp" alt="Building library" width="220"> | **[Building morphology](docs/techniques/building-morphology.md)** | Eleven cyberpunk archetypes built from reusable parts, picked by district and sized to their lots |
+| <img src="site/src/world/screenshots/2026-10-13-building-library.webp" alt="Building library" width="220"> | **[Building morphology](docs/techniques/building-morphology.md)** | Eleven cyberpunk archetypes built from reusable parts, picked by district and sized to their lots; and a shape grammar (`/grammar`) that derives a building rule by rule, with a Simulation page that grows one on every lot of a street grid, its height set by a map |
 | <img src="site/src/world/screenshots/2026-10-09-wfc-streets-districts.webp" alt="Street network" width="220"> | **[Network](docs/techniques/network.md)** | A street network by wave function collapse, districts and lots zoned along it, and the walking and lane graphs the agents move on |
 
 How they fit together, in the order the city is made:
@@ -112,6 +112,7 @@ The full dated log with every screenshot is in
 | 2026-10-28    | **Traffic** (cars, vans, taxis, buses); **smoothed blocks** and graded lots; small lots merged and gaps filled                       |
 | 2026-10-29    | **One state machine per agent**, each change with its reason; people drawn to the scale of the streets; buses kept moving at corners |
 | 2026-11-08    | **City controls**: Build and Layers tabs, one ground color at a time, a timeline of named steps, and a camera toolbar of five views |
+| 2026-11-12/16 | **The building grammar** (`/grammar`): bays, facades, massing and roofs derived from a few parameters; **Simulation** grows one on every lot, its height set by a map |
 
 | Version 1, rainy night (Oct 7) | Districts and parks (Oct 12) |
 |---|---|
@@ -125,7 +126,13 @@ The full dated log with every screenshot is in
 | ------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
 | ![The Build tab with an explanation beside the panel](site/src/world/screenshots/2026-11-08-panel-build.webp) | ![The Park view](site/src/world/screenshots/2026-11-08-view-park.webp) |
 
-Plans: [terrain plan](docs/plans/terrain-plan.md) · [town plan](docs/plans/town-plan.md) · [shader studio plan](docs/plans/shader-studio-plan.md) · [city controls plan](docs/plans/city-controls-plan.md)
+| The building grammar (Nov 16) | Simulation: each lot's massing (Nov 16) |
+|---|---|
+| ![The building grammar page: parameters on the left, the building, and what the rules made on the right](site/src/world/screenshots/2026-11-16-grammar-page.webp) | ![The Simulation page in Masses view](site/src/world/screenshots/2026-11-16-simulation-masses-page.webp) |
+
+![The Simulation page in Grammar view: a grammar building on every lot](site/src/world/screenshots/2026-11-16-simulation-grammar-page.webp)
+
+Plans: [terrain plan](docs/plans/terrain-plan.md) · [town plan](docs/plans/town-plan.md) · [shader studio plan](docs/plans/shader-studio-plan.md) · [city controls plan](docs/plans/city-controls-plan.md) · [building grammar plan](docs/plans/building-grammar-plan.md)
 
 ---
 
@@ -182,7 +189,7 @@ Procedure-World-Building/
         ├── components/      ← UI shared by all pages
         ├── world/           ← Blueprint City (route /world) and its development log
         │   ├── terrain/     ← one file per pipeline stage
-        │   ├── buildings/   ← the building library (route /buildings)
+        │   ├── buildings/   ← the building library (route /buildings) and grammar (route /grammar)
         │   ├── city/        ← parks and building placement
         │   ├── life/        ← people, animals and traffic
         │   ├── render/      ← three.js view and shaders

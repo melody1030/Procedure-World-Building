@@ -7,22 +7,27 @@ import { CompassIcon, external } from "./ui";
 
 export type HomeTab = "concept" | "technique" | "city";
 
+/** The tab underline's classes, shared by the tabs and the Building link beside them. */
+const TAB =
+  "relative flex items-center px-3 font-display text-[1.05rem] font-bold sm:px-4 transition-colors after:absolute after:inset-x-3 after:-bottom-px sm:after:inset-x-4 after:h-0.5 after:rounded-full after:transition-colors ";
+const TAB_IDLE = "text-slate-400 after:bg-transparent hover:text-cyan-300 hover:after:bg-cyan-400/30";
+
 export const HOME_TABS: { id: HomeTab; label: string; path: string }[] = [
   { id: "concept", label: "Concept", path: "/concept" },
-  { id: "technique", label: "Technique", path: "/technique" },
   { id: "city", label: "City", path: "/city" },
+  { id: "technique", label: "Technique", path: "/technique" },
 ];
 
 /**
  * The project's front page, in three tabs, each with its own address so it can be shared: Concept
- * (what Blueprint City is and the research behind it), Technique (what the city is made of, and
- * every studio where a technique was tried first) and City (the way in), under one slim bar with
- * the project's name and the tabs; each tab has its own headline.
+ * (what Blueprint City is and the research behind it), City (the way in) and Technique (what the
+ * city is made of, and every studio where a technique was tried first), under one slim bar with
+ * the project's name, the tabs and a link to the building grammar; each tab has its own headline.
  */
 export default function HomePage({ tab }: { tab: HomeTab }) {
   return (
     <div className="flex flex-1 flex-col font-technical">
-      {/* One slim bar: the name, the three tabs and the documentation. The headline is each tab's own. */}
+      {/* One slim bar: the name, the three tabs, the building grammar and the documentation. The headline is each tab's own. */}
       <header className="sticky top-0 z-20 border-b border-slate-800/80 bg-page/80 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-[1600px] items-stretch gap-4 px-6 sm:gap-8 sm:px-10 lg:px-20">
           <a {...linkProps("/")} className="flex items-center whitespace-nowrap font-display text-lg font-bold tracking-tight text-slate-100 sm:text-xl">
@@ -36,15 +41,16 @@ export default function HomePage({ tab }: { tab: HomeTab }) {
                 aria-current={t.id === tab ? "page" : undefined}
                 className={
                   // The underline sits on the header's bottom border, glowing cyan on the open tab.
-                  "relative flex items-center px-3 font-display text-[1.05rem] font-bold sm:px-4 transition-colors after:absolute after:inset-x-3 after:-bottom-px sm:after:inset-x-4 after:h-0.5 after:rounded-full after:transition-colors " +
-                  (t.id === tab
-                    ? "text-cyan-300 after:bg-cyan-400 after:shadow-[0_0_10px_rgba(34,211,238,0.7)]"
-                    : "text-slate-400 after:bg-transparent hover:text-cyan-300 hover:after:bg-cyan-400/30")
+                  TAB + (t.id === tab ? "text-cyan-300 after:bg-cyan-400 after:shadow-[0_0_10px_rgba(34,211,238,0.7)]" : TAB_IDLE)
                 }
               >
                 {t.label}
               </a>
             ))}
+            {/* Not a tab: the building grammar is a page of its own, full screen. */}
+            <a {...linkProps("/grammar")} className={TAB + TAB_IDLE}>
+              Building
+            </a>
           </nav>
           <a href={DOCS} {...external} className="ml-auto hidden items-center whitespace-nowrap text-[12px] uppercase tracking-[0.15em] text-slate-400 transition-colors hover:text-cyan-300 sm:flex">
             Documentation ↗

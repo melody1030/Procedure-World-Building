@@ -1549,3 +1549,11 @@ rebuilds only the lots whose floors changed. At the largest area the build stays
 
 The two pages share their night view (`buildings/stage.ts`) and their panel pieces
 (`buildings/panels.tsx`).
+
+With that the grammar plan's last milestone is done:
+- The homepage's Technique tab has a **Building grammar** studio card, and the Building morphology
+  card a chip for it.
+- `docs/techniques/building-morphology.md` has a section on the grammar and Simulation, with five
+  new screenshots (`2026-11-16-grammar-*` and `2026-11-16-simulation-*`).
+- The production build loads the workers from their own bundle (`grammarWorker-*.js`) and builds
+  every lot.

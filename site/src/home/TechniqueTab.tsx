@@ -62,7 +62,7 @@ export default function TechniqueTab() {
 
       <section className="mx-auto max-w-[1600px] px-6 py-16 sm:px-10 lg:px-20">
         <SectionHeading eyebrow="Studios" title="Where each technique was tried first">
-          The weekly workshops, each an interactive studio of its own, and the city's building library.
+          The weekly workshops, each an interactive studio of its own, and the city's building library and building grammar.
         </SectionHeading>
         {/* Hovering the cards shows a cursor spotlight: everything outside it turns grayscale. */}
         <ChromaGrid className="mt-10 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">

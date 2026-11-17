@@ -283,7 +283,7 @@ layout and build times.
    - L, U and Stepped;
    - Stepped's stages and terraces;
    - roofs and crowns.
-4. **Simulation, and docs:**
+4. **Simulation, and docs** (built 2026-11-16):
    - the Simulation page (§2.1);
    - the Technique tab card and chip;
    - the technique page section with screenshots;
