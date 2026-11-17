@@ -22,10 +22,10 @@ seed → noise → shaping → heights → terraces → river → claims → hub
 - **Streets:** done (third design, wave function collapse from the plaza).
 - **Districts, lots and parks:** done, Cities: Skylines style (whole districts, every lot on a
   street, parks as their own layer).
-- **Buildings:** a library of eleven archetypes, previewed at `/buildings`, not yet placed on
-  the lots.
-- **Next:** place buildings on the lots by district (one landmark at the plaza), then scatter
-  and bridges.
+- **Buildings:** done. Every lot builds from the building grammar (`/grammar`), weighted by its
+  district, with the Landmark at the plaza, all at the people's scale.
+- **Next:** the town plan's steps 6–9 (`docs/plans/town-plan.md` §9): scatter along the streets
+  (lamps, street trees, the plaza fountain), area scatter, bridges, then check and tune.
 
 Overlays can be opened from the URL: `/world?show=districts,lots,parks`. One ground tint shows at
 a time (`districts`, `claims` or `suitability`); `network` draws the street network on top.
