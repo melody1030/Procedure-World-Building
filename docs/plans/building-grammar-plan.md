@@ -34,7 +34,7 @@ page, **Simulation**, lays out streets, blocks and lots, and grows a building on
 a height map setting how tall each one is.
 
 **Scope:** this plan covers the two pages and the modules they run. Putting grammar
-buildings on the city's lots is a later plan. That plan will keep the Landmark Tower and the
+buildings on the city's lots is a later plan ([grammar-city-plan.md](grammar-city-plan.md)). That plan will keep the Landmark Tower and the
 Corporate Megatower as signature buildings. The grammar builds into the same `Kit` and returns
 the same `BuildingModel` as the library does, so that plan can use it as it is.
 

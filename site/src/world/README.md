@@ -1557,3 +1557,214 @@ With that the grammar plan's last milestone is done:
   new screenshots (`2026-11-16-grammar-*` and `2026-11-16-simulation-*`).
 - The production build loads the workers from their own bundle (`grammarWorker-*.js`) and builds
   every lot.
+
+## 2026-11-16: Grammar buildings on the city's lots
+
+The plan: [grammar-city-plan.md](../../../docs/plans/grammar-city-plan.md), M1. Every lot in
+`/world` now gets a grammar building. The Landmark Tower stays on the plaza, and the Corporate
+Megatower stays wherever the library would put it. `planBuildings` still picks an archetype for
+every lot.
+
+**Each lot's building** (`city/placement.ts`, `planGrammar`):
+- **The body:** the room (the lot less 0.5 m all round) less 0.5 m on the sides and back. In front
+  it keeps as much of 1.5 m as the depth can spare above 6 m. The smallest lots (8 × 8 m) give a
+  6 × 6 m body.
+- **The floors:** 1 + floor((height − 4.5 m) ÷ 3 m), so the top floor stays within the zoning
+  limit and the slender rule.
+- **The settings:** the same draw as Simulation's, now shared in `buildings/lotGrammar.ts`, seeded
+  by the lot.
+- **The place:** the body sits toward the street from the lot's center, by half of what the front
+  clearance takes over the back's.
+
+**The clearance rule** (`buildGrammar`'s new `clearance`): most lots are too small to keep a
+balcony's 1.13 m of room on every side. So each face measures how far it is from the room's edge:
+- a face with less room than a balcony's reach gets no balconies, so the sides read as party walls;
+- blade signs shorten to the room, and are left out under 0.85 m;
+- awnings shorten to the room, and are left out under 0.5 m;
+- anything else reaching past the room is cut at its edge (`Kit.clip`), as in the library.
+
+With no clearance nothing changes. Before and after, the same 400 buildings from `/grammar` and
+Simulation hash the same. For the city, the build allows bodies 6 m deep and 66 floors (a 200 m
+Center height); the `/grammar` sliders keep 8 m and 46.
+
+**Checked** on four seeds (`blueprint`, `harbor`, `lantern`, `delta`), at Center height 40, 140 and
+200 m, and at Lot size 6, 8, 10 and 12 m:
+- no vertex reaches past its room, and no balcony stands outside it;
+- `findClashes` stays at zero;
+- every top floor is within its limit and the slender rule.
+
+Two settings leave a little flicker (0.13 m² on `blueprint` at Lot size 10, 0.03 m² on `harbor`),
+under the library's own 0.5 m² allowance.
+
+The same seed and camera, before and after:
+
+| The building library (before) | The building grammar (after) |
+|---|---|
+| ![Blueprint City with the building library](screenshots/2026-11-16-city-library-overview.webp) | ![Blueprint City with grammar buildings](screenshots/2026-11-16-city-grammar-overview.webp) |
+| ![Closer: the library's buildings by the plaza](screenshots/2026-11-16-city-library-close.webp) | ![Closer: grammar buildings by the plaza](screenshots/2026-11-16-city-grammar-close.webp) |
+
+**Speed:**
+- **Building:** `blueprint` builds all 107 lots in 125 ms, where the library's `fitBuilding` took
+  about 1.1 s (it tries up to ten body sizes per lot). So `setBuildings` keeps its 10 ms-per-frame
+  loop and needs no workers.
+- **Vertices:** 2.77M, against the library's 1.83M.
+- **Drawing:** one frame costs the same either way, by the time from a frame's start to the GPU
+  finishing it: a median of 8.1 ms and a 90th percentile of about 10 ms on `blueprint`. The
+  browser pane was hidden, so its own frame rate was throttled and not measured.
+
+## 2026-11-16: Zones drive the grammar
+
+The plan's M2 ([grammar-city-plan.md](../../../docs/plans/grammar-city-plan.md) §1.5): each
+district now weights its lots' draws, so the assignment's "building types by zones" shows in the
+city itself.
+
+`drawCityGrammar` (`buildings/lotGrammar.ts`) takes Simulation's size-and-tier draw, then the
+district's weights from a stream of their own:
+
+| District | What it weights |
+|---|---|
+| Core | Glass windows, few balconies, helipads (on roofs big enough), bands and caps, signs mostly on avenues |
+| Commercial | Shops on every ground bay, a 5–6 m ground floor, signs on 30–50% of the front, billboards, neon bands |
+| Megablock | Balconies 0.3–0.55 where the clearance allows, more lit windows, gear and gardens, no crown |
+| Industrial | Service bays up the walls and opening the ground floor, few shops, ribbon windows, few lights, full gear |
+| Wealthy | Wide bays, no signs, a ground floor of windows and doors, Stepped more often, gardens and caps |
+
+**The frontage:**
+- **Avenues:** an avenue lot gets shops and a 5–6 m ground floor whatever its district. A taller
+  ground floor takes its height from the top floors, so the top floor stays within the limit.
+- **Corners:** a corner lot's side on its cross street is a second street front, with the front's
+  ground floor and signs. It also gets up to 1.5 m of clearance, as the front does. The terrain now
+  records which side that is (`Lot.cornerSide`).
+
+The grammar takes these as an optional `GrammarStyle`: the bay weights, the ground floor's first
+slot, the sign range and cap, and the corner side. With none it builds as before. The same 400
+buildings from `/grammar` and Simulation still hash the same.
+
+**Commercial's sign cap.** At first commercial lots averaged 0.3 signs each. The grammar caps signs
+at 30% of a front's columns, and the city's three- and four-bay fronts round that down to none.
+Commercial now has its own cap of 50%, which gives one sign per building on average.
+
+**Checked** on six seeds at Center height 140 and 200 m, and on three of them at every Lot size and
+40 m:
+- no vertex past its room, and no clashes;
+- every top floor within its limit;
+- flicker at most 0.19 m², under the library's 0.5 m²;
+- the corner side faces paving on 124 of 125 corner lots at Center height 140. The one left
+  (`blueprint` lot 50) is a true corner: its cross street runs only along the back half of its
+  side, past where the check looked.
+
+Across the six seeds at 140 m:
+
+| District | Buildings | Glass windows | Signs each | Ground bays that are shops | Balconies each | Lit windows | Crowned |
+|---|---|---|---|---|---|---|---|
+| Core | 67 | 54% | 0.2 | 77% | 3.3 | 49% | 81% |
+| Commercial | 96 | 0% | 1.0 | 87% | 5.4 | 50% | 63% |
+| Megablock | 188 | 0% | 0.1 | 75% | 13.9 | 54% | 0% |
+| Industrial | 10 | 0% | 0 | 10% | 0.5 | 24% | 10% |
+
+Wealthy lots don't appear on any of 20 seeds tried, so its weights are untested in the city.
+
+Most lots are 8 m wide, so many roofs are too small for a billboard (11 m) or a helipad. Those
+fall back to gear: 18 of 96 commercial roofs carry a billboard, and 3 of 67 core roofs a helipad.
+
+| `blueprint` with zones (same camera as above) | The Districts ground color |
+|---|---|
+| ![Blueprint City with district-weighted grammar buildings](screenshots/2026-11-16-city-grammar-zones.webp) | ![The same view over the Districts ground color](screenshots/2026-11-16-city-grammar-zones-districts.webp) |
+
+## 2026-11-16: Denser lots and party walls
+
+The city's buildings stood apart: each kept 0.5 m of its lot clear on every side, and lots kept a
+1 m alley on every side too. So a street front read as a row of towers with slots between them,
+and footprints covered under two thirds of each lot. Three changes close the gaps:
+
+- **Party walls between lots** (`terrain/districts.ts`): lots side by side now share an edge
+  (`SIDE_ALLEY` is 0). The 1 m alley stays only behind lots, where back meets back.
+- **Deeper lots:** a lot deepens up to `LOT_DEEPEST` (40 m) rather than its district's depth, still
+  stopping halfway to the street behind the block. Then a new backfill step (6b) lets every lot
+  but a through lot grow on into free land behind it, while the ground stays within its step and
+  no paving or other lot lies within an alley behind it. So a block whose far side got no lots
+  (a slope, a bend) fills from the side that did.
+- **Party walls in the building** (`city/placement.ts`): a grammar building's room is now its whole
+  lot. Its sides stand `PARTY_WALL` (0.25 m) in from the lot's side edges, a hairline that keeps
+  neighbors apart where lots fan out on a curve. Its back is on the lot's back edge. The front
+  keeps up to 1.5 m for awnings, signs and balconies, and so does a corner lot's cross-street
+  side. The library's buildings keep their 0.5 m all round.
+
+On `blueprint` (Center height 140 m, Lot size 8 m):
+
+| | Before | After |
+|---|---|---|
+| Lot area | 17,317 m² | 19,089 m² |
+| Footprints | 10,969 m² | 15,420 m² |
+| Footprints / lot area | 63% | 81% |
+| Footprints / district land | 28% | 40% |
+
+`harbor` and `alpha` come out at 84% and 82% of lot area. Most free land left within 10 m of a
+street is the thin strip between a verge and its lots' fronts. Most of `harbor`'s is more than
+40 m from any street, which needs streets, not lots.
+
+**Checked** on four seeds, every Lot size and Center height 40, 140 and 200 m:
+- no vertex past its room, no clashes, no flicker, every top floor within its limit;
+- no two buildings' bodies overlap. On `delta` at the 6 m Lot size, two rooms reach up to 0.63 m²
+  into a neighbor's body where lots fan inward on a curve, so a pipe or AC unit there would sit
+  inside the next wall;
+- `/grammar` and Simulation still hash the same.
+
+`blueprint` makes 3.1M vertices (2.8M before) and builds in about 150 ms. A frame's render takes
+1.8 ms.
+
+![Blueprint City with party walls and deeper lots (the same camera as above)](screenshots/2026-11-16-city-grammar-dense.webp)
+
+## 2026-11-16: Buildings at the people's scale
+
+People are drawn to the scale of the streets, not to life (`render/life.ts`): a person is about
+1.3 m, standing in for one of about 1.75 m. The buildings were drawn at full size, so a 3 m storey
+stood more than two people tall, a window as tall as a person and a door half again taller.
+
+`scale.ts` now has `FIGURE_SCALE` (0.75), the people's scale, and the city's buildings are drawn
+at it:
+- **How:** each lot's building is built at full size and the finished model is scaled by 0.75
+  (`scaleModel` in `city/placement.ts`): every vertex, its sizes and its parts' boxes. So every
+  rule and part keeps its exact proportions. Scaling each size on its own instead rounded them to
+  the quarter-voxel grid and made parts run into each other.
+- **Fit:** the grammar is given the lot, its room and the zoning height at full size (each over
+  0.75), so the scaled model fills the same footprint and stops under the same height limit. A
+  storey is now drawn 2.25 m, about 1.75 people tall, as a 3 m storey is to a real person. The
+  same height holds a third more floors.
+- **Which buildings:** the grammar buildings and the Corporate Megatower. The library builds to
+  200 m at most, so a Megatower over 150 m comes out 150 m. The Landmark stays at full size, the
+  city's monument.
+- `/grammar` and Simulation have no people and are unchanged: their 400 buildings still hash the
+  same.
+
+**Checked** on four seeds, Lot size 6, 8 and 12 m, and Center height 40, 140 and 200 m:
+- no vertex past its room, no clashes, no balcony out, and every top floor within its limit;
+- flicker at most 0.63 m² in a whole city;
+- no two buildings' bodies overlap.
+
+`blueprint` at 140 m makes 5.8M vertices (3.1M before): more floors, and more bays across each
+front. A frame's render still takes about 1 ms.
+
+| Before (full size) | After (the people's scale), the same camera |
+|---|---|
+| ![A street with people and full-size buildings](screenshots/2026-11-16-city-scale-before-street.webp) | ![The same street with buildings at the people's scale](screenshots/2026-11-16-city-scale-after-street.webp) |
+
+![Blueprint City with its buildings at the people's scale (the same camera as above)](screenshots/2026-11-16-city-scale-overview.webp)
+
+## 2026-11-17: The Landmark and shop fronts at the people's scale
+
+Two places still read too big beside the people:
+- **The Landmark's base:** it was left at full size, so its door stood more than two people tall
+  and its windows taller than a person. It is now built at full size and drawn at FIGURE_SCALE
+  too, from its footprint, room and height each over 0.75. It still stands 170 m on an 18 m
+  footprint, the tallest in the city. For this the library now takes heights up to 270 m (200 m
+  over 0.75), so the Corporate Megatower is no longer held to 150 m.
+- **Commercial ground floors:** commercial and avenue lots drew a 5–6 m ground floor, so their
+  shop windows stood about two and a half people tall. They now draw 4.75–5.25 m at full size,
+  so the shop windows stand about two people tall.
+
+Checked on four seeds at Center height 40, 140 and 200 m: the grammar rules still all hold, the
+Landmark and the Megatower have the same part clashes as at full size (none and 2), and
+`/grammar` and Simulation still hash the same.
+
+![The Landmark's base on the plaza beside the people](screenshots/2026-11-17-plaza-landmark-scale.webp)

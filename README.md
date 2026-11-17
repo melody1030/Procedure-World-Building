@@ -113,6 +113,9 @@ The full dated log with every screenshot is in
 | 2026-10-29    | **One state machine per agent**, each change with its reason; people drawn to the scale of the streets; buses kept moving at corners |
 | 2026-11-08    | **City controls**: Build and Layers tabs, one ground color at a time, a timeline of named steps, and a camera toolbar of five views |
 | 2026-11-12/16 | **The building grammar** (`/grammar`): bays, facades, massing and roofs derived from a few parameters; **Simulation** grows one on every lot, its height set by a map |
+| 2026-11-16    | **Grammar buildings on the city's lots**: every lot in `/world` builds from the grammar, its facades fitted to the room the lot leaves, its district weighting its windows, shops, signs, balconies and roof |
+| 2026-11-16    | **Denser lots**: party walls between lots and buildings, deeper lots and a backfill step, so footprints cover 81% of each lot (63% before) |
+| 2026-11-16/17 | **Buildings at the people's scale**: the city's buildings, the Landmark included, are drawn at 0.75, as its people are, so a storey stands about 1.75 people tall |
 
 | Version 1, rainy night (Oct 7) | Districts and parks (Oct 12) |
 |---|---|
@@ -132,7 +135,38 @@ The full dated log with every screenshot is in
 
 ![The Simulation page in Grammar view: a grammar building on every lot](site/src/world/screenshots/2026-11-16-simulation-grammar-page.webp)
 
-Plans: [terrain plan](docs/plans/terrain-plan.md) · [town plan](docs/plans/town-plan.md) · [shader studio plan](docs/plans/shader-studio-plan.md) · [city controls plan](docs/plans/city-controls-plan.md) · [building grammar plan](docs/plans/building-grammar-plan.md)
+The same seed (`blueprint`) and the same camera, before and after the city's lots switched to the
+grammar:
+
+| The building library (before) | The building grammar (after, Nov 16) |
+|---|---|
+| ![Blueprint City with the building library](site/src/world/screenshots/2026-11-16-city-library-overview.webp) | ![Blueprint City with grammar buildings](site/src/world/screenshots/2026-11-16-city-grammar-overview.webp) |
+| ![Closer: the library's buildings by the plaza](site/src/world/screenshots/2026-11-16-city-library-close.webp) | ![Closer: grammar buildings by the plaza](site/src/world/screenshots/2026-11-16-city-grammar-close.webp) |
+
+With each district weighting its lots' draws (the same camera), and the same view over the
+Districts ground color:
+
+| Zones drive the grammar (Nov 16) | Districts: core (cyan), commercial (pink), megablock (violet) |
+|---|---|
+| ![Blueprint City with district-weighted grammar buildings](site/src/world/screenshots/2026-11-16-city-grammar-zones.webp) | ![The same view over the Districts ground color](site/src/world/screenshots/2026-11-16-city-grammar-zones-districts.webp) |
+
+With party walls and deeper lots (the same camera), footprints cover 81% of each lot, up from 63%:
+
+![Blueprint City with party walls and deeper lots](site/src/world/screenshots/2026-11-16-city-grammar-dense.webp)
+
+The buildings drawn at the people's scale (0.75), so storeys, doors and windows stand to the
+people as they would at full size (the same street camera):
+
+| Before | After |
+|---|---|
+| ![A street with people and full-size buildings](site/src/world/screenshots/2026-11-16-city-scale-before-street.webp) | ![The same street with buildings at the people's scale](site/src/world/screenshots/2026-11-16-city-scale-after-street.webp) |
+
+The Landmark and the shop fronts around the plaza at the same scale (Nov 17), with the
+commercial ground floors lowered to 4.75–5.25 m:
+
+![The plaza, the Landmark and its shop fronts at the people's scale](site/src/world/screenshots/2026-11-17-plaza-landmark-scale.webp)
+
+Plans: [terrain plan](docs/plans/terrain-plan.md) · [town plan](docs/plans/town-plan.md) · [shader studio plan](docs/plans/shader-studio-plan.md) · [city controls plan](docs/plans/city-controls-plan.md) · [building grammar plan](docs/plans/building-grammar-plan.md) · [grammar city plan](docs/plans/grammar-city-plan.md)
 
 ---
 
