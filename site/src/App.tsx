@@ -7,6 +7,7 @@ import { weeks } from "./weeks/registry";
 import WorldPage from "./world";
 import BuildingsPreview from "./world/buildings/Preview";
 import GrammarPage from "./world/buildings/GrammarPage";
+import SimulationPage from "./world/buildings/SimulationPage";
 
 export default function App() {
   const path = usePath();
@@ -21,6 +22,7 @@ export default function App() {
     if (path === "/world") document.title = "Blueprint City · Procedural World Building";
     else if (path === "/buildings") document.title = "Building library · Procedural World Building";
     else if (path === "/grammar") document.title = "Building grammar · Procedural World Building";
+    else if (path === "/grammar/simulation") document.title = "Grammar simulation · Procedural World Building";
     else if (active) document.title = `${active.title} · Procedural World Building`;
     else document.title = `Blueprint City · ${HOME_TABS.find((t) => t.id === tab)!.label}`;
   }, [active, path, tab]);
@@ -31,6 +33,8 @@ export default function App() {
   if (path === "/buildings") return <BuildingsPreview />;
   // The building grammar editor, a Technique demo.
   if (path === "/grammar") return <GrammarPage />;
+  // Its Simulation: streets, blocks and lots, a building on every lot.
+  if (path === "/grammar/simulation") return <SimulationPage />;
 
   return (
     <div className="flex min-h-screen flex-col">

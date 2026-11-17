@@ -172,7 +172,7 @@ const weighted = (items: [Bay, number][], x: number): Bay => {
 
 /**
  * The facade's two patterns, drawn from the seed: two to four letters for the upper floors, two or
- * three for the ground floor, mirrored four times in five.
+ * three for the ground floor. Every front is mirrored.
  * - The upper pattern opens with a window, so every front has some; the rest are windows, service
  *   bays and blank panels. Signs aren't in it: placeSigns sets them on the expanded
  *   row, where their share of the front can be kept under SIGN_CAP.
@@ -183,7 +183,7 @@ export function drawPatterns(seed: number): { upper: Bay[]; ground: Bay[]; mirro
   const u = (slot: number, salt: number) => hash2(slot, salt, seed);
   const upper = Array.from({ length: 2 + Math.floor(u(0, 101) * 3) }, (_, i): Bay => (i === 0 ? "A" : weighted(UPPER_REST, u(i, 203))));
   const ground = Array.from({ length: 2 + Math.floor(u(0, 102) * 2) }, (_, i): Bay => (i === 0 ? "S" : weighted(GROUND_REST, u(i, 301))));
-  return { upper, ground, mirror: u(0, 401) < 0.8 };
+  return { upper, ground, mirror: true };
 }
 
 /**

@@ -1,16 +1,14 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import * as THREE from "three";
-import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
-import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
-import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
-import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
+import type { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { linkProps } from "../../router";
 import { VOXEL_M } from "../scale";
-import { Button, CHIP, GLASS, HEADING, NOTE, RULE, Row, Segmented, Select, Slider } from "../ui/kit";
+import { Button, CHIP, GLASS, NOTE, Row, Segmented, Select, Slider } from "../ui/kit";
 import { BAY_NAMES, CROWN_TYPES, DEFAULT_GRAMMAR, GRAMMAR_RANGES, ROOF_TYPES, SIGN_CAP, WINDOW_TYPES, buildGrammar, type Bay, type Derivation, type GrammarParams, type RoofType } from "./grammar";
 import { SHAPES, type Shape } from "./massing";
 import { buildingObject, disposeBuilding } from "./render";
+import { createNightStage } from "./stage";
+import { PageSwitch, Panel, Stat, thousands } from "./panels";
 
 /**
  * The building grammar editor (docs/plans/building-grammar-plan.md): the parameters on the left,
@@ -151,7 +149,7 @@ const VIEW_DIST = 526;
 /** The panels' size relative to the weeks' controls, drawn with CSS zoom like /world's UI_SCALE. */
 const UI_SCALE = 0.9;
 
-/** The first draw shown: A B A over S S B, mirrored, so windows, balconies and two sign columns show at once. */
+/** The first draw shown: windows, balconies and two sign columns show at once. */
 const START_SEED = 15;
 export default function GrammarPage() {
   const [params, setParams] = useState<GrammarParams>(DEFAULT_GRAMMAR);
@@ -167,81 +165,15 @@ export default function GrammarPage() {
 
   // The view: the city's night light and bloom, orbit controls, the lot it stands on.
   useEffect(() => {
-    const el = host.current!;
-    const renderer = new THREE.WebGLRenderer({
-      antialias: true,
-      logarithmicDepthBuffer: true,
-    });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.25;
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    el.appendChild(renderer.domElement);
-
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0b0f1d);
-    scene.fog = new THREE.Fog(0x0b0f1d, 1600, 3600);
-    scene.add(new THREE.HemisphereLight(0x9aa3c4, 0x1c1a26, 2.0));
-    const key = new THREE.DirectionalLight(0xdfe4ff, 2.6);
-    key.position.set(-500, 900, 600);
-    key.castShadow = true;
-    key.shadow.mapSize.set(4096, 4096);
-    Object.assign(key.shadow.camera, {
-      left: -400,
-      right: 400,
-      top: 700,
-      bottom: -400,
-      near: 10,
-      far: 3000,
-    });
-    key.shadow.bias = -0.0002;
-    key.shadow.normalBias = 0.6;
-    scene.add(key);
-    const rim = new THREE.DirectionalLight(0xc06bff, 1.1);
-    rim.position.set(700, 300, -700);
-    scene.add(rim);
-
-    const camera = new THREE.PerspectiveCamera(30, 1, 10, 8000);
-    camera.position.set(-260, 240, 420);
-    const controls = new OrbitControls(camera, renderer.domElement);
-    controls.target.set(0, 60, 0);
-    controls.enableDamping = true;
-    controls.maxPolarAngle = Math.PI * 0.49;
-    controls.update();
-
-    // Only the lights cross the bloom's threshold, so windows and neon glow and the walls stay dark.
-    const composer = new EffectComposer(renderer);
-    composer.addPass(new RenderPass(scene, camera));
-    composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 0.55, 0.45, 0.72));
-    composer.addPass(new OutputPass());
-
-    const resize = () => {
-      const { clientWidth: w, clientHeight: h } = el;
-      renderer.setSize(w, h);
-      composer.setSize(w, h);
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
-    };
-    resize();
-    const observer = new ResizeObserver(resize);
-    observer.observe(el);
     // Where the view should look and how far back it stands. When the height changes, the target
     // glides up or down and the camera pulls back along its own line of sight: a pan and a dolly,
     // never a turn, so the view doesn't tilt or jolt. Grabbing the view stops the glide.
-    const aim = {
-      y: controls.target.y,
-      dist: camera.position.distanceTo(controls.target),
-      height: 0,
-    };
-    controls.addEventListener("start", () => {
-      aim.y = controls.target.y;
-      aim.dist = camera.position.distanceTo(controls.target);
-    });
+    const aim = { y: 60, dist: 0, height: 0 };
     const offset = new THREE.Vector3();
-    let frame = 0;
-    const tick = () => {
-      frame = requestAnimationFrame(tick);
+    let view: ReturnType<typeof createNightStage> | null = null;
+    const glide = () => {
+      if (!view) return;
+      const { camera, controls } = view;
       offset.subVectors(camera.position, controls.target);
       const dist = offset.length();
       const dy = (aim.y - controls.target.y) * 0.12;
@@ -250,19 +182,25 @@ export default function GrammarPage() {
         controls.target.y += dy;
         camera.position.copy(controls.target).add(offset.setLength(dist + dd));
       }
-      controls.update();
-      composer.render();
     };
-    tick();
+    view = createNightStage(host.current!, {
+      shadow: { left: -400, right: 400, top: 700, bottom: -400 },
+      camera: [-260, 240, 420],
+      target: [0, 60, 0],
+      fog: [1600, 3600],
+      onFrame: glide,
+    });
+    const { scene, camera, controls } = view;
+    aim.dist = camera.position.distanceTo(controls.target);
+    controls.addEventListener("start", () => {
+      aim.y = controls.target.y;
+      aim.dist = camera.position.distanceTo(controls.target);
+    });
     stage.current = { scene, camera, controls, aim };
+    const dispose = view.dispose;
     return () => {
       stage.current = null;
-      cancelAnimationFrame(frame);
-      observer.disconnect();
-      controls.dispose();
-      composer.dispose();
-      renderer.dispose();
-      renderer.domElement.remove();
+      dispose();
     };
   }, []);
 
@@ -316,6 +254,7 @@ export default function GrammarPage() {
               <h1 className="mt-1 font-display text-lg font-bold text-white">Building grammar</h1>
               <p className={NOTE + " mt-1"}>A building derived rule by rule from a few parameters, after Class 09's building morphology demo.</p>
             </div>
+            <PageSwitch path="/grammar" />
             {GROUPS.map((g) => (
               <Panel key={g.title} title={g.title}>
                 {g.title === "Footprint" && (
@@ -374,10 +313,12 @@ export default function GrammarPage() {
         </aside>
 
         {/* Right: what the rules made. */}
-        <aside className={"pointer-events-auto absolute right-4 top-4 flex w-80 flex-col gap-4 rounded-2xl border p-4 " + GLASS}>
+        <aside className={"pointer-events-auto absolute right-4 top-4 flex max-h-[calc(100%-2rem)] w-80 flex-col gap-4 overflow-y-auto rounded-2xl border p-4 " + GLASS}>
           <Panel title="Variation">
             <div className="flex items-center justify-between gap-2">
-              <span className={NOTE}>A new draw of the bay patterns, the lit windows, the signs, the balconies' clutter and the rooftop gear.</span>
+              <span className={NOTE}>
+                Seed <span className="font-mono text-[#ffd27a]">{seed}</span>: bay patterns, lit windows, signs, clutter and rooftop gear.
+              </span>
               <Button onClick={() => setSeed((v) => v + 1)}>Randomize</Button>
             </div>
           </Panel>
@@ -387,10 +328,9 @@ export default function GrammarPage() {
           <Panel title="Stats">
             <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[12px]">
               <Stat label="Height" value={`${stats.height.toFixed(1)} m · ${stats.tier}-rise`} />
-              <Stat label="Footprint" value={`${stats.frontage} × ${stats.depth} m`} />
-              <Stat label="Floors" value={`${stats.floors}`} />
-              <Stat label="Windows" value={`${stats.windows} (${stats.lit} lit)`} />
-              <Stat label="Mesh" value={`${stats.vertices.toLocaleString()} verts · ${stats.triangles.toLocaleString()} tris`} />
+              <Stat label="Footprint" value={`${stats.frontage} × ${stats.depth} m · ${stats.floors} floors`} />
+              <Stat label="Windows" value={`${stats.windows} · ${stats.lit} lit`} />
+              <Stat label="Mesh" value={`${thousands(stats.vertices)} verts · ${thousands(stats.triangles)} tris`} />
               <Stat label="Build" value={`${stats.ms.toFixed(1)} ms`} />
             </dl>
           </Panel>
@@ -400,92 +340,89 @@ export default function GrammarPage() {
   );
 }
 
-function Panel({ title, children }: { title: string; children: ReactNode }) {
+/** A row of bay letters along the street front, one chip per bay (hover for its name). */
+function Bays({ letters }: { letters: Bay[] }) {
   return (
-    <section className={"flex flex-col gap-3 border-t pt-3 " + RULE}>
-      <h2 className={"m-0 " + HEADING}>{title}</h2>
-      {children}
-    </section>
+    <span className="flex flex-wrap gap-1">
+      {letters.map((l, i) => (
+        <span key={i} title={BAY_NAMES[l]} className={CHIP + " cursor-help"}>
+          {l}
+        </span>
+      ))}
+    </span>
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+/** One line of the summary: a plain name on the left, what it is on the right. */
+function Line({ label, children }: { label: ReactNode; children: ReactNode }) {
   return (
-    <>
+    <div className="contents">
       <dt className="text-[#9db2c8]">{label}</dt>
-      <dd className="m-0 text-right font-mono tabular-nums text-[#ffd27a]">{value}</dd>
-    </>
-  );
-}
-
-/** A row of bay letters as the rule expanded them. */
-function Bays({ label, letters }: { label: string; letters: Bay[] }) {
-  return (
-    <div className="flex items-start gap-2">
-      <span className="w-12 shrink-0 pt-0.5 text-[11px] text-[#9db2c8]">{label}</span>
-      <span className="flex flex-wrap gap-1">
-        {letters.map((l, i) => (
-          <span key={i} title={BAY_NAMES[l]} className={CHIP + " cursor-help"}>
-            {l}
-          </span>
-        ))}
-      </span>
+      <dd className="m-0 text-[#dce8f5]">{children}</dd>
     </div>
   );
 }
 
-/** The rules as they read now: each rule's name, what it expands to, and the numbers in amber. */
+/** A note under a line, dimmed: what was asked for but didn't fit. */
+function Aside({ children }: { children: ReactNode }) {
+  return <span className="block text-[11px] text-[#6f86a0]">{children}</span>;
+}
+
+/**
+ * What the rules made, in plain words and read top down like the building: the shape, the top,
+ * the upper floors' and the ground floor's bays along the street front, then the windows and signs.
+ */
 function Printout({ d }: { d: Derivation }) {
   const v = (text: string | number) => <span className="text-[#ffd27a]">{text}</span>;
-  const pattern = (bays: Bay[]) => `[${bays.join(" ")}]+`;
-  const mirrored = d.mirror ? " mirrored" : "";
-  const rules: [string, ReactNode][] = [
-    ["BUILDING", "PLAN BASE SHAFT TOP"],
-    ["PLAN", <>{v(SHAPES.find((o) => o.value === d.shape)?.label ?? d.shape)}{["l", "u"].includes(d.shape) ? <> · wings {v(`${d.wing} m`)}</> : null}</>],
-    ["BASE", <>pier {pattern(d.groundPattern)} pier{mirrored} · {v(`${d.groundFloor} m`)}</>],
-    ["SHAFT", d.stageFloors.length > 1 ? <>STAGE × {v(d.stageFloors.length)}</> : <>FLOOR × {v(d.floors - 1)}</>],
-    ...(d.stageFloors.length > 1
-      ? ([
-          [
-            "STAGE",
-            <>
-              FLOOR × {v(d.stageFloors.join(" | "))}
-              {" "}· in {v(d.stageInsets.map((x) => `${+x.toFixed(2)}`).join(" | ") + " m")}
-            </>,
-          ],
-        ] as [string, ReactNode][])
-      : []),
-    ["FLOOR", <>pier {pattern(d.upperPattern)} pier{mirrored} · {v(`${d.floorHeight} m`)}</>],
-    ["TOP", <>parapet {v(`${d.parapet} m`)} + ROOF{d.crown !== "none" ? " + CROWN" : ""}</>],
-    [
-      "ROOF",
-      <>
-        {d.roofBuilt === d.roof ? v(d.roof) : <>{v(d.roof)} (roof too small: {d.roofBuilt})</>}
-        {d.roofBuilt === "helipad" ? <> · {v(`${+d.roofSize.toFixed(2)} m`)} pad</> : null}
-        {d.roofBuilt !== "helipad" ? <> · fill {v(`${Math.round(d.fill * 100)}%`)}</> : null}
-      </>,
-    ],
-    ...(d.crown !== "none" ? ([["CROWN", d.crown === "cap" && !d.capped ? <>{v("cap")} (roof too small: none)</> : v(d.crown === "band" ? "neon band" : "stepped cap")]] as [string, ReactNode][]) : []),
-    ["A", <>{v(d.windowType)} window | balcony {v(`${Math.round(d.balconies * 100)}%`)}</>],
-    ["N", <>{v(d.signs)} of {v(d.columns)} columns · drawn {v(`${Math.round(d.signShare * 100)}%`)}, at most {v(`${Math.round(SIGN_CAP * 100)}%`)}</>],
-    ["FRONT", <>{v(d.bays)} bays × {v(`${d.bay.toFixed(2)} m`)}{d.fronts > 1 ? <> on each of {v(d.fronts)} wings</> : null}</>],
-  ];
+  const shape = SHAPES.find((o) => o.value === d.shape)?.label ?? d.shape;
+  const tiers = d.stageFloors.length;
+  const step = tiers > 1 ? +(d.stageInsets[1] - d.stageInsets[0]).toFixed(2) : 0;
+  const roofName: Record<string, string> = { gear: "gear", garden: "garden", billboard: "billboard", helipad: "helipad" };
+  const crown = d.crown === "band" ? "neon band" : d.crown === "cap" && d.capped ? "stepped cap" : null;
+  // The letters the front uses, in the order they first appear, for the key.
+  const used = [...new Set([...d.upper, ...d.ground])];
   return (
     <>
-      <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 font-mono text-[11px] leading-snug">
-        {rules.map(([name, body]) => (
-          <div key={name} className="contents">
-            <dt className="text-[#dce8f5]">{name}</dt>
-            <dd className="m-0 text-[#9db2c8]">
-              <span className="text-[#6f86a0]">→ </span>
-              {body}
-            </dd>
-          </div>
-        ))}
+      <dl className="m-0 grid grid-cols-[6.5rem_1fr] items-baseline gap-x-2 gap-y-2 text-[12px] leading-snug">
+        <Line label="Shape">
+          {v(shape)}
+          {tiers > 1 ? <> in {v(tiers)} tiers</> : null}
+          {d.shape === "l" || d.shape === "u" ? <> · wings {v(`${d.wing} m`)}</> : null}
+          {tiers > 1 ? <Aside>{d.stageFloors.join(" + ")} floors, each tier {step} m back</Aside> : null}
+        </Line>
+        <Line label="Top">
+          {v(roofName[d.roofBuilt])}
+          {d.roofBuilt === "helipad" ? <> {v(`${+d.roofSize.toFixed(2)} m`)}</> : null}
+          {crown ? <> · {v(crown)}</> : null}
+          {d.roofBuilt !== d.roof ? <Aside>no room for the {roofName[d.roof]}</Aside> : null}
+          {d.crown === "cap" && !d.capped ? <Aside>no room for the stepped cap</Aside> : null}
+        </Line>
+        <Line label={<>Upper floors <span className="text-[#6f86a0]">× {d.floors - 1}</span></>}>
+          <Bays letters={d.upper} />
+        </Line>
+        <Line label="Ground floor">
+          <Bays letters={d.ground} />
+        </Line>
+        <Line label="Street front">
+          {v(d.bays)} bays of {v(`${d.bay.toFixed(2)} m`)}
+          {d.fronts > 1 ? <Aside>on each of {d.fronts} wings</Aside> : null}
+        </Line>
+        <Line label="Windows">
+          {v(d.windowType)}, {v(`${Math.round(d.balconies * 100)}%`)} balconies
+        </Line>
+        <Line label="Signs">
+          {d.signs ? <>{v(d.signs)} of {v(d.columns)} columns</> : v("none")}
+          <span className="text-[#6f86a0]"> (at most {Math.round(SIGN_CAP * 100)}%)</span>
+        </Line>
       </dl>
-      <p className={"m-0 " + NOTE}>The street front expands to (hover a letter for its bay):</p>
-      <Bays label="Upper" letters={d.upper} />
-      <Bays label="Ground" letters={d.ground} />
+      <p className={"m-0 " + NOTE}>
+        {used.map((l, i) => (
+          <span key={l}>
+            {i > 0 ? " · " : ""}
+            <span className="font-mono text-[#ffd27a]">{l}</span> {BAY_NAMES[l]}
+          </span>
+        ))}
+      </p>
     </>
   );
 }

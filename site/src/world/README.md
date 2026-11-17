@@ -1437,8 +1437,18 @@ rectangles, and the facades run along the plan's outline:
   - **Crown:** none, a neon band round the parapet, or a stepped cap: two tiers, the lower ringed
     in neon, with the roof on top of it.
 
-The printout gains PLAN, STAGE (each stage's floors and how far it steps in), ROOF (with the pad's size,
-or the fill) and CROWN lines, and TOP shows the parapet's height.
+The right panel's Grammar section now reads in plain words rather than as rule notation
+(BUILDING → PLAN BASE SHAFT TOP and so on), which was hard to follow. Top down, like the building:
+- Shape, with Stepped's tiers and how far each steps back;
+- Top: the roof and crown, with a dimmed note when one didn't fit;
+- the upper floors' and the ground floor's bays as letter chips;
+- the street front's bays, the windows and balconies, and the signs;
+- a key to the letters the front uses.
+
+Stats fold Floors into Footprint, and the Variation note shows the seed.
+
+Every front is now mirrored. M2 mirrored four draws in five, so Randomize sometimes gave a lopsided
+front that read as a mistake rather than a variation. The back still runs A, V and B in turns.
 
 Things that came up in testing:
 - The corner columns reached a quarter voxel past the core and the walls behind them. Their tops
@@ -1478,3 +1488,64 @@ Two fixes outside the grammar came out of this:
 
 The default still builds in about 3 ms. The largest (46 floors on 40 × 40 m, Stepped)
 builds in up to about 170 ms.
+
+## 2026-11-16: The building grammar's Simulation
+
+The grammar now has a second page, **Simulation** (`/grammar/simulation`), after Class 09's City
+Morphology Demo. A Building | Simulation switch at the top of the left column moves between the two.
+It replaces the City lot panel the plan first had: a height map driving each building on its lot
+shows the same idea without generating a whole city first.
+
+`buildings/block.ts` (pure) lays it out:
+- **Streets:** a grid on flat ground, with long blocks along x. Each band of blocks has its own
+  cross streets, so with Irregularity on they stagger into T junctions.
+- **Blocks:** two rows of lots back to back, each row facing its own street.
+- **Lots:** cut along each row at the frontage and jittered. The body is the lot less its
+  setbacks. A lot whose body is under the grammar's smallest (6 × 8 m) stays open.
+- **Height:** a hidden Perlin field, stretched over the lots from Min to Max height, sharpened by
+  Contrast, and capped by the city's slender rule. The floors follow from it.
+- **Each lot's draws:** its shape (L and U on wide lots, Stepped on tall ones), windows,
+  balconies, lights, roof and crown, suited to its height tier.
+
+The view shows the buildings as Masses (each lot's massing as boxes, from `massing.ts`), as
+Grammar (every lot's grammar building), or not at all, which shows the lots with the Height map.
+Grammar builds from the middle out, within 12 ms per frame. A building whose settings didn't change
+is kept and only moved, so New heights rebuilds only the lots whose floors changed.
+
+The setbacks start just past what the grammar's parts reach out from the body: 1.15 m for
+balconies on the sides and back, and 1.52 m for awnings in front. The front setback first started at
+1.5 m and the awnings crossed it by 2 cm. It now starts at 1.75 m. Across 8 settings and 3 seeds,
+2,383 buildings stay inside their lots, and no two lots overlap.
+
+At the defaults (320 m, 194 lots) Grammar builds in about 0.6 s of work, about a second on the
+clock, and draws 8.7M vertices. At first that ran at about 39 fps. Three changes to the view brought
+it to 60 fps, the display's limit, with the slowest frame going from 33–36 ms to 18 ms:
+- **Shadows drawn only when the buildings change.** The light never moves, so the shadow map was
+  drawing every vertex a second time each frame for nothing.
+- **A plain depth buffer.** A logarithmic one writes each pixel's depth itself, which stops the
+  GPU from skipping hidden pixels early. The camera's near plane went from 10 to 20 voxels to keep
+  the precision.
+- **At most 1.5 device pixels per pixel**, down from 2, with bloom on top.
+
+The Building page keeps its settings: one building gains nothing from them.
+
+Changing a setting in Grammar view still stalled the page while the buildings rebuilt, so the
+building moved off the main thread:
+- **Workers.** Up to four Web Workers (`grammarWorker.ts`, run by `grammarPool.ts`) build the
+  buildings and hand their buffers back without copying. Each worker takes one job at a time, so a
+  new layout drops every job not yet started.
+- **A few per frame.** Taking every finished building at once stalled a frame for seconds, because
+  each must go to the GPU, and the workers sent more in the meantime. Now at most 300k vertices go up
+  per frame, and the shadows follow every 0.3 s while buildings arrive.
+- **Masses stand in.** Lots still waiting show their masses. While a slider is dragged, the
+  buildings hide and every lot shows its mass; the build runs once, when the slider is let go.
+- **A vertex cap.** Past about 10M vertices, each new GPU buffer stalled frames for seconds
+  (470 lots made 17.6M). Grammar now stops at 10M, from the middle out, and the lots left keep
+  their masses, with a note under the stats.
+
+At the defaults a full rebuild (New streets) now takes about 0.4 s at 60 fps, with the slowest frame
+23 ms, where it took about a second with frames dropping. New heights takes about the same, since it
+rebuilds only the lots whose floors changed. At the largest area the build stays at about 59 fps.
+
+The two pages share their night view (`buildings/stage.ts`) and their panel pieces
+(`buildings/panels.tsx`).
