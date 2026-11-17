@@ -1,8 +1,9 @@
 import { tierOf, type Tier } from "./config";
-import { DEFAULT_GRAMMAR, GRAMMAR_RANGES, type CrownType, type GrammarParams, type RoofType, type WindowType } from "./grammar";
-import { massing, type Shape } from "./massing";
+import { GRAMMAR_RANGES, type GrammarParams } from "./grammar";
+import { LOT_GROUND, STOREY, drawGrammar } from "./lotGrammar";
+import { massing } from "./massing";
 import { fbm } from "../noise";
-import { Rng, hash2 } from "../rng";
+import { hash2 } from "../rng";
 import { voxels } from "../scale";
 
 /**
@@ -80,8 +81,7 @@ export const BLOCK_RANGES = {
 /** The tallest a building may be, as a multiple of its body's narrower side (the city's rule). */
 export const SLENDER = 8;
 /** The grammar's storeys: the ground floor the lots draw with, and the city's 3 m above it. */
-const GROUND = DEFAULT_GRAMMAR.groundFloor;
-const STOREY = 3;
+const GROUND = LOT_GROUND;
 
 const quarter = (v: number) => Math.round(v * 4) / 4;
 const clamp = (v: number, [lo, hi]: readonly [number, number]) => Math.min(hi, Math.max(lo, v));
@@ -214,7 +214,8 @@ export function layoutBlocks(params: Partial<BlockParams>, streets: number, heig
     lot.floors = Math.round(clamp(1 + (height - GROUND) / STOREY, GRAMMAR_RANGES.floors));
     lot.height = GROUND + (lot.floors - 1) * STOREY;
     lot.tier = tierOf(lot.height);
-    lot.grammar = drawGrammar(lot, streets);
+    const [gx0, gz0, gx1, gz1] = lot.body;
+    lot.grammar = drawGrammar({ id: lot.id, salt: streets, frontage: gx1 - gx0, depth: gz1 - gz0, floors: lot.floors, tier: lot.tier });
     tiers[lot.tier]++;
     tallest = Math.max(tallest, lot.height);
   });
@@ -250,54 +251,6 @@ function makeLot(id: number, block: number, rect: PlanRect, facing: 1 | -1, p: B
     body = [cx, fz, cx + bw, fz + bd];
   }
   return { id, block, rect, facing, body, field: 0, height: 0, cap: "none", floors: 0, tier: "low", grammar: null, seed: Math.floor(hash2(id, 0x9e37, streets) * 2 ** 31) };
-}
-
-/** A weighted pick: [value, weight] pairs. */
-function weighted<T>(rng: Rng, items: [T, number][]): T {
-  const total = items.reduce((s, [, w]) => s + w, 0);
-  let t = rng.next() * total;
-  for (const [v, w] of items) if ((t -= w) < 0) return v;
-  return items[items.length - 1][0];
-}
-
-/**
- * The lot's own grammar settings, drawn from its seed and suited to its size and tier: courts on
- * wide lots, steps on tall ones, glass and helipads high up, gardens and shops low down.
- */
-function drawGrammar(lot: Lot, streets: number): GrammarParams {
-  const rng = new Rng(Math.floor(hash2(lot.id, 0x2c4f, streets) * 2 ** 32));
-  const [bx0, bz0, bx1, bz1] = lot.body!;
-  const frontage = bx1 - bx0;
-  const depth = bz1 - bz0;
-  const t = lot.tier;
-  let shape: Shape = "bar";
-  const roll = rng.next();
-  if (lot.floors >= 10 && depth >= 14 && roll < 0.3) shape = "stepped";
-  else if (frontage >= 20 && depth >= 16 && roll < 0.65) shape = frontage >= 24 && rng.chance(0.5) ? "u" : "l";
-  const windowType = weighted<WindowType>(rng, t === "high" ? [["glass", 5], ["ribbon", 3], ["punched", 2]] : t === "mid" ? [["punched", 5], ["ribbon", 3.5], ["glass", 1.5]] : [["punched", 7], ["ribbon", 3]]);
-  const bayWidth = rng.pick([1.75, 2, 2, 2.25, 2.5, 3]);
-  const windowWidth = quarter(Math.min(bayWidth - 0.75, rng.range(1, 1.75)));
-  const roof = weighted<RoofType>(rng, t === "high" ? [["gear", 4], ["helipad", 3.5], ["garden", 1], ["billboard", 1.5]] : t === "mid" ? [["gear", 4.5], ["garden", 2.5], ["billboard", 3]] : [["gear", 4], ["garden", 4.5], ["billboard", 1.5]]);
-  const crown = weighted<CrownType>(rng, t === "high" ? [["none", 3], ["band", 3.5], ["cap", 3.5]] : t === "mid" ? [["none", 6], ["band", 3], ["cap", 1]] : [["none", 8.5], ["band", 1.5]]);
-  return {
-    ...DEFAULT_GRAMMAR,
-    shape,
-    frontage,
-    depth,
-    floors: lot.floors,
-    groundFloor: GROUND,
-    windowType,
-    bayWidth,
-    windowWidth: Math.max(0.5, windowWidth),
-    windowHeight: quarter(rng.range(1.5, 2)),
-    lit: rng.range(0.35, 0.75),
-    balconies: t === "high" ? rng.range(0, 0.2) : rng.range(0.1, 0.5),
-    roof,
-    fill: rng.range(0.3, 0.8),
-    padSize: 16,
-    parapet: rng.pick([0.75, 0.75, 1]),
-    crown,
-  };
 }
 
 /**

@@ -50,22 +50,27 @@ import type { Columns } from "./voxelize";
  * 4. Lots, as in Cities: Skylines' zoning: only along the streets, so every lot fronts one. Each
  *    street side (avenues first) is cut behind the verge into lots ZONE meters a cell: the
  *    district's width in cells or one more (seeded; fewer where a full one doesn't fit). A second
- *    walk fills the gaps the first left with lots of any width from MIN_PLOT up. A lot starts
- *    MIN_DEPTH deep and deepens a meter at a time to the district's depth (up to 4 cells), while
- *    the street straight behind the block is still farther than the lot is deep: lots from
- *    facing streets meet half an ALLEY short of halfway. A block shallower than THROUGH_BLOCK
- *    (parallel streets a tile apart) is not split: its lots run through it, fronting both streets. A lot is kept only if it touches the
- *    verge, every column is free (so not a park), no column is within an
- *    ALLEY of another lot, and its ground spans at most MAX_LOT_STEP (megablocks MAX_STACK_STEP:
- *    they stack down slopes). Its columns are claimed `lot`.
+ *    walk fills the gaps the first left with lots of any width from MIN_PLOT up. Lots side by side
+ *    share an edge (SIDE_ALLEY is none), so a street front is one continuous wall. A lot starts
+ *    MIN_DEPTH deep and deepens a meter at a time up to LOT_DEEPEST, while the street straight
+ *    behind the block is still farther than the lot is deep: lots from facing streets meet half an
+ *    ALLEY short of halfway. A block shallower than THROUGH_BLOCK (parallel streets a tile apart)
+ *    is not split: its lots run through it, fronting both streets. A lot is kept only if it touches
+ *    the verge, every column is free (so not a park), no column is within an ALLEY behind another
+ *    lot, and its ground spans at most MAX_LOT_STEP (megablocks MAX_STACK_STEP: they stack down
+ *    slopes). Its columns are claimed `lot`.
  * 5. Corner lots: the frontage the walk leaves (rounded corners, short runs, odd pockets) is
  *    packed with grid-aligned rectangles, the district's size or smaller down to MIN_PLOT a
  *    side (in CORNER_STEP steps), each fronting a verge or street along at least a quarter of its
  *    narrower side, with the same
  *    alley and ground rules. So every lot still fronts a street.
  * 6. Small lots: a lot narrower than MERGE_BELOW is merged with the neighbor beside it on the same
- *    frontage (across their alley); one still narrower than MIN_PLOT is given up, its ground left
+ *    frontage (across their shared edge); one still narrower than MIN_PLOT is given up, its ground left
  *    free (see mergeSmallLots).
+ *    6b. Backfill: every lot but a through lot deepens on into the free land behind it, up to
+ *    LOT_DEEPEST, while its ground stays within its step and no paving or other lot lies within an
+ *    ALLEY behind it. So a block whose far side got no lots (a slope, a bend) fills from the side
+ *    that did.
  * 7. Frontage: each lot records what it fronts. Its street is an avenue (a main street, or the
  *    plaza) or a side street: the street walk knows its own; a corner lot reads the paving out
  *    from its front edge. Its frontage is its front edge's length. It is a corner lot if a side
@@ -129,10 +134,14 @@ const SMOOTH_PASSES = 3;
 const MIN_REGION = 2000;
 /** How many cells a district region reaches across a street. */
 const ACROSS = 3;
-/** Lots: the depth every lot starts at, the gap between lots, and the most their ground may span
- * (meters; the building stage terraces them). The zone cell is `params.lots.unit`. */
+/** Lots: the depth every lot starts at, the deepest one grows, the lane behind lots and the gap
+ * between lots side by side (none: neighbors share a party wall, so a street front is one
+ * continuous wall), and the most their ground may span (meters; the building stage terraces
+ * them). The zone cell is `params.lots.unit`. */
 const MIN_DEPTH = 6;
+const LOT_DEEPEST = 40;
 const ALLEY = 1;
+const SIDE_ALLEY = 0;
 const MAX_LOT_STEP = 6;
 const MAX_STACK_STEP = 10;
 /** Small lots: narrower than MERGE_BELOW (meters) either way, a lot is merged with a neighbor
@@ -170,6 +179,12 @@ export interface Lot {
   frontage: number;
   /** It fronts paving on its front and one side too: a corner lot. */
   corner: boolean;
+  /**
+   * Which side a corner lot's second street is on, as seen from the street: right is the edge from
+   * the front-right corner back (corners[1] to corners[2]), left the one from the back-left corner
+   * to the front-left (corners[3] to corners[0]). Null for any other lot.
+   */
+  cornerSide: "left" | "right" | null;
   /** It fronts paving at its back too: a through lot, the whole depth of a thin block. */
   through: boolean;
 }
@@ -722,7 +737,7 @@ export function buildDistricts(seed: number, cols: Columns, streets: Streets, hu
           const grow = voxels(1);
           let deep = depth;
           let stopped = false;
-          while (deep + grow <= voxels(spec.depth * ZONE) + 0.01) {
+          while (deep + grow <= voxels(LOT_DEEPEST) + 0.01) {
             const strip = rasterize([corners[3], corners[2], { x: corners[2].x + mx * grow, z: corners[2].z + mz * grow }, { x: corners[3].x + mx * grow, z: corners[3].z + mz * grow }], n);
             let lo = low;
             let hi = high;
@@ -766,20 +781,21 @@ export function buildDistricts(seed: number, cols: Columns, streets: Streets, hu
             claim[k] = CLAIM.lot;
             lotId[k] = id + 1;
           }
-          // The lot grown by an alley on every side (the front's alley falls on the verge).
+          // The lot grown by a lane at its back and SIDE_ALLEY at its sides (the front's falls on the verge).
           const a = voxels(ALLEY);
+          const sa = voxels(SIDE_ALLEY);
           const ring = [
-            { x: corners[0].x - tx * a - mx * a, z: corners[0].z - tz * a - mz * a },
-            { x: corners[1].x + tx * a - mx * a, z: corners[1].z + tz * a - mz * a },
-            { x: corners[2].x + tx * a + mx * a, z: corners[2].z + tz * a + mz * a },
-            { x: corners[3].x - tx * a + mx * a, z: corners[3].z - tz * a + mz * a },
+            { x: corners[0].x - tx * sa - mx * a, z: corners[0].z - tz * sa - mz * a },
+            { x: corners[1].x + tx * sa - mx * a, z: corners[1].z + tz * sa - mz * a },
+            { x: corners[2].x + tx * sa + mx * a, z: corners[2].z + tz * sa + mz * a },
+            { x: corners[3].x - tx * sa + mx * a, z: corners[3].z - tz * sa + mz * a },
           ];
           for (const k of rasterize(ring, n, false)) gap[k] = 1;
           const centerCell = cellOf((corners[0].x + corners[2].x) / 2, (corners[0].z + corners[2].z) / 2);
-          lots.push({ id, corners, facing: Math.atan2(-mz, -mx), district: d as District, density: density[centerCell], area: columns.length * VOXEL_M * VOXEL_M, low, high, floor: low, street: st.kind === "main" ? "avenue" : "side", frontage: 0, corner: false, through: false });
+          lots.push({ id, corners, facing: Math.atan2(-mz, -mx), district: d as District, density: density[centerCell], area: columns.length * VOXEL_M * VOXEL_M, low, high, floor: low, street: st.kind === "main" ? "avenue" : "side", frontage: 0, corner: false, cornerSide: null, through: false });
           placed = w;
         }
-        s += placed ? placed + voxels(ALLEY) : voxels(1);
+        s += placed ? placed + voxels(SIDE_ALLEY) : voxels(1);
       }
     }
   }
@@ -792,10 +808,11 @@ export function buildDistricts(seed: number, cols: Columns, streets: Streets, hu
     lots.push(...kept);
     gap.fill(0);
     const a = voxels(ALLEY);
+    const sa = voxels(SIDE_ALLEY);
     for (const lot of lots) {
       const f = frame(lot);
       const at = (u: number, v: number) => ({ x: f.a.x + f.t.x * u + f.m.x * v, z: f.a.z + f.t.z * u + f.m.z * v });
-      for (const k of rasterize([at(-a, -a), at(f.width + a, -a), at(f.width + a, f.depth + a), at(-a, f.depth + a)], n, false)) gap[k] = 1;
+      for (const k of rasterize([at(-sa, -a), at(f.width + sa, -a), at(f.width + sa, f.depth + a), at(-sa, f.depth + a)], n, false)) gap[k] = 1;
     }
   }
 
@@ -803,7 +820,8 @@ export function buildDistricts(seed: number, cols: Columns, streets: Streets, hu
   // pockets) is packed with grid-aligned rectangles, the district's size or smaller down to
   // MIN_PLOT a side, each touching a verge or street, an alley from every other lot. A summed-area
   // table of usable columns tests a rectangle at once; `taken` holds those placed so far.
-  const alley = voxels(ALLEY);
+  // Corner lots pack against each other as street lots do, wall to wall.
+  const alley = voxels(SIDE_ALLEY);
   const sat = new Int32Array((n + 1) * (n + 1));
   for (let z = 0; z < n; z++) {
     let row = 0;
@@ -939,7 +957,7 @@ export function buildDistricts(seed: number, cols: Columns, streets: Streets, hu
         }
         for (let z = Math.max(0, z0 - alley); z < Math.min(n, z1 + alley); z++) taken.fill(1, z * n + Math.max(0, x0 - alley), z * n + Math.min(n, x1 + alley));
         const center = cellOf((x0 + x1) / 2, (z0 + z1) / 2);
-        lots.push({ id, corners, facing, district: d, density: density[center], area: w * dd * VOXEL_M * VOXEL_M, low, high, floor: low, street: frontStreet(corners), frontage: 0, corner: false, through: false });
+        lots.push({ id, corners, facing, district: d, density: density[center], area: w * dd * VOXEL_M * VOXEL_M, low, high, floor: low, street: frontStreet(corners), frontage: 0, corner: false, cornerSide: null, through: false });
         break;
       }
     }
@@ -948,12 +966,68 @@ export function buildDistricts(seed: number, cols: Columns, streets: Streets, hu
   // 6. Small lots: merged with a neighbor, else given up.
   const kept = mergeSmallLots(lots, lotId, claim, height, n);
 
+  // 6b. Backfill: a lot deepens on into the free land behind it, a meter at a time, up to
+  // LOT_DEEPEST, while the ground stays within its step and nothing (paving or another lot) lies
+  // within an ALLEY behind its new back edge. So a block whose far side got no lots (a slope, a
+  // park, a bend) fills from the side that did.
+  for (const lot of kept) {
+    if (lot.through) continue;
+    const maxStep = voxels(lot.district === DISTRICT.megablock ? MAX_STACK_STEP : MAX_LOT_STEP);
+    const f = frame(lot);
+    const grow = voxels(1);
+    const a = voxels(ALLEY);
+    const c = lot.corners;
+    // Free behind the edge from c[3] to c[2], moved `by` toward the back: paving or another lot within an alley stops it.
+    const clearBehind = (by: number) => {
+      for (let u = 0.5; u <= f.width - 0.5 + 1e-6; u += 1) {
+        const x = c[3].x + f.t.x * u + f.m.x * by;
+        const z = c[3].z + f.t.z * u + f.m.z * by;
+        for (let i = 0; i <= a; i++) {
+          const X = Math.round(x + f.m.x * i);
+          const Z = Math.round(z + f.m.z * i);
+          if (X < 0 || Z < 0 || X >= n || Z >= n) return false;
+          const k = Z * n + X;
+          const what = claim[k];
+          if (what === CLAIM.road || what === CLAIM.plaza || what === CLAIM.verge) return false;
+          if (lotId[k] && lotId[k] !== lot.id + 1) return false;
+        }
+      }
+      return true;
+    };
+    let deep = f.depth;
+    while (deep + grow <= voxels(LOT_DEEPEST) + 0.01 && clearBehind(grow)) {
+      const strip = rasterize([c[3], c[2], { x: c[2].x + f.m.x * grow, z: c[2].z + f.m.z * grow }, { x: c[3].x + f.m.x * grow, z: c[3].z + f.m.z * grow }], n);
+      let lo = lot.low;
+      let hi = lot.high;
+      let fits = strip.length > 0;
+      for (const k of strip) {
+        if (claim[k] !== CLAIM.free || district[cellOf(k % n, Math.floor(k / n))] === NO_DISTRICT) {
+          fits = false;
+          break;
+        }
+        lo = Math.min(lo, height[k]);
+        hi = Math.max(hi, height[k]);
+      }
+      if (!fits || hi - lo > maxStep) break;
+      for (const k of strip) {
+        claim[k] = CLAIM.lot;
+        lotId[k] = lot.id + 1;
+      }
+      for (const q of [2, 3]) c[q] = { x: c[q].x + f.m.x * grow, z: c[q].z + f.m.z * grow };
+      lot.low = lo;
+      lot.high = hi;
+      lot.area += strip.length * VOXEL_M * VOXEL_M;
+      deep += grow;
+    }
+  }
+
   // 7. Frontage, on the lots as they are now: the front edge's length, and which other edges
   // front paving too (a side: a corner lot; the back: a through lot).
   for (const lot of kept) {
     const [front, right, back, left] = frontedEdges(lot, claim, n);
     lot.frontage = frame(lot).width * VOXEL_M;
     lot.corner = front && (left || right);
+    lot.cornerSide = !lot.corner ? null : right ? "right" : "left";
     lot.through = front && back;
   }
 

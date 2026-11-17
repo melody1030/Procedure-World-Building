@@ -118,6 +118,45 @@ export const GRAMMAR_RANGES = {
   parapet: [0.5, 2],
 } as const;
 
+/**
+ * What `validateGrammar` keeps a build to, where it is wider than the page's sliders: the city's
+ * smallest lots leave a 6 m deep body, and its 200 m Center height, at full size (city/placement.ts
+ * draws its buildings at FIGURE_SCALE), needs 89 floors.
+ */
+const BUILD_RANGES = { ...GRAMMAR_RANGES, depth: [6, 40], floors: [2, 90] } as const;
+
+/**
+ * The room round the body, in meters, on the street front, the two sides and the back: a building
+ * on the city's lots (city/placement.ts) has little. A face with less than a part's reach leaves
+ * the part out or shortens it (balconies, blade signs, awnings), and anything else reaching past
+ * the room is cut at its edge (`Kit.clip`). With none, every face has all the room it needs.
+ */
+export interface Clearance {
+  front: number;
+  /** The sides: left at x = 0, right at x = frontage, as the plan is drawn (the street at +z). */
+  left: number;
+  right: number;
+  back: number;
+}
+
+/**
+ * How a lot's district and frontage steer the facade (city/placement.ts and lotGrammar.ts;
+ * docs/plans/grammar-city-plan.md §1.5). Every field is optional; with none, the facade is the
+ * one the seed alone draws, as on the `/grammar` page.
+ */
+export interface GrammarStyle {
+  /** The weights of the upper pattern's slots after its first window, and of the ground's after its first slot. */
+  upper?: [Bay, number][];
+  ground?: [Bay, number][];
+  /** The ground pattern's first slot: a shop unless given. */
+  groundFirst?: Bay;
+  /** The range the sign share is drawn in, and the most of the front's columns that may be signs (SIGN_CAP unless given). */
+  signs?: readonly [number, number];
+  signCap?: number;
+  /** A side that fronts a street too (a corner lot): its floors take the street front's patterns, ground floor and signs. */
+  corner?: "left" | "right";
+}
+
 /** Down to a quarter voxel, as the kit's sizes are. */
 const quarter = (v: number) => Math.floor(v * 4) / 4;
 
@@ -179,10 +218,13 @@ const weighted = (items: [Bay, number][], x: number): Bay => {
  * - The ground pattern opens with a shop; the rest are shops, windows, doors, service doors and
  *   blank walls.
  */
-export function drawPatterns(seed: number): { upper: Bay[]; ground: Bay[]; mirror: boolean } {
+export function drawPatterns(seed: number, style: GrammarStyle = {}): { upper: Bay[]; ground: Bay[]; mirror: boolean } {
   const u = (slot: number, salt: number) => hash2(slot, salt, seed);
-  const upper = Array.from({ length: 2 + Math.floor(u(0, 101) * 3) }, (_, i): Bay => (i === 0 ? "A" : weighted(UPPER_REST, u(i, 203))));
-  const ground = Array.from({ length: 2 + Math.floor(u(0, 102) * 2) }, (_, i): Bay => (i === 0 ? "S" : weighted(GROUND_REST, u(i, 301))));
+  const upperRest = style.upper ?? UPPER_REST;
+  const groundRest = style.ground ?? GROUND_REST;
+  const first = style.groundFirst ?? "S";
+  const upper = Array.from({ length: 2 + Math.floor(u(0, 101) * 3) }, (_, i): Bay => (i === 0 ? "A" : weighted(upperRest, u(i, 203))));
+  const ground = Array.from({ length: 2 + Math.floor(u(0, 102) * 2) }, (_, i): Bay => (i === 0 ? first : weighted(groundRest, u(i, 301))));
   return { upper, ground, mirror: true };
 }
 
@@ -202,10 +244,16 @@ export function rowLetters(pattern: Bay[], n: number, mirror: boolean, ground: b
  * the columns, never more than SIGN_CAP of them, become sign columns. On a mirrored row a column
  * goes with its reflection, so the signs stay symmetric; which columns is drawn from the seed too.
  */
-export function placeSigns(row: Bay[], mirror: boolean, seed: number): { row: Bay[]; share: number; count: number } {
+export function placeSigns(
+  row: Bay[],
+  mirror: boolean,
+  seed: number,
+  range: readonly [number, number] = [0, SIGN_CAP],
+  cap = SIGN_CAP,
+): { row: Bay[]; share: number; count: number } {
   const n = row.length;
-  const share = SIGN_CAP * hash2(0, 501, seed);
-  const budget = Math.min(Math.round(share * n), Math.floor(SIGN_CAP * n));
+  const share = range[0] + (range[1] - range[0]) * hash2(0, 501, seed);
+  const budget = Math.min(Math.round(share * n), Math.floor(cap * n));
   const half = mirror ? Math.floor(n / 2) : n;
   // The first column is never a sign: its blade would stand on the corner column.
   const units = Array.from({ length: half }, (_, i) => (mirror ? [i, n - 1 - i] : [i])).slice(1);
@@ -287,7 +335,7 @@ const clamp = (v: number, [lo, hi]: readonly [number, number]) => Math.min(hi, M
 /** Keeps every parameter in its range. */
 export function validateGrammar(p: Partial<GrammarParams>): GrammarParams {
   const c = { ...DEFAULT_GRAMMAR, ...p };
-  const r = GRAMMAR_RANGES;
+  const r = BUILD_RANGES;
   return {
     ...c,
     frontage: clamp(c.frontage, r.frontage),
@@ -316,6 +364,8 @@ interface Face {
   p: GrammarParams;
   lo: number;
   hi: number;
+  /** How far out from the wall a part may reach (voxels; Infinity with no clearance). */
+  room: number;
 }
 
 /** One storey: its foot, the top of its floor band (where openings start), its top. */
@@ -343,12 +393,24 @@ const LIP = 3 * PROUD;
 /** The parapet's thickness. */
 const COPE = m(0.25);
 
-export function buildGrammar(params: Partial<GrammarParams>, seed: number): { model: BuildingModel; derivation: Derivation; stats: GrammarStats } {
+export function buildGrammar(
+  params: Partial<GrammarParams>,
+  seed: number,
+  clearance?: Clearance,
+  style: GrammarStyle = {},
+): { model: BuildingModel; derivation: Derivation; stats: GrammarStats } {
   const start = performance.now();
   const p = validateGrammar(params);
   const k = new Kit(seed ^ 0x6a17);
   const W = m(p.frontage);
   const D = m(p.depth);
+  // The room, in the plan's voxels (the street at +z), and how far out from an edge's line it reaches.
+  const room: [number, number, number, number] | null = clearance
+    ? [-m(clearance.left), -m(clearance.back), W + m(clearance.right), D + m(clearance.front)]
+    : null;
+  k.clip = room;
+  const roomOut = (e: Edge) =>
+    !room ? Infinity : e.dir === 0 ? room[3] - e.line : e.dir === 1 ? room[2] - e.line : e.dir === 2 ? e.line - room[1] : e.line - room[0];
   const gh = m(p.groundFloor);
   const H = gh + (p.floors - 1) * FLOOR;
   const parapet = m(p.parapet);
@@ -364,7 +426,9 @@ export function buildGrammar(params: Partial<GrammarParams>, seed: number): { mo
   const at = (face: number, floor: number, bay: number) => new Rng(Math.floor(hash2(face * 64 + floor, bay, seed) * 4294967296));
   // How lit each floor is: some floors busy, some nearly dark, the same on every side.
   const floorLight = Array.from({ length: p.floors }, (_, j) => 0.35 + 1.3 * hash2(j, 7919, seed));
-  const { upper: upperPattern, ground: groundPattern, mirror } = drawPatterns(seed);
+  const { upper: upperPattern, ground: groundPattern, mirror } = drawPatterns(seed, style);
+  const signRange = style.signs ?? ([0, SIGN_CAP] as const);
+  const signCap = style.signCap ?? SIGN_CAP;
   // The street front: every edge of the first stage along the street (the U has two, its wings'
   // ends), each with its own row of bays and its own signs. The widest is the one the printout shows.
   const streets = outline(plan.stages[0].rects)
@@ -372,7 +436,7 @@ export function buildGrammar(params: Partial<GrammarParams>, seed: number): { mo
     .sort((a, b) => a.side.ox - b.side.ox)
     .map((e) => {
       const { n, bay } = bayLayout(e.side.length, m(p.bayWidth));
-      const signed = placeSigns(rowLetters(upperPattern, n, mirror, false), mirror, seed);
+      const signed = placeSigns(rowLetters(upperPattern, n, mirror, false), mirror, seed, signRange, signCap);
       return { ox: e.side.ox, n, bay, ground: rowLetters(groundPattern, n, mirror, true), signed };
     });
   const front = streets.reduce((best, f) => (f.n > best.n ? f : best));
@@ -436,14 +500,20 @@ export function buildGrammar(params: Partial<GrammarParams>, seed: number): { mo
       const r0 = e.convex[0] ? 0 : CLEAR;
       const r1 = e.convex[1] ? L : L - CLEAR;
       const { n, bay } = r1 - r0 >= PIER + m(1) ? bayLayout(r1 - r0, m(p.bayWidth)) : { n: 0, bay: 0 };
+      // A corner lot's side on the cross street reads as a second street front.
+      const corner = (style.corner === "right" && e.dir === 1 && e.line === W) || (style.corner === "left" && e.dir === 3 && e.line === 0);
       const rows = street
         ? { ground: street.ground, upper: street.signed.row }
-        : e.dir === 2
+        : corner
+          ? { ground: rowLetters(groundPattern, n, mirror, true), upper: placeSigns(rowLetters(upperPattern, n, mirror, false), mirror, seed ^ 0x7c1, signRange, signCap).row }
+          : e.dir === 2
           ? { ground: rowLetters(back, n, false, false), upper: rowLetters(back, n, false, false) }
           : e.dir === 0 && e.line === zMax
             ? { ground: rowLetters(plain(groundPattern), n, mirror, false), upper: rowLetters(upperPattern, n, mirror, false) }
             : { ground: rowLetters(plain(groundPattern), n, mirror, false), upper: rowLetters(plain(upperPattern), n, mirror, false) };
-      const f: Face = { k, s, p, lo: e.convex[0] ? PIER : 0, hi: e.convex[1] ? L - PIER : L };
+      const f: Face = { k, s, p, lo: e.convex[0] ? PIER : 0, hi: e.convex[1] ? L - PIER : L, room: roomOut(e) };
+      // A face with no room for a balcony's reach gets none (on the city's lots, a party wall).
+      const balconies = f.room >= BALCONY_REACH;
       // A sign column is a blade sign on its bay's left pier, one color all the way up. The first
       // bay's left pier is the corner column, so placeSigns never picks it.
       const columns: Column[] = Array.from({ length: n }, (_, i) => ({ color: at(fk, 63, i).pick(NEON) }));
@@ -482,7 +552,7 @@ export function buildGrammar(params: Partial<GrammarParams>, seed: number): { mo
           };
           // A -> window | balcony, for the windows above the ground floor: each draws its own
           // number, so raising the share adds balconies one by one.
-          const free = letter === "A" && !ground && !terrace;
+          const free = letter === "A" && !ground && !terrace && balconies;
           let hole: Hole | null = null;
           if (letter === "B") blank(f, r, fl, a, ow);
           else if (letter === "C" && ground) hole = door(f, r, a, ow, rt);
@@ -491,7 +561,7 @@ export function buildGrammar(params: Partial<GrammarParams>, seed: number): { mo
           else if (free && hash2(fk * 64 + j, i, seed ^ 0x5bd1) < p.balconies) hole = balcony(f, r, fl, a, ow, light());
           else {
             hole = window_(f, r, fl, a, ow, p.windowType, light());
-            if (letter === "N") blade(f, r, fl, a - PIER / 2, columns[i]);
+            if (letter === "N" && f.room >= BLADE_MIN) blade(f, r, fl, a - PIER / 2, columns[i]);
           }
           if (hole) holes.push(hole);
         }
@@ -890,12 +960,27 @@ function shop(f: Face, r: Rng, a: number, ow: number, rt: number): Hole {
   sideBox(k, s, a, top, -RECESS, ow, FASCIA, RECESS, TRIM);
   sideBox(k, s, a + m(0.1), top + m(0.1), 0, ow - m(0.2), FASCIA - m(0.2), PROUD, PAL.night);
   sideBox(k, s, a + m(0.2), top + m(0.22), PROUD, ow - m(0.4), m(0.45), 0.1, neon, true, 0.9 * k.neon);
-  if (r.chance(0.5)) {
-    sideBox(k, s, a, top - m(0.25), 0, ow, m(0.2), m(0.9), r.pick(AWNINGS));
-    sideBox(k, s, a + m(0.1), top - m(0.3), m(0.1), ow - m(0.2), m(0.05), m(0.7), neon, true, 0.5 * k.neon);
+  // The awning reaches AWNING out, or what the room allows; under half a meter, none.
+  const awning = Math.min(AWNING, f.room);
+  if (r.chance(0.5) && awning >= m(0.5)) {
+    sideBox(k, s, a, top - m(0.25), 0, ow, m(0.2), awning, r.pick(AWNINGS));
+    sideBox(k, s, a + m(0.1), top - m(0.3), m(0.1), ow - m(0.2), m(0.05), awning - m(0.2), neon, true, 0.5 * k.neon);
   }
   return [a, a + ow, 0, rt];
 }
+
+/** How far out a shop's awning reaches. */
+const AWNING = m(0.9);
+
+/**
+ * A blade sign's depth, and the least it is built at where the room is short (a column whose
+ * face has less room than that gets no blade, its windows only).
+ */
+const BLADE = m(1.4);
+const BLADE_MIN = m(0.15) + m(0.6) + 0.1;
+
+/** How far out a balcony reaches from the wall (its slab, rail and what hangs on it). */
+const BALCONY_REACH = PROUD + m(1.1);
 
 /**
  * A balcony, in place of a window: a tall door behind a slab with a sheet-metal front and ends, and on it, by chance,
@@ -962,7 +1047,8 @@ function blade(f: Face, r: Rng, fl: Storey, pier: number, col: Column) {
   const t = 1.25;
   const ba = pier - t / 2;
   const out = m(0.15);
-  const deep = m(1.4);
+  // As deep as BLADE, or as the room allows (BLADE_MIN at the least: see the caller).
+  const deep = Math.min(BLADE, f.room - out - 0.1);
   const h = fl.rt - fl.rb;
   k.occupy(sideBounds(s, ba - 0.05, fl.rb, out, t + 0.1, h, deep), "sign");
   sideBox(k, s, ba, fl.rb, out, t, h, deep, PAL.charcoal);

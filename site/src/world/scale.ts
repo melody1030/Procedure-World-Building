@@ -12,6 +12,14 @@ export const voxels = (meters: number) => meters / VOXEL_M;
 /** Voxels → meters, for labels. */
 export const toMeters = (v: number) => v * VOXEL_M;
 
+/**
+ * The scale people are drawn to (render/life.ts): a person is about 1.3 m, standing in for one of
+ * about 1.75 m, so they read at the size of the streets and cars. Building details a person stands
+ * next to (storeys, windows, doors, balconies, awnings, signs) are drawn at this scale too, so a
+ * storey (3 m at full size) is 2.25 m and still stands about 1.7 people tall.
+ */
+export const FIGURE_SCALE = 0.75;
+
 /** Voxels per side of one chunk (the unit the land is divided into, and meshed in). */
 export const CHUNK = 32;
 /** The terrain: a square of CHUNKS × CHUNKS chunks (928 voxels = 232 m across) filling the whole plinth. */

@@ -9,7 +9,8 @@ import type { VehicleKind } from "../life/traffic";
  * instance; the parts' matrices are set from the agent's place and pose every frame. People are
  * drawn to the scale of the streets and vehicles, not to life: those are small (3.5 m streets,
  * 1.4 m-wide cars), so a person is about 1.3 m, a little chunky, with a big head and arms, so they
- * read as people from far off. A pigeon is 30 cm, a cat 45 cm long.
+ * read as people from far off (FIGURE_SCALE in scale.ts; the city's buildings are drawn at it too).
+ * A pigeon is 30 cm, a cat 45 cm long.
  *
  * - People: legs and arms swing as they walk; sitting, they bend at the hip with their feet on the
  *   ground and their hands on their knees; hailing a taxi, they hold a glowing phone up.

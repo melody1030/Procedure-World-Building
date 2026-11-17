@@ -82,7 +82,8 @@ export function validate(defaults: BuildingConfig, overrides: Partial<BuildingCo
     ...c,
     width: clamp(c.width, 4, 64, defaults.width),
     depth: clamp(c.depth, 4, 64, defaults.depth),
-    height: clamp(c.height, 6, 200, defaults.height),
+    // (Up to 270 m: the city builds at full size and draws at FIGURE_SCALE, so its 200 m is 267 m here.)
+    height: clamp(c.height, 6, 270, defaults.height),
     floorHeight: clamp(c.floorHeight, 2.5, 5, defaults.floorHeight),
     windowDensity: clamp(c.windowDensity, 0, 1, defaults.windowDensity),
     balconyDensity: clamp(c.balconyDensity, 0, 1, defaults.balconyDensity),

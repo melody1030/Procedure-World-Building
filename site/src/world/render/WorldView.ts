@@ -11,7 +11,7 @@ import { BASE, WORLD_SIZE, voxels } from "../scale";
 import { buildPlinth } from "./base";
 import { makePrintable, type PrintableBuilding } from "../buildings/print";
 import { buildingMaterials, buildingObject, disposeBuilding } from "../buildings/render";
-import { fitBuilding, type BuildingPlan } from "../city/placement";
+import { fitBuilding, fitGrammar, type BuildingPlan } from "../city/placement";
 import type { Park, Parks } from "../city/parks";
 import { buildParkModel } from "../city/parkModels";
 import { BUILD_PHASES, PAVING_FROM, PAVING_TO, type BuildUp } from "../terrain/buildup";
@@ -756,9 +756,11 @@ export class WorldView {
       const start = performance.now();
       while (this.cityQueue.length && performance.now() - start < 10) {
         const { plan, index, delay } = this.cityQueue.shift()!;
-        // All of it within its lot, less a gap all round.
-        const group = buildingObject(fitBuilding(plan));
-        group.position.set(plan.x - half, plan.base, plan.z - half);
+        // All of it within its lot, less a gap all round: the lot's grammar building, or its
+        // signature one (the Landmark, the Megatower).
+        const g = plan.grammar;
+        const group = buildingObject(g ? fitGrammar(g, plan.seed) : fitBuilding(plan));
+        group.position.set((g ? g.x : plan.x) - half, plan.base, (g ? g.z : plan.z) - half);
         group.rotation.y = plan.rotation;
         // Its bounds in the scene, once placed, so it hides what stands behind it from a click
         // (the city group stays at the origin).
