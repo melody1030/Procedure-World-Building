@@ -1,0 +1,98 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-18T00:00:00Z",
+  "title": "Design System: Blueprint City",
+  "extensions": {
+    "colorMeta": {
+      "ink-glass": { "role": "neutral", "displayName": "Ink Glass", "canonical": "#0b1626", "tonalRamp": ["#05090f", "#0b1626", "#12243b", "#1c3350", "#2d4a6c", "#4d6c90", "#7f9bb9", "#c3d3e4"] },
+      "neon-cyan": { "role": "primary", "displayName": "Neon Cyan", "canonical": "#5ad8ff", "tonalRamp": ["#06212b", "#0b4256", "#10647f", "#1688aa", "#3bb0d6", "#5ad8ff", "#9fe8ff", "#dcf6ff"] },
+      "lit-amber": { "role": "secondary", "displayName": "Lit Amber", "canonical": "#ffd27a", "tonalRamp": ["#2e2008", "#5a3f0e", "#8a6214", "#b98a22", "#e0ad45", "#ffd27a", "#ffe3a8", "#fff3d9"] }
+    },
+    "typographyMeta": {
+      "heading": { "displayName": "Heading", "purpose": "Uppercase panel section titles in Share Tech." },
+      "value": { "displayName": "Value", "purpose": "Amber tabular mono numbers inside chips." }
+    },
+    "shadows": [
+      { "name": "glass-lift", "value": "0 12px 32px rgba(8,16,30,0.35)", "purpose": "Soft lift under floating glass panels." }
+    ],
+    "motion": [
+      { "name": "color-fade", "value": "150ms ease", "purpose": "Hover and selection recolors." },
+      { "name": "panel-slide", "value": "300ms ease-in-out", "purpose": "Panels sliding in and out." }
+    ],
+    "breakpoints": []
+  },
+  "components": [
+    {
+      "name": "Parameter Row",
+      "kind": "custom",
+      "refersTo": "value-chip",
+      "description": "Name left, amber value chip right, slim track below.",
+      "html": "<div class=\"ds-row\"><div class=\"ds-top\"><span class=\"ds-label\">Street density</span><span class=\"ds-chip\">0.62</span></div><div class=\"ds-track\"><div class=\"ds-fill\"></div></div></div>",
+      "css": ".ds-row{width:240px;display:flex;flex-direction:column;gap:8px;font-family:Roboto,system-ui,sans-serif}.ds-top{display:flex;justify-content:space-between;align-items:center}.ds-label{font-size:12px;font-weight:500;color:#9db2c8}.ds-chip{font:11px ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums;color:#ffd27a;background:rgba(255,210,122,.1);border-radius:6px;padding:2px 6px}.ds-track{position:relative;height:3px;border-radius:9999px;background:#24384f}.ds-fill{width:62%;height:100%;border-radius:9999px;background:#5ad8ff;position:relative}.ds-fill::after{content:'';position:absolute;right:-5px;top:-4px;width:10px;height:10px;border-radius:9999px;background:#f2f8ff;border:2px solid #5ad8ff;box-sizing:border-box}"
+    },
+    {
+      "name": "Button",
+      "kind": "button",
+      "refersTo": "button",
+      "description": "Small ink button; cyan border on hover.",
+      "html": "<button class=\"ds-btn\">Rebuild city</button>",
+      "css": ".ds-btn{font:500 12px Roboto,system-ui,sans-serif;color:#dce8f5;background:rgba(14,28,48,.6);border:1px solid rgba(125,180,230,.2);border-radius:8px;padding:6px 10px;cursor:pointer;transition:color .15s,border-color .15s}.ds-btn:hover{color:#fff;border-color:rgba(90,216,255,.5)}.ds-btn:focus-visible{outline:2px solid #5ad8ff;outline-offset:2px}"
+    },
+    {
+      "name": "Segmented",
+      "kind": "chip",
+      "refersTo": "button",
+      "description": "Shared track; the selected option has a cyan wash.",
+      "html": "<div class=\"ds-seg\"><span>Day</span><span class=\"on\">Dusk</span><span>Night</span></div>",
+      "css": ".ds-seg{display:flex;gap:2px;padding:2px;border:1px solid rgba(125,180,230,.2);background:rgba(14,28,48,.7);border-radius:8px;font:11px Roboto,system-ui,sans-serif}.ds-seg span{flex:1;text-align:center;padding:4px;border:1px solid transparent;border-radius:6px;color:#9db2c8;cursor:pointer}.ds-seg span:hover{color:#dce8f5}.ds-seg .on{background:rgba(90,216,255,.15);border-color:rgba(90,216,255,.4);color:#dce8f5}"
+    },
+    {
+      "name": "Select",
+      "kind": "input",
+      "refersTo": "select",
+      "description": "Ink field with drawn chevron.",
+      "html": "<div class=\"ds-sel\"><span>Terraced</span><svg viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M6 9l6 6 6-6\"/></svg></div>",
+      "css": ".ds-sel{width:200px;display:flex;justify-content:space-between;align-items:center;font:12px Roboto,system-ui,sans-serif;color:#dce8f5;background:rgba(14,28,48,.7);border:1px solid rgba(125,180,230,.2);border-radius:8px;padding:6px 10px;transition:border-color .15s}.ds-sel svg{color:#6f86a0}.ds-sel:hover{border-color:rgba(125,180,230,.4)}"
+    },
+    {
+      "name": "Glass Panel",
+      "kind": "card",
+      "refersTo": "panel-glass",
+      "description": "Translucent navy card with uppercase stencil heading.",
+      "html": "<div class=\"ds-panel\"><h3>Terrain</h3><p>Hover a name to see what it does.</p></div>",
+      "css": ".ds-panel{width:240px;padding:20px;border-radius:14px;border:1px solid rgba(125,180,230,.15);background:rgba(11,22,38,.75);box-shadow:0 12px 32px rgba(8,16,30,.35);color:#dce8f5;font-family:Roboto,system-ui,sans-serif}.ds-panel h3{margin:0 0 8px;font:700 13px 'Share Tech',system-ui,sans-serif;letter-spacing:.14em;text-transform:uppercase}.ds-panel p{margin:0;font-size:11px;line-height:1.375;color:#6f86a0}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Drafting Table",
+    "overview": "The interface is a drafting table set beside a lit model. The model, a terraced voxel island in cool daylight, is the subject; the controls are the blueprint paper around it: deep navy ink, hairline pale-blue rules, small precise type. Cyan marks what you can touch. Amber marks what has been measured.",
+    "keyCharacteristics": [
+      "Navy ink glass over a bright diorama; the scene is never hidden behind chrome.",
+      "Two voices of color: cyan for interaction, amber for values.",
+      "Hairline rules instead of heavy borders or shadows.",
+      "Share Tech for headings only; Roboto for reading; monospace for numbers.",
+      "Everything explains itself on hover, in plain sentences."
+    ],
+    "rules": [
+      { "name": "The Two Voices Rule", "body": "Cyan is for things you can act on; amber is for things that are measured. Never swap them, never add a third accent to the UI.", "section": "colors" },
+      { "name": "The City Glows Rule", "body": "UI color stays cold and muted so the lit city carries the saturation.", "section": "colors" },
+      { "name": "The Short Stencil Rule", "body": "Share Tech is for short headings only; never set a sentence in it.", "section": "typography" },
+      { "name": "The Hairline Rule", "body": "Borders are 1px Rule color at 10 to 25% opacity. Never thicker, never opaque.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep cyan for controls and amber for values (The Two Voices Rule).",
+      "Do give every control a one or two sentence hover explanation in plain American English.",
+      "Do use the kit in site/src/world/ui/kit.tsx before writing a new control; extend it rather than restyling in place.",
+      "Do keep panels translucent and dimming so the scene shows through.",
+      "Do fix the decimals of every shown number."
+    ],
+    "donts": [
+      "Don't add a second UI accent; amber, pink and lime are for data only.",
+      "Don't use solid opaque panels, heavy borders or hard shadows.",
+      "Don't animate layout size; slide, fade or recolor instead, 150 to 300 ms.",
+      "Don't set long text in Share Tech.",
+      "Don't design for phone widths in /world.",
+      "Don't use em dashes in interface descriptions."
+    ]
+  }
+}

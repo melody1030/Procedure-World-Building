@@ -2,7 +2,7 @@
 
 The visual rules for every page of the Procedural World Building site (Weeks 1 to 5). The
 look is **dark slate with cyan accents**: quiet translucent panels floating over a 3D scene, one
-accent colour, and a small set of reusable shapes. When you add or change anything, follow this
+accent color, and a small set of reusable shapes. When you add or change anything, follow this
 guide so the weeks keep feeling like one product.
 
 The values below are the ones in the code today. If you change a value, change it here too.
@@ -16,14 +16,14 @@ The values below are the ones in the code today. If you change a value, change i
 2. **One accent.** Cyan means "active, selected, or a live value". Everything else is slate.
 3. **Same thing, same look.** A dropdown, slider, switch, panel or heading looks and behaves the
    same in every week. Reuse the shared pieces instead of restyling.
-4. **Calm motion.** Panels slide, colours fade, nothing bounces. 150 to 300 ms, ease-in-out.
+4. **Calm motion.** Panels slide, colors fade, nothing bounces. 150 to 300 ms, ease-in-out.
 5. **Plain language.** Short, natural sentences. No jargon without a one-line explanation.
 
 ## 2. Where the styles live
 
 | What | File |
 |---|---|
-| Tailwind config: `page` / `stage` colours, `sans` (Roboto) and `display` (Share Tech) fonts, corner radii | `tailwind.config.js` |
+| Tailwind config: `page` / `stage` colors, `sans` (Roboto) and `display` (Share Tech) fonts, corner radii | `tailwind.config.js` |
 | Tailwind directives plus the base layer (page defaults, slider thumb) | `src/styles.css` |
 | Top bar and week tabs | `src/App.tsx` |
 | Floating side panel, its toggle button and the `E` shortcut | `src/components/SidePanel.tsx` |
@@ -37,11 +37,11 @@ defaults and the native slider thumb pseudo-elements).
 
 ---
 
-## 3. Colour
+## 3. Color
 
 ### 3.1 Tokens
 
-The palette is Tailwind's slate and cyan, plus two custom colours in `tailwind.config.js`. The
+The palette is Tailwind's slate and cyan, plus two custom colors in `tailwind.config.js`. The
 token names below are the vocabulary used in this guide; use the Tailwind class in code.
 
 | Token | Value | Tailwind | Used for |
@@ -64,7 +64,7 @@ token names below are the vocabulary used in this guide; use the Tailwind class 
 | `--accent-soft-hover` | `rgba(6,182,212,0.3)` | `hover:bg-cyan-500/30` | Hover on an active fill |
 | `--accent-border` | `rgba(34,211,238,0.6)` | `border-cyan-400/60` | Border of an active element |
 
-### 3.2 Colour roles
+### 3.2 Color roles
 
 - **Neutral (default):** slate text on `slate-800/50` with a `slate-700/50` border.
 - **Active / selected:** `bg-cyan-500/20`, `border-cyan-400/60`, `text-cyan-200`.
@@ -74,19 +74,19 @@ token names below are the vocabulary used in this guide; use the Tailwind class 
 - **Destructive:** slate by default, `text-red-400` on hover only (for example the bin icon).
 - **Disabled:** `text-slate-600`, `border-slate-800/50`, `bg-slate-800/20`, `cursor-not-allowed`.
 
-Do not introduce a second accent colour for UI. Amber, pink, orange and lime exist only as
-*data colours inside the 3D scene* (see below).
+Do not introduce a second accent color for UI. Amber, pink, orange and lime exist only as
+*data colors inside the 3D scene* (see below).
 
-### 3.3 3D scene colours
+### 3.3 3D scene colors
 
-| Element | Colour |
+| Element | Color |
 |---|---|
 | Scene background and fog | `#0a0f17` |
 | Bounding box (Week 3) | `#22d3ee` at 20% opacity |
 | Ambient light | `#aac4dd` |
 | Mesh surface (Week 3 meshing) | `#7fb5d6` steel blue |
 | Week 1 default object | `#7fb5d6` |
-| Week 1 floor grid | lines `#64748b`, centre `#334155` |
+| Week 1 floor grid | lines `#64748b`, center `#334155` |
 | Week 2 terrain ramp (low to high) | `#0f1e33`, `#155e75`, `#06b6d4`, `#67e8f9`, `#f0fdff` |
 | Voxel overlay / inside samples | `#22d3ee` |
 | Outside samples | `#8090a8` |
@@ -94,12 +94,12 @@ Do not introduce a second accent colour for UI. Amber, pink, orange and lime exi
 | Edge crossings | pink `#f472b6` |
 | Surface normals | orange `#fb923c` |
 | Cell vertices | lime `#a3e635` |
-| Week 4 unlit surface (no base colour) | grey `#8c8c8c` |
+| Week 4 unlit surface (no base color) | gray `#8c8c8c` |
 | Week 4 Flat default | `#7fb5d6` |
 | Week 4 position-gradient ramp (low to high) | `#1d3a52`, `#a5d4ee` |
 | Week 4 Slope (flat, steep) | `#5fa391`, `#8b8394` |
 | Week 4 fresnel rim default | cyan `#22d3ee` |
-| Week 4 fog default | `#0a0f17` (the stage colour) |
+| Week 4 fog default | `#0a0f17` (the stage color) |
 | Week 4 cel outlines | `#05080d` |
 | Week 4 Ripple water (shallow to deep), glint and foam | `#54b8cc`, `#1a528c`, `#99cce6`, `#f7fcff` |
 | Week 4 curve plot in the panel | cyan `#22d3ee` |
@@ -110,10 +110,10 @@ Do not introduce a second accent colour for UI. Amber, pink, orange and lime exi
 | Week 5 layer mask: allowed, slope fail, height fail, path | cyan `#22d3ee`, amber `#fbbf24`, `#334155`, pink `#f472b6` |
 | Week 5 particles: rain, wind, clouds, field arrows | `#a5f3fc`, `#22d3ee`, `#cbd5e1`, `#22d3ee` |
 
-Week 4's shaders write these as raw sRGB values and output them without colour-space conversion,
+Week 4's shaders write these as raw sRGB values and output them without color-space conversion,
 so they show exactly as listed. While fog is in the shader, the stage background swaps to the fog
-colour. Matcap pictures (clay, chrome, neon rim, holographic) are drawn on a canvas at runtime and
-are scene colours, not UI.
+color. Matcap pictures (clay, chrome, neon rim, holographic) are drawn on a canvas at runtime and
+are scene colors, not UI.
 
 CSG primitives keep a hue per shape in their icons (cube blue, sphere sky, cylinder violet,
 cone emerald, torus amber) so they can be told apart in the tree.
@@ -134,7 +134,7 @@ Rules:
 
 - Share Tech only ships a regular weight. The bold is the browser's synthetic bold, so keep it to
   short titles and headings; never set long text in it.
-- Headings are `font-display text-sm font-bold` plus their colour and tracking classes. Reuse
+- Headings are `font-display text-sm font-bold` plus their color and tracking classes. Reuse
   `headingClass` from `controls.tsx` (or the `Section` component) rather than retyping it.
 - Uppercase headings are produced with CSS or a class, not by typing capitals in the source.
 - To use the display font on something that is not a heading, add `font-display font-bold`.
@@ -195,7 +195,7 @@ Tailwind's scale is set 10% smaller in `tailwind.config.js`.
   Width `16.2rem` (259px) for every settings panel and the Week 3 navigation.
 - **Overlays.** Small cards floating over the stage use the same glass card: Week 2's erosion
   player (top right) and 2D noise map (bottom right), Week 3 tab 01's bottom control bar
-  (bottom centre, `36rem` wide, `rounded-3xl`).
+  (bottom center, `36rem` wide, `rounded-3xl`).
 
 ---
 
@@ -265,9 +265,9 @@ slide. `<Switch>` inside `<Field inline>`, used in Week 1 for on/off options.
 | Icon (row action) | `24px` square, `text-slate-400`, `hover:text-slate-200`; destructive icon `hover:text-red-400` |
 | Round toggle | `40px` circle, `bg-slate-900/70 backdrop-blur-md`, `hover:text-cyan-300` |
 
-- Button text is `12px` and `font-medium`. Selected buttons stay the same size; only colour changes.
+- Button text is `12px` and `font-medium`. Selected buttons stay the same size; only color changes.
 - Choice groups (mode, transform mode, tabs) are equal-width buttons in a grid; the selected one
-  uses the active style. Two-button nav rows (Back / Next) use equal columns with a centred
+  uses the active style. Two-button nav rows (Back / Next) use equal columns with a centered
   indicator in the middle.
 - Sticky primary button (Week 1 Randomize) sits on a solid `#0f172a` base so scrolling content
   never shows through the translucent cyan.
@@ -299,11 +299,11 @@ shapes only) bin icon on the right. Children are indented under a `slate-700/50`
 | Thing | Duration | Easing |
 |---|---|---|
 | Panel slide and toggle button move | 300 ms | ease-in-out |
-| Colour, border and background changes | 150 ms | ease |
+| Color, border and background changes | 150 ms | ease |
 | Switch knob, chevrons | 150 to 200 ms | ease |
 | Press feedback on primary button | 100 ms, `translateY(1px)` | ease |
 
-Do not animate layout size or height. Slide, fade or recolour instead.
+Do not animate layout size or height. Slide, fade or recolor instead.
 
 ---
 
@@ -322,8 +322,8 @@ Do not animate layout size or height. Slide, fade or recolour instead.
 
 Inline SVG, no icon library. `viewBox="0 0 24 24"`, `fill="none"`, `stroke="currentColor"`, stroke
 width `1.8` to `2`, round caps and joins. Size `16px` (`h-4 w-4`) in buttons and toggles, `14px`
-next to headings, `14px` (`h-3.5 w-3.5`) for row actions. Icons take their colour from the text
-colour; only CSG primitives carry their own hue.
+next to headings, `14px` (`h-3.5 w-3.5`) for row actions. Icons take their color from the text
+color; only CSG primitives carry their own hue.
 
 ---
 
@@ -334,7 +334,7 @@ colour; only CSG primitives carry their own hue.
   Good: "Turn this off to put every vertex at its edge's midpoint, so the surface snaps to coarse positions."
 - **No em dashes in descriptions or hints.** Use a full stop, comma or colon. (Tab and page names
   keep the `01 — Title` format.)
-- British spellings are used in the copy (neighbours, centre, bevelled). Keep it consistent.
+- American spellings are used in the copy (neighbors, center, beveled). Keep it consistent.
 - Numbers show with a fixed number of decimals so they do not jump (`0.40`, `2.4`).
 
 ---
@@ -347,8 +347,8 @@ colour; only CSG primitives carry their own hue.
 3. Put controls in `<SidePanel>`; do not build a new panel.
 4. Build fields from `src/components/controls.tsx`, or with the Tailwind recipes in section 7. Do
    not add a CSS file.
-5. Colour the 3D scene from section 3.3: `#0a0f17` background and fog, cyan for emphasis, one
-   surface colour.
+5. Color the 3D scene from section 3.3: `#0a0f17` background and fog, cyan for emphasis, one
+   surface color.
 6. Add screenshots to the week's `screenshots/` folder and a README process log.
 
 ---
