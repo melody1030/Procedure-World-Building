@@ -1961,3 +1961,9 @@ the simulation, 34 people sat down and 0 used a vending machine. Three causes, a
 After the change, over 300 s: 74 people sat down on `blueprint` and 92 bought a drink; on `neon7`,
 69 sat down (53 before the last change) and 77 bought a drink, and people giving up because
 every seat was taken fell from 71 to 29.
+
+## 2026-11-18: Fewer pigeons
+
+There were too many pigeons: 150, shared among the flocks (one at the plaza and one at each park's
+court), some 25 a flock on `blueprint`. Now there are 60 (`LIFE` in `index.tsx`), about 10 a
+flock.

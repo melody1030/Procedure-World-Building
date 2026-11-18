@@ -26,7 +26,7 @@ import type { Selection } from "./render/select";
 /** The interface's size relative to the weeks' (the panel, the time bar and the note). */
 const UI_SCALE = 0.8;
 /** How many people, pigeons and cats are out. */
-const LIFE = { people: 420, pigeons: 150, cats: 8, cars: 14, vans: 4, taxis: 10, buses: 4 };
+const LIFE = { people: 420, pigeons: 60, cats: 8, cars: 14, vans: 4, taxis: 10, buses: 4 };
 
 export default function WorldPage() {
   const ctl = useWorldState();
