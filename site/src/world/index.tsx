@@ -26,7 +26,7 @@ import type { Selection } from "./render/select";
 /** The interface's size relative to the weeks' (the panel, the time bar and the note). */
 const UI_SCALE = 0.8;
 /** How many people, pigeons and cats are out. */
-const LIFE = { people: 420, pigeons: 150, cats: 8, cars: 14, vans: 4, taxis: 8, buses: 2 };
+const LIFE = { people: 420, pigeons: 150, cats: 8, cars: 14, vans: 4, taxis: 10, buses: 4 };
 
 export default function WorldPage() {
   const ctl = useWorldState();
@@ -198,18 +198,17 @@ export default function WorldPage() {
       {/* The whole interface is drawn at UI_SCALE (80%), so it takes less of the view. */}
       <div className="pointer-events-none absolute inset-0" style={{ zoom: UI_SCALE }}>
         <TerrainPanel terrain={terrain} life={life} ctl={ctl} open={panelOpen} onToggle={() => setPanelOpen((v) => !v)} busy={busy} />
-        <CameraBar life={life} view={view} available={available} onFly={flyTo} shown={overlays} follow={follow} onHelp={openHelp} />
-        {overlays && (
-          <Inspector
-            view={viewRef.current}
-            selection={selection}
-            following={following}
-            life={life}
-            scale={UI_SCALE}
-            onClose={closeInspector}
-            onFollow={setFollow}
-          />
-        )}
+        <CameraBar view={view} available={available} onFly={flyTo} shown={overlays} follow={follow} onHelp={openHelp} />
+        {/* Not hidden with E: the card stays with its agent while the panels and toolbars go. */}
+        <Inspector
+          view={viewRef.current}
+          selection={selection}
+          following={following}
+          life={life}
+          scale={UI_SCALE}
+          onClose={closeInspector}
+          onFollow={setFollow}
+        />
         {overlays && touring && <Tour selection={selection} scale={UI_SCALE} panelOpen={panelOpen} setPanelOpen={setPanelOpen} onClose={() => setTouring(false)} />}
         {/* While the city rebuilds: a quiet note at the top of the view, over the part the panel leaves. */}
         <div

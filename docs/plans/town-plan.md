@@ -5,7 +5,7 @@
 The terrain is finished: noise → shaping → heights → terraces → river valley → voxels →
 surfaces → mesh, on a 232 m diorama of 0.25 m voxels (928 × 928 columns). This plan adds the
 first layer of the city on top of it: a **street network** that starts by the river and grows
-automatically, the **scatter** that follows from it (lamps, street trees, forest, rocks,
+automatically, the **scatter** that follows from it (lamps, forest, rocks,
 reeds), and a **district map**: an internal map of what kind of building belongs where, so
 buildings can be scattered onto it later.
 
@@ -86,7 +86,7 @@ that it is allowed to share):
 | `river` | the channel |
 | `bank` | one column beside the channel |
 | `road` | inside a road's width |
-| `verge` | the 1.5 m strip along each road edge, where lamps and street trees stand |
+| `verge` | the 1.5 m strip along each road edge, where the street lamps stand |
 | `plaza` | inside a plaza |
 | `lot` | a building lot (section 6); scatter keeps off it, except where the district allows greenery |
 | *(later)* `rail` | rail pillars |
@@ -1258,9 +1258,10 @@ New collapsible sections, after River, all closed by default:
      - *See:* rows of lots facing the streets, narrow neon shopfronts, wide industrial lots, with
        alleys between.
    - **5c. Checks.** The 6.5 numbers on 7 seeds; the plan updated.
-6. **Scatter along paths.**
-   - Voxel assets, instancing, print support; lamps, street trees, the fountain.
-   - *See:* lit streets, and a plaza with a fountain.
+6. **Street lamps.** Built 2026-11-18 (`docs/plans/street-furniture-plan.md`).
+   - A lamp every 24 m along each street, side to side; a lamp at each corner of the plaza. Kept
+     few: 37 lamps on `blueprint`.
+   - *See:* lit streets, amber in the homes and cyan in the core.
 7. **Area scatter.**
    - Poisson disk, density and rules for forest, bushes, rocks and reeds; the Scatter section and its Result line.
    - *See:* green slopes and parks, empty lots waiting for buildings, reeds on the banks; no copy

@@ -2,7 +2,6 @@ import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "re
 import { isTextEntry } from "../../components/SidePanel";
 import type { Day, Life, Need, Person } from "../life/agents";
 import type { Building, Role } from "../life/city";
-import { clockLabel } from "../life/clock";
 import type { Vehicle } from "../life/traffic";
 import type { WorldView } from "../render/WorldView";
 import type { Selection } from "../render/select";
@@ -46,6 +45,9 @@ const TASK: Record<Vehicle["task"], string> = {
   cruise: "Cruising for a fare",
   fetch: "Fetching a fare",
   carry: "Carrying a fare",
+  depot: "Back to the depot",
+  collect: "Collecting a bin",
+  haul: "To the incinerator",
 };
 
 const LIMIT: Record<Vehicle["limit"], string> = {
@@ -58,25 +60,27 @@ const LIMIT: Record<Vehicle["limit"], string> = {
   halt: "at its halt",
 };
 
-const VEHICLE_ACTIVITY: Record<Vehicle["activity"], string> = { drive: "Driving", stand: "Standing", off: "Off the island" };
+/** (Off the island or in the depot, a vehicle can't be seen, and its card is closed.) */
+type Seen = Exclude<Vehicle["activity"], "off">;
+const VEHICLE_ACTIVITY: Record<Seen, string> = { drive: "Driving", stand: "Standing" };
 
-/** A person's day, as the card says it. */
-function dayLabel(p: Person, life: Life): string {
-  const labels: Record<Day, string> = {
-    asleep: "Asleep at home",
-    commute: p.lunched === life.clock.day && life.clock.hour > p.hours.lunch ? "Back to work" : "Off to work",
-    working: "At work",
-    out: p.lunch ? "Out for lunch" : "Out for the evening",
+/** The steps of the cycle a person can be seen in: at home or at work they are indoors, and the card is closed. */
+type Outdoors = Exclude<Day, "home" | "working">;
+
+/** A person's step of the cycle, as the card says it. */
+function dayLabel(p: Person): string {
+  const labels: Record<Outdoors, string> = {
+    commute: p.back ? "Back to work" : "Off to work",
+    out: p.pause ? "On a break" : "Out after work",
     homeward: "Going home",
   };
-  return labels[p.day];
+  return labels[p.day as Outdoors];
 }
 
-/** What comes next on its day, and when. */
+/** What comes next on its cycle, and in how long (only out: the commute and the way home end on arriving). */
 function nextLabel(p: Person): string | null {
-  if (!Number.isFinite(p.next) || p.day === "commute" || p.day === "homeward") return null;
-  const what = p.day === "asleep" ? "wakes" : p.day === "working" ? (p.lunch ? "lunch" : "work ends") : p.lunch ? "back to work" : "bedtime";
-  return `${what} at ${clockLabel(p.next)}`;
+  if (p.day !== "out" || !Number.isFinite(p.left)) return null;
+  return `${p.pause ? "Back to work" : "Home"} in ${Math.max(0, Math.ceil(p.left))} s`;
 }
 
 const ROLE_LABEL: Record<Role, string> = { home: "flats", office: "offices", shop: "shop", works: "works" };
@@ -88,9 +92,8 @@ function buildingLabel(b: Building | undefined): string {
   return `${name}, ${b.storeys} storeys`;
 }
 
+/** What a person is doing (riding or indoors they can't be seen, and the card is closed). */
 function personActivity(p: Person): string {
-  if (p.activity === "ride") return p.ride === "taxi" ? "Riding a taxi" : "Riding the bus";
-  if (p.activity === "away") return p.day === "asleep" ? "At home" : "At work";
   if (p.activity === "use") {
     switch (p.use) {
       case "seat":
@@ -129,8 +132,7 @@ function describe(sel: Selection, life: Life | null): { name: string; badges: st
   if (sel.kind === "person") {
     const p = life.people[sel.index];
     if (!p) return null;
-    const badges = [dayLabel(p, life), personActivity(p)];
-    if (p.activity === "walk" || p.activity === "use") badges.push(MOTION[p.motion]);
+    const badges = [dayLabel(p), personActivity(p), MOTION[p.motion]];
     const all = life.city.buildings;
     const rows: [string, string][] = [
       ["Home", buildingLabel(all[p.home])],
@@ -165,7 +167,7 @@ function describe(sel: Selection, life: Life | null): { name: string; badges: st
   }
   const v = life.traffic.vehicles[sel.index];
   if (!v) return null;
-  const kind = v.kind[0].toUpperCase() + v.kind.slice(1);
+  const kind = v.kind === "truck" ? "Garbage truck" : v.kind[0].toUpperCase() + v.kind.slice(1);
   const name = v.kind === "bus" ? `Bus · route ${v.route + 1}` : title(kind, life.traffic.vehicles.filter((o, i) => o.kind === v.kind && i < sel.index).length);
   const rows: [string, string][] = [["Task", TASK[v.task]]];
   if (v.activity === "drive") rows.push(["Held by", LIMIT[v.limit]]);
@@ -174,7 +176,9 @@ function describe(sel: Selection, life: Life | null): { name: string; badges: st
     if (stops) rows.push(["Next stop", `${(v.next % stops) + 1} of ${stops}`]);
     rows.push(["Riders", String(v.riders.length)]);
   }
-  return { name, badges: [VEHICLE_ACTIVITY[v.activity]], why: v.why, since: v.since, body: <Facts rows={rows} /> };
+  const round = v.kind === "truck" ? life.waste.roundOf(v) : null;
+  if (round) rows.push(["Load", `${round.load.toFixed(1)} of ${life.waste.capacity} bins`]);
+  return { name, badges: [VEHICLE_ACTIVITY[v.activity as Seen]], why: v.why, since: v.since, body: <Facts rows={rows} /> };
 }
 
 function Facts({ rows }: { rows: [string, string][] }) {
@@ -256,7 +260,7 @@ export function Inspector({
   }, [selection, onClose]);
 
   // Every frame: sit beside the selection, on its right unless that runs off screen, kept clear of
-  // the edges. When it can't be seen (riding, behind the camera), the card waits at the top right.
+  // the edges. While the selection is behind the camera, the card waits at the top right.
   useLayoutEffect(() => {
     if (!selection || phone || !view) return;
     let frame = 0;

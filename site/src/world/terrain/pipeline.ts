@@ -3,6 +3,7 @@ import { buildClaims, type Claims } from "./claims";
 import { buildDistricts, type Districts } from "./districts";
 import { gradeLots, type Grading } from "./grade";
 import { planParks, type Parks } from "../city/parks";
+import { planStreetProps } from "../city/streetProps";
 import { paintCity } from "./urban";
 import { buildHubs, type Hubs } from "./hubs";
 import { buildStreets, type Streets } from "./streets";
@@ -92,7 +93,8 @@ export const STAGES: Stage[] = [
     },
   },
   // Districts and lots come after the mesh, so the ground can be drawn first; then the lots are
-  // dug level (site grading), the parks laid out and regraded, the city's ground is painted, and the
+  // dug level (site grading), the parks laid out and regraded, the lamps set along the
+  // streets, the city's ground is painted, and the
   // mesh is redone from all of it. `columns` stays ungraded, the ground the lots were laid out on.
   {
     id: "districts",
@@ -100,7 +102,8 @@ export const STAGES: Stage[] = [
     run: (t, seed) => {
       t.districts = buildDistricts(seed, t.columns!, t.streets!, t.hubs!, t.streets!.claims, t.params.lots);
       t.grading = gradeLots(t.columns!, t.districts);
-      t.parks = planParks(t.districts, t.grading?.ground ?? t.columns!, t.streets!.plazas[0], seed, t.grading?.dugBy ?? null);
+      const parks = planParks(t.districts, t.grading?.ground ?? t.columns!, t.streets!.plazas[0], seed, t.grading?.dugBy ?? null);
+      t.parks = { ...parks, street: planStreetProps(t.districts, t.streets!, parks, seed) };
       t.urban = paintCity(t.surfaces!, t.districts, t.grading, t.parks, t.columns!);
       t.mesh = meshColumns(t.parks.ground, t.urban, t.params.surfaces.tones);
     },

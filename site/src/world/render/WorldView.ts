@@ -9,12 +9,13 @@ import type { Streets } from "../terrain/streets";
 import type { RiverPath } from "../terrain/river";
 import { BASE, WORLD_SIZE, voxels } from "../scale";
 import { buildPlinth } from "./base";
-import { WINDOWS, makePrintable, type PrintableBuilding } from "../buildings/print";
-import { lightAt } from "../life/clock";
+import { makePrintable, type PrintableBuilding } from "../buildings/print";
 import { buildingMaterials, buildingObject, disposeBuilding } from "../buildings/render";
+import { addChimney } from "../buildings/chimney";
+import { incineratorPlan } from "../life/waste";
 import { fitBuilding, fitGrammar, type BuildingPlan } from "../city/placement";
 import type { Park, Parks } from "../city/parks";
-import { buildParkModel } from "../city/parkModels";
+import { buildParkModel, type ParkModel } from "../city/parkModels";
 import { BUILD_PHASES, PAVING_FROM, PAVING_TO, type BuildUp } from "../terrain/buildup";
 import { createLookUniforms, createPrintUniforms, printDepthMaterial, printMaterial } from "./print";
 import { LifeView } from "./life";
@@ -27,6 +28,9 @@ import { HEIGHT_TINT_ENCODE, type Zoning } from "../city/zoning";
 const VIEW_AZIMUTH = THREE.MathUtils.degToRad(38);
 const VIEW_ELEVATION = THREE.MathUtils.degToRad(38);
 const FOV = 32;
+/** The Waste tint's stops (a bin empty, half full, full) and how strongly it colors the walls. */
+const WASTE_TINT = [new THREE.Color(0x2f9e6a), new THREE.Color(0xe0b040), new THREE.Color(0xd8432e)];
+const WASTE_TINT_AMOUNT = 0.7;
 /** How much of the buildings' phase goes to staggering them, Landmark first, outward from the plaza. */
 const RAISE_SPREAD = 0.6;
 /** The share of a building's time spent digging its lot level before it starts going up. */
@@ -155,7 +159,7 @@ export class WorldView {
   /** The buildings on the lots: built a few per frame, each raised in turn in the timeline's last
    * phase (`delay` 0–RAISE_SPREAD, the Landmark first, then outward from the plaza). */
   private readonly city = new THREE.Group();
-  private cityItems: { group: THREE.Group; delay: number; print: PrintableBuilding }[] = [];
+  private cityItems: { group: THREE.Group; index: number; delay: number; print: PrintableBuilding }[] = [];
   /** The buildings by plan (null until built), with their bounds, for picking. */
   /** Each building's bounds in the scene, once built: they hide the agents behind them from a click. */
   private buildingBoxes: (THREE.Box3 | null)[] = [];
@@ -180,10 +184,6 @@ export class WorldView {
   private lifeShown = true;
   private built = true;
   private readonly clock = new THREE.Clock();
-  /** The sky's lights, set from the inhabitants' clock each frame; and the hour they were last set for. */
-  private readonly hemi: THREE.HemisphereLight;
-  private readonly sun: THREE.DirectionalLight;
-  private lightHour = -1;
   /** What the presets aim at: the river's course, the streets and plaza, and the ground's height. */
   private riverPath: RiverPath | null = null;
   private streetData: Streets | null = null;
@@ -195,6 +195,10 @@ export class WorldView {
   private selection: Selection | null = null;
   private onSelect: ((selection: Selection | null) => void) | null = null;
   private readonly mark = new SelectionMark();
+  /** The Waste tint: whether it is on, whether the buildings carry it now, and a color to work in. */
+  private wasteTint = false;
+  private wasteTinted = false;
+  private readonly tintColor = new THREE.Color();
   private following = false;
   private onFollow: ((on: boolean) => void) | null = null;
   /** Where a press began, to tell a click (pick) from a drag (orbit). */
@@ -222,8 +226,8 @@ export class WorldView {
       this.onView?.(null);
     });
 
-    const hemi = (this.hemi = new THREE.HemisphereLight(SKY.hemisphereSky, SKY.hemisphereGround, SKY.hemisphereIntensity));
-    const sun = (this.sun = new THREE.DirectionalLight(SKY.sun, SKY.sunIntensity));
+    const hemi = new THREE.HemisphereLight(SKY.hemisphereSky, SKY.hemisphereGround, SKY.hemisphereIntensity);
+    const sun = new THREE.DirectionalLight(SKY.sun, SKY.sunIntensity);
     const az = THREE.MathUtils.degToRad(SKY.sunAzimuth);
     const el = THREE.MathUtils.degToRad(SKY.sunElevation);
     const reach = EXTENT * 1.6;
@@ -261,8 +265,11 @@ export class WorldView {
         this.life.group.visible = this.lifeShown && this.built;
         if (this.life.group.visible) this.life.update(dt);
         else this.life.life.prepare();
-        this.light(this.life.life.clock.hour);
       }
+      this.tintWaste();
+      // The selection went out of sight (indoors, onto a bus or into a taxi, off the island, into
+      // the depot, or Life hidden): let it go, and its card with it.
+      if (this.selection && !locate(this.selection, this.lifeNow(), WORLD_SIZE / 2)) this.select(null);
       this.track();
       this.fly();
       this.controls.update();
@@ -271,23 +278,6 @@ export class WorldView {
       this.renderer.render(this.scene, this.camera);
     };
     loop();
-  }
-
-  /** The sky, the sun (or moon) and the windows at an hour of the inhabitants' clock. */
-  private light(hour: number) {
-    if (Math.abs(hour - this.lightHour) < 0.01) return;
-    this.lightHour = hour;
-    const l = lightAt(hour);
-    (this.scene.background as THREE.Color).setHex(l.background);
-    this.hemi.color.setHex(l.hemisphereSky);
-    this.hemi.groundColor.setHex(l.hemisphereGround);
-    this.hemi.intensity = l.hemisphereIntensity;
-    this.sun.color.setHex(l.sun);
-    this.sun.intensity = l.sunIntensity;
-    const reach = EXTENT * 1.6;
-    this.sun.position.set(l.sunDirection[0] * reach, l.sunDirection[1] * reach, l.sunDirection[2] * reach);
-    this.renderer.toneMappingExposure = l.exposure;
-    WINDOWS.value = l.windows;
   }
 
   /**
@@ -776,6 +766,7 @@ export class WorldView {
       .map((plan, index) => ({ plan, index, delay: plan.archetype === "landmark-tower" || !plaza ? 0 : RAISE_SPREAD * (Math.hypot(plan.x - plaza.x, plan.z - plaza.z) / far) }))
       .sort((a, b) => a.delay - b.delay);
     this.lotDelay = new Map(this.cityQueue.map(({ plan, delay }) => [plan.lot, delay]));
+    const incinerator = incineratorPlan(plans);
     const step = () => {
       const start = performance.now();
       while (this.cityQueue.length && performance.now() - start < 10) {
@@ -784,6 +775,8 @@ export class WorldView {
         // signature one (the Landmark, the Megatower).
         const g = plan.grammar;
         const group = buildingObject(g ? fitGrammar(g, plan.seed) : fitBuilding(plan));
+        // The incinerator (life/waste.ts) gets its chimney, to go up with it.
+        if (index === incinerator) addChimney(group);
         group.position.set((g ? g.x : plan.x) - half, plan.base, (g ? g.z : plan.z) - half);
         group.rotation.y = plan.rotation;
         // Its bounds in the scene, once placed, so it hides what stands behind it from a click
@@ -791,7 +784,7 @@ export class WorldView {
         group.updateMatrixWorld(true);
         this.buildingBoxes[index] = new THREE.Box3().setFromObject(group);
         this.city.add(group);
-        this.cityItems.push({ group, delay, print: makePrintable(group) });
+        this.cityItems.push({ group, index, delay, print: makePrintable(group) });
       }
       this.applyRaise();
       if (this.cityQueue.length) this.cityFrame = requestAnimationFrame(step);
@@ -800,9 +793,10 @@ export class WorldView {
   }
 
   /**
-   * Replaces the parks' props: per park, one solid and one glow mesh. Each prop grows out of its
-   * base in turn: the parks start outward from the plaza (as the buildings do), and within a park
-   * the middle first (the props' `delay`).
+   * Replaces the parks' props: per park, one solid and one glow mesh, and two more for the street
+   * lamps. Each prop grows out of its base in turn: the parks start outward from the
+   * plaza (as the buildings do), and within a park the middle first (the props' `delay`); the
+   * street props each by their own distance from the plaza.
    */
   setParks(parks: Parks | null) {
     this.parkData = parks;
@@ -815,9 +809,8 @@ export class WorldView {
     const half = n / 2;
     const far = Math.max(n * 0.5, ...parks.parks.map((p) => p.fromPlaza));
     const { solid, glow } = this.parkMaterialsFor();
-    parks.parks.forEach((park, i) => {
-      const model = buildParkModel(park, i + 1);
-      const start = RAISE_SPREAD * (park.fromPlaza / far);
+    // A model's two meshes; `start` gives each prop's start from its delay.
+    const add = (model: ParkModel, start: (delay: number) => number) => {
       for (const [data, grow, material, shadow] of [
         [model.solid, model.solidGrow, solid, true],
         [model.glow, model.glowGrow, glow, false],
@@ -828,7 +821,7 @@ export class WorldView {
         for (let v = 0; v < g.length; v += 4) {
           g[v] -= half;
           g[v + 2] -= half;
-          g[v + 3] = start + g[v + 3] * PARK_SPREAD;
+          g[v + 3] = start(g[v + 3]);
         }
         geometry.setAttribute("aGrow", new THREE.BufferAttribute(g, 4));
         geometry.translate(-half, 0, -half);
@@ -837,7 +830,13 @@ export class WorldView {
         mesh.userData.shadow = shadow;
         this.parks.add(mesh);
       }
+    };
+    parks.parks.forEach((park, i) => {
+      const start = RAISE_SPREAD * (park.fromPlaza / far);
+      add(buildParkModel(park, i + 1), (delay) => start + delay * PARK_SPREAD);
     });
+    // The street lamps: all of them in two meshes, each starting by its distance from the plaza.
+    if (parks.street.length) add(buildParkModel({ x: 0, z: 0, fromPlaza: 0, garden: false, props: parks.street }, 0x5eed), (delay) => RAISE_SPREAD * delay);
     this.applyRaise();
   }
 
@@ -865,6 +864,26 @@ transformed = aGrow.xyz + (transformed - aGrow.xyz) * popped;`,
     const { solid, glow } = buildingMaterials();
     this.parkMaterials = { solid: patch(solid, "park-solid"), glow: patch(glow, "park-glow") };
     return this.parkMaterials;
+  }
+
+  /**
+   * The Waste tint: each building's walls toward green (its bin empty), yellow, then red (full);
+   * buildings with no bin, and every building once the tint is off, untinted.
+   */
+  private tintWaste() {
+    const waste = this.wasteTint ? this.life?.life.waste : null;
+    if (!waste && !this.wasteTinted) return;
+    for (const { index, print } of this.cityItems) {
+      const bin = waste?.binOf.get(index);
+      if (!bin) {
+        print.setTint(WASTE_TINT[0], 0);
+        continue;
+      }
+      const f = bin.fill * 2;
+      this.tintColor.copy(WASTE_TINT[f < 1 ? 0 : 1]).lerp(WASTE_TINT[f < 1 ? 1 : 2], f < 1 ? f : f - 1);
+      print.setTint(this.tintColor, WASTE_TINT_AMOUNT);
+    }
+    this.wasteTinted = !!waste;
   }
 
   /** Replaces the inhabitants. */
@@ -1218,8 +1237,9 @@ transformed = aGrow.xyz + (transformed - aGrow.xyz) * popped;`,
     this.look.uShowParks.value = on ? 1 : 0;
   }
 
-  /** Color the ground by one thing at a time: districts, frontage, claims, city-center suitability, or nothing. */
+  /** Color the ground by one thing at a time: districts, frontage, claims, city-center suitability, or nothing; or the buildings by their bins (Waste). */
   setGroundTint(tint: GroundTint) {
+    this.wasteTint = tint === "waste";
     this.look.uShowDistricts.value = tint === "districts" ? 1 : 0;
     this.look.uShowFrontage.value = tint === "frontage" ? 1 : 0;
     this.look.uShowHeights.value = tint === "heights" ? 1 : 0;
@@ -1382,7 +1402,6 @@ transformed = aGrow.xyz + (transformed - aGrow.xyz) * popped;`,
 
   dispose() {
     cancelAnimationFrame(this.frame);
-    WINDOWS.value = 1;
     this.mark.dispose();
     this.setLife(null);
     cancelAnimationFrame(this.cityFrame);

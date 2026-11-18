@@ -90,7 +90,21 @@ function draw(k: Kit, p: ParkProp, r: Rng, lampColor: Hex) {
       return conifer(k, r, p.size);
     case "shrub":
       return shrub(k, r, p.size);
+    case "streetlamp":
+      return streetLamp(k, p.color ?? lampColor);
   }
+}
+
+/**
+ * A street lamp: a post 4.2 m tall at the road's edge, an arm reaching out over the road (+z), and
+ * a lantern hanging under its end, lit in its district's color.
+ */
+function streetLamp(k: Kit, color: Hex) {
+  k.box(-m(0.15), 0, -m(0.15), m(0.3), m(0.4), m(0.3), PAL.charcoal);
+  k.box(-0.3, 0, -0.3, 0.6, m(4.2), 0.6, PAL.charcoal);
+  k.box(-0.25, m(4.2) - 0.5, -0.25, 0.5, 0.5, m(1.1), PAL.charcoal);
+  k.box(-m(0.22), m(4.2) - 0.75, m(1.1) - m(0.5), m(0.44), 0.4, m(0.5), PAL.charcoal);
+  k.light(-m(0.16), m(4.2) - 1.3, m(1.1) - m(0.44), m(0.32), 0.55, m(0.38), color, 1);
 }
 
 /** A square basin with chamfered corners, lit from under the water, and a two-tier spout. */

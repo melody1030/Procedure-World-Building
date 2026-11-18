@@ -24,9 +24,10 @@ seed → noise → shaping → heights → terraces → river → claims → hub
   street, parks as their own layer).
 - **Buildings:** done. Every lot builds from the building grammar (`/grammar`), weighted by its
   district, with the Landmark at the plaza, all at the people's scale.
-- **Next:** the city as a simulation (`docs/plans/city-simulation-plan.md`): a day clock, homes
-  and jobs, and power, waste and goods carried through the streets. Then the town plan's steps 6–9
-  (`docs/plans/town-plan.md` §9): scatter along the streets, area scatter, bridges, check and tune.
+- **Simulation:** done (`docs/plans/city-simulation-plan.md`): homes and jobs with a cycle for
+  everyone (no clock), and the city's waste carried by garbage trucks to the incinerator.
+- **Next:** the town plan's steps 6–9 (`docs/plans/town-plan.md` §9): scatter along the streets,
+  area scatter, bridges, check and tune.
 
 Overlays can be opened from the URL: `/world?show=districts,lots,parks`. One ground tint shows at
 a time (`districts`, `claims` or `suitability`); `network` draws the street network on top.
@@ -1769,3 +1770,169 @@ Landmark and the Megatower have the same part clashes as at full size (none and 
 `/grammar` and Simulation still hash the same.
 
 ![The Landmark's base on the plaza beside the people](screenshots/2026-11-17-plaza-landmark-scale.webp)
+
+## 2026-11-17: The city as a simulation: homes, jobs and waste
+
+Class 09's second assignment asks whether the city runs as a simulation: inhabitants, resource
+flows, and agents performing tasks across the roads and buildings. Blueprint City had the
+inhabitants but no schedule and no resources. Now it runs as a steady loop, with no clock: every
+rule is a state, a rate per second or a stay of so many seconds, so at any moment the city is
+somewhere in every part of its loop (`docs/plans/city-simulation-plan.md`).
+
+**Homes and jobs** (`life/city.ts`, `life/agents.ts`):
+- Every grammar building has a role from its district: megablock and wealthy lots are homes; core,
+  commercial and industrial lots are jobs. Each person has a home and a job; the job is picked by
+  its places, the home near it.
+- Each person goes round a cycle of their own: at home (60–150 s), the commute (on foot, by bus or
+  by taxi), working (a shift of 75–150 s, half of them with a break), then out (the needs machine,
+  as before) and home. Everyone starts at a random point of it, so there is no rush hour.
+- Indoors now means inside a known building: a person comes out of the same door they went in.
+- The inspector shows a person's home, job and step of the cycle, and how long until the next.
+
+**Waste** (`life/waste.ts`, pure, its books kept once a second; bins and piles few on purpose):
+- **Bins:** one to each group of about six neighboring doors, on the curb nearest them: 18 on
+  `blueprint`. A bin fills by who is inside its buildings (shops half as fast again), from empty
+  to full in about ten minutes.
+- **Garbage trucks**, a new vehicle (`life/traffic.ts`): two or three, each with its side of the
+  city. A truck waits in the depot, off the road, until a bin on its side is past half; then it
+  empties the fullest bins one by one, hauls the load to the incinerator, unloads, and goes out
+  again or back into the depot. The inspector shows its task and its load ("0.7 of 4 bins").
+- **The incinerator** is the tallest industrial building; `blueprint` has no industry, so it is
+  the building farthest from the plaza. A concrete chimney with two red bands rises from it
+  (`buildings/chimney.ts`).
+- **A missed bin**, full for 90 s, spills a pile of bags beside it (at most six in the city). The
+  nearest flock of pigeons takes the pile for its roost, and goes home once a truck clears it.
+
+**Seeing it:**
+- **Ground color → Waste** tints every building by the bin it shares with its neighbors, green
+  (empty) through yellow to red (full); a tint uniform per building (`buildings/print.ts`).
+- **The selected agent's path ahead** (`life/ahead.ts`, `render/select.ts`): click any person,
+  pigeon, cat or vehicle and a thin blue line runs from it along where it means to go, with a ring
+  breathing slowly at its goal; where the goal is out of reach, the line fades out instead. Each
+  agent works its path out from what it will actually do:
+  - a person: down the field they are walking (their group's, then their building's own for the
+    last steps), or straight to a seat or a vehicle's door; 30 m ahead;
+  - a vehicle: along its segment and the segments it has planned (a taxi's or a truck's whole
+    route, a car's next three turns, picked at random as before), stopping at its halt; 60 m
+    ahead;
+  - a cat: at its pigeon while it hunts, else straight on till its next turn or a wall;
+  - a pigeon: to the spot it hops or lands on, or to its roost (or the pile it has taken for one)
+    while it flies.
+  The line is a flat strip a little off the ground (0.45 voxels wide for a person, 0.9 for a
+  vehicle): a one-pixel line read too dark on the paving. A walker's path steps from column to
+  column in its field, so it is rounded off before it is drawn. Nothing is kept between frames: the
+  path is worked out for the one selected agent each frame. (It first drew a trail of dots where
+  the agent had been, every vehicle's 120 m long, then dots ahead, which slid along with the agent
+  and looked like loose voxels; the line ahead reads best, and a vehicle's is half that length.)
+
+**Checked** on `blueprint`:
+- over fifteen minutes with the trucks running, no bin spilled; the trucks burned about nine
+  bins' worth;
+- with the trucks taken away, the first pile spilled after about four minutes and six by the end,
+  with flocks on four of them; with the trucks back, the piles were cleared in about six minutes;
+- a step of the whole simulation: median 0.8 ms, at most 1.4 ms.
+
+| The Waste ground color | A bus and the line of its way to the next stop |
+|---|---|
+| ![Blueprint City with every building tinted by its bin](screenshots/2026-11-17-waste-tint.webp) | ![A bus turning a corner, the blue line of its way ahead](screenshots/2026-11-18-bus-path.webp) |
+
+![A person on the way to work, the blue line of the way ahead along the sidewalk](screenshots/2026-11-18-person-path.webp)
+
+## 2026-11-18: The card closes when its agent goes out of sight
+
+A selected agent that went out of sight (indoors, onto a bus or into a taxi, off the island, a
+garbage truck into its depot) kept its card open, waiting at the top right with nothing to point
+at. Now the selection lets go as soon as its agent can't be seen (`render/WorldView.ts`, each
+frame, by `locate` in `render/select.ts`): the card closes, the ring and the path ahead go, and
+the camera stops following. Hiding Life does the same. Checked on `blueprint`: a person selected
+a few steps from their door, the card closed the moment they went in.
+
+The card's words for agents out of sight are gone with it (`ui/Inspector.tsx`): "Riding the bus",
+"Riding a taxi", "At home", "At work", "Off the island", "In the depot", and the next step from
+home or work. A garbage truck's task on its way back reads "Back to the depot" (it said "At the
+depot", which it only ever is out of sight).
+
+E (hide the panels) no longer hides the card too (`index.tsx`): with the panels, the toolbar and
+the timeline out of the way, the card stays with its agent. × or Escape still closes it.
+
+## 2026-11-18: Street lamps
+
+Town plan step 6 (`docs/plans/street-furniture-plan.md`), kept few on purpose. Each street is
+walked with a slot every 24 m (`city/streetProps.ts`), each on the other side from the one
+before, so on either side a lamp stands every 48 m. A slot stays empty off the verge, near a
+junction or the plaza, near a lot's front middle (its door) or a park's way in, and where the
+street steps. The plaza gets a lamp at each corner.
+
+A lamp (`city/parkModels.ts`) is a post 4.2 m tall with an arm out over the road and a lantern,
+glowing by district: amber in the homes, cyan in the core and the shops, warm white in industry.
+The lamps are drawn as the parks' props are, in one solid and one glow mesh, and grow out of the
+ground with them, outward from the plaza. People walk round them (`life/walk.ts`), and the bus
+shelters, the bins and the taxis' fares keep clear of them (`life/traffic.ts`).
+
+| Seed | Streets | Lamps | Planning |
+|---|---|---|---|
+| `blueprint` | 1.86 km | 37 | 5.8 ms |
+| `8ahsrz` | 1.06 km | 27 | 4.8 ms |
+| `neon7` | 0.86 km | 14 | 4.9 ms |
+| `rust42` | 0.20 km | 6 | 3.9 ms |
+
+On all four: no lamp off the verge or the plaza, none within 6 columns of a building's door or a
+bus stop, or 3 columns of a bin, and no door's column blocked.
+
+![A street lamp at the top of a stepped street, its amber lantern over the road](screenshots/2026-11-18-street-lamp.webp)
+
+## 2026-11-18: Taxis come for the people who hail them
+
+People leaving work stood at the curb with no taxi coming, and empty taxis drove past them. On
+`blueprint`, timed over 120 s of the simulation, 3 of 27 people who hailed got a ride. The
+causes, and what changed (`life/traffic.ts`, `life/agents.ts`, `index.tsx`):
+
+- **Too few taxis for the hailing.** A taxi took about 85–150 s a trip (fetching 25–55 s,
+  carrying 70–110 s), so 8 taxis made about 3–5 trips a minute against about 13 hails. Now there
+  are 10 taxis, and someone takes a taxi only while more taxis are free (cruising, empty) than
+  fares no taxi is coming for and people already on their way to the curb; otherwise they go by
+  bus or on foot.
+- **Giving up on a taxi on its way.** People gave up after 25 s even with a taxi coming, and the
+  taxi turned back. Now, with one on its way, they wait up to 90 s longer for it.
+- **Empty taxis passing.** A taxi only went to the fare it was sent to. Now a free taxi about to
+  pass someone hailing (up to 22.5 m ahead on its lane, if it can brake in time) stops for them,
+  and the taxi that was sent is free again. A taxi already on its way to someone else keeps going
+  to them.
+- **The nearest taxi by the road.** The taxi sent was the nearest in a straight line, often
+  across a block and round a loop of one-way lanes; now it is the one with the shortest drive.
+- **Curbs no taxi drives past.** A street cut off from the rest (part of the road graph of its
+  own) had curbs to hail at but no taxi on it. Taxis now stay on the main part, and people walk
+  only to the curbs beside it.
+
+After the change, over 300 s with 14 taxis: on `blueprint` 18 of 23 hails got a ride (the rest
+gave up waiting for a free taxi), on `neon7` 18 of 24, and an empty, free taxi drove past someone
+hailing on its lane no more. 14 taxis crowded the streets, so the fleet went down to 10: on
+`blueprint`, 9 rides in 300 s and 1 hail given up, as fewer take a taxi while none is free.
+
+## 2026-11-18: The buses take their riders
+
+No one rode the buses. On `blueprint`, over 300 s of the simulation, 14 people set off for a
+bus and none got on: each waited 30 s at the shelter and walked on. Three causes, and what
+changed (`life/traffic.ts`, `life/agents.ts`, `index.tsx`):
+
+- **Buses drove past stops.** A bus halted at its route's stops in a fixed order, but the way
+  from one stop to the next often runs along another stop's lane, and the bus drove past the
+  people waiting there. Now a bus halts at the first of its route's stops it comes to from where
+  it is (`toNextStop`).
+- **Too long between buses.** A route's lap is about 8,700 voxels (2.2 km, round the lanes'
+  one-way loops), some 10 min at a bus's pace, so with 2 buses a route a bus came every 5 min,
+  and people waited 30 s. Now there are 4 buses a route.
+- **Waiting by the clock, not for the bus.** Now someone at a shelter keeps waiting while a bus
+  of the route is within 1,600 voxels of driving (about 2 min, `busDue`), up to 2 min longer than
+  the 30 s; if none is that near when they get there, they walk on at once.
+
+After the change, over 300 s: 58 people got on a bus on `neon7` (61 set off for one) and 20 on
+`blueprint`, with up to 11 riders on a bus. Few take the bus on `blueprint` because few trips
+there are long: most people live near their work.
+
+Then more people take the bus: on a trip longer than 50 m, 60% look for one (35% before), and a
+bus counts as going their way if the walks to its stop and from the one it takes them to add up
+to less than 75% of the straight way (60% before; `BUS_SAVES`). Over 300 s, 36 people got on a
+bus on `blueprint` (20 before) and 124 on `neon7` (58 before), where some buses run nearly full
+(16 of 18 seats).
+

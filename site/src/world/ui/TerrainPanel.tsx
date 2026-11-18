@@ -110,6 +110,7 @@ const TINT_OPTIONS: { value: GroundTint; label: string }[] = [
   { value: "heights", label: "Height" },
   { value: "claims", label: "Claims" },
   { value: "suitability", label: "Suitability" },
+  { value: "waste", label: "Waste" },
 ];
 
 function SettingLabel({ label, pending }: { label: string; pending: boolean }) {
@@ -324,6 +325,16 @@ function LayersTab({ terrain, life, ctl }: { terrain: Terrain; life: Life | null
               <Note>Best for the center</Note>
             </span>
             <Note>Dark ground can't be built on.</Note>
+          </div>
+        )}
+        {tint === "waste" && (
+          <div className="flex flex-col gap-1">
+            <span className="h-1.5 rounded-full bg-gradient-to-r from-[#2f9e6a] via-[#e0b040] to-[#d8432e]" aria-hidden />
+            <span className="flex justify-between">
+              <Note>Bin empty</Note>
+              <Note>Bin full</Note>
+            </span>
+            <Note>Each building is tinted by the bin it shares with its neighbors.</Note>
           </div>
         )}
       </div>

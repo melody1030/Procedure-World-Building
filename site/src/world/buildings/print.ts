@@ -28,15 +28,14 @@ const WORK_LIGHT = new THREE.Color(0xffb347);
 export interface PrintableBuilding {
   /** Sets how far it has been built, 0 (nothing) to 1 (done). */
   setProgress(s: number): void;
+  /** Tints its walls (not its windows or signs) toward a color, by `amount` 0–1 (the Waste tint). */
+  setTint(color: THREE.Color, amount: number): void;
   dispose(): void;
 }
 
 const ease = (t: number) => 1 - (1 - t) * (1 - t);
 
-/** How bright every building's windows and signs are, 0–1: the world's clock dims them by day (life/clock.ts). */
-export const WINDOWS = { value: 1 };
-
-function patch(glow: boolean, frame: { value: number }, clad: { value: number }) {
+function patch(glow: boolean, frame: { value: number }, clad: { value: number }, tint: { value: THREE.Vector4 }) {
   return (shader: THREE.WebGLProgramParametersWithUniforms) => {
     shader.uniforms.uFrameTop = frame;
     shader.uniforms.uCladTop = clad;
@@ -44,7 +43,7 @@ function patch(glow: boolean, frame: { value: number }, clad: { value: number })
     shader.uniforms.uSteel = { value: STEEL };
     shader.uniforms.uWorkLight = { value: WORK_LIGHT };
     shader.uniforms.uConcrete = { value: CONCRETE };
-    shader.uniforms.uWindows = WINDOWS;
+    shader.uniforms.uTint = tint;
     shader.vertexShader = shader.vertexShader
       .replace("#include <common>", "#include <common>\nuniform float uFrameTop;\nvarying vec3 vSitePos;\nvarying float vUnclad;\nvarying float vDeck;")
       .replace(
@@ -53,11 +52,11 @@ function patch(glow: boolean, frame: { value: number }, clad: { value: number })
       );
     shader.fragmentShader = shader.fragmentShader.replace(
       "#include <common>",
-      "#include <common>\nuniform float uWindows;\nuniform float uFrameTop;\nuniform float uCladTop;\nuniform vec3 uScaffold;\nuniform vec3 uSteel;\nuniform vec3 uWorkLight;\nuniform vec3 uConcrete;\nvarying vec3 vSitePos;\nvarying float vUnclad;\nvarying float vDeck;",
+      "#include <common>\nuniform vec4 uTint;\nuniform float uFrameTop;\nuniform float uCladTop;\nuniform vec3 uScaffold;\nuniform vec3 uSteel;\nuniform vec3 uWorkLight;\nuniform vec3 uConcrete;\nvarying vec3 vSitePos;\nvarying float vUnclad;\nvarying float vDeck;",
     );
     if (glow) {
       // A window lights up once the facade has been clad up past it.
-      shader.fragmentShader = shader.fragmentShader.replace("#include <color_fragment>", "#include <color_fragment>\nif (vUnclad > uCladTop + 0.001) discard;\ndiffuseColor.rgb *= uWindows;");
+      shader.fragmentShader = shader.fragmentShader.replace("#include <color_fragment>", "#include <color_fragment>\nif (vUnclad > uCladTop + 0.001) discard;");
     } else {
       // Above the cladding: scaffolding, poles along each face (x + z runs along whichever face this
       // is), ledgers up it, a brace on the diagonal; and work lights in a strip under the frame top.
@@ -74,6 +73,7 @@ float steel = max(pole, max(ledger, brace));
 // The deck at the frame top is bare concrete; the faces are scaffolding.
 vec3 site = mix(mix(uScaffold, uSteel, steel), uConcrete, vDeck);
 diffuseColor.rgb = mix(diffuseColor.rgb, site, onSite);
+diffuseColor.rgb = mix(diffuseColor.rgb, uTint.rgb, uTint.a);
 float workLight = onSite * (1.0 - vDeck) * (1.0 - smoothstep(0.0, 0.6, uFrameTop - vSitePos.y)) * step(0.5, fract(along * 0.5));`,
         )
         .replace("#include <emissivemap_fragment>", "#include <emissivemap_fragment>\ntotalEmissiveRadiance += uWorkLight * workLight * 0.9;");
@@ -84,6 +84,7 @@ float workLight = onSite * (1.0 - vDeck) * (1.0 - smoothstep(0.0, 0.6, uFrameTop
 export function makePrintable(group: THREE.Group): PrintableBuilding {
   const frame = { value: 1e5 };
   const clad = { value: 1e5 };
+  const tint = { value: new THREE.Vector4(0, 0, 0, 0) };
   let height = 0;
   const materials: THREE.Material[] = [];
   const bodies: THREE.Mesh[] = [];
@@ -93,7 +94,7 @@ export function makePrintable(group: THREE.Group): PrintableBuilding {
     height = Math.max(height, o.geometry.boundingBox!.max.y);
     const glow = o.material instanceof THREE.MeshBasicMaterial;
     const material = (o.material as THREE.Material).clone();
-    material.onBeforeCompile = patch(glow, frame, clad);
+    material.onBeforeCompile = patch(glow, frame, clad, tint);
     material.customProgramCacheKey = () => (glow ? "building-site-glow" : "building-site-solid");
     o.material = material;
     materials.push(material);
@@ -124,6 +125,9 @@ export function makePrintable(group: THREE.Group): PrintableBuilding {
         done = finished;
         for (const b of bodies) b.castShadow = finished;
       }
+    },
+    setTint(color, amount) {
+      tint.value.set(color.r, color.g, color.b, amount);
     },
     dispose() {
       for (const m of materials) m.dispose();

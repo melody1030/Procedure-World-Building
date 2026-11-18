@@ -43,6 +43,13 @@ export interface WalkMap {
   links: Uint8Array;
   /** 1 for people's columns beside one they can't walk on. */
   edge: Uint8Array;
+  /** Where the street lamps stand (columns): the bus stops and curb spots keep clear of them. */
+  street: { x: number; z: number }[];
+}
+
+/** True if no street lamp stands within `r` columns of (x, z). */
+export function clearOfStreetProps(map: WalkMap, x: number, z: number, r: number): boolean {
+  return !map.street.some((p) => Math.abs(p.x - x) <= r && Math.abs(p.z - z) <= r && Math.hypot(p.x - x, p.z - z) <= r);
 }
 
 /** True where people walk. */
@@ -65,6 +72,7 @@ const BLOCK: Partial<Record<ParkPropKind, number | [number, number]>> = {
   conifer: 1,
   blossom: 1,
   shrub: 1.5,
+  streetlamp: 1,
 };
 
 export const N8: [number, number, number][] = [
@@ -104,7 +112,7 @@ export function walkMap(claim: Uint8Array, parks: Parks, plans: BuildingPlan[]):
       }
     }
   };
-  for (const park of parks.parks) {
+  for (const park of [...parks.parks, { props: parks.street }]) {
     for (const p of park.props) {
       const b = BLOCK[p.kind];
       if (b === undefined) continue;
@@ -125,7 +133,7 @@ export function walkMap(claim: Uint8Array, parks: Parks, plans: BuildingPlan[]):
       if (forPeople(walk[k]) && ((closed(k - 1) && closed(k + 1)) || (closed(k - n) && closed(k + n)))) walk[k] = GROUND.none;
     }
   }
-  const map: WalkMap = { n, y: height, walk, links: new Uint8Array(n * n), edge: new Uint8Array(n * n) };
+  const map: WalkMap = { n, y: height, walk, links: new Uint8Array(n * n), edge: new Uint8Array(n * n), street: parks.street.map((p) => ({ x: p.x, z: p.z })) };
   const people = (k: number) => forPeople(walk[k]);
   // Straight steps: to an open neighbor no more than STEP up or down.
   const { links } = map;

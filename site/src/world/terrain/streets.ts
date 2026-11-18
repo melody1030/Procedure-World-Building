@@ -69,7 +69,7 @@ const BANK_RUN = 1;
 const MAX_EMBANKMENT = 10;
 /** How much higher a curb stands than the paving, in voxels. */
 const CURB = 1;
-/** The strip beyond each street edge kept for lamps and street trees, in meters. */
+/** The strip beyond each street edge kept for the street lamps, in meters. */
 const VERGE = 1.5;
 /** Block smoothing: within BLOCK_REACH meters of paving the ground is free to take the smoothest
  * shape between the streets' levels; by WILD_REACH it keeps its own (the hills beyond the city). */

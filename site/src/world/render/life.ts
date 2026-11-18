@@ -20,7 +20,10 @@ import type { VehicleKind } from "../life/traffic";
  *   Headlights always on, tail lights flaring when they brake; a taxi's roof light is lit while it
  *   is free; a bus's windows are lit from inside and its door lights up while it stands open.
  *   Someone hailing a taxi holds up a glowing phone. Bus shelters stand at the stops, signed in
- *   their route's color.
+ *   their route's color. Garbage trucks: a cab and a compactor body.
+ * - Waste (life/waste.ts): a bin on the curb for each group of doors, from green (empty) to rust
+ *   (full); a spilled pile of bags beside a bin that was missed. One instanced mesh each, a few
+ *   dozen instances in all.
  */
 
 /** A box of size (w, h, d) whose base center (or, with `top`, top center) is at the origin, moved by (x, y, z). */
@@ -41,6 +44,9 @@ const TAXI_HIRED = 0x3a3f46;
 const INTERIOR = 0xffd79a;
 const DOOR = 0x23272f;
 const PHONE = 0x7ff3ff;
+const BIN_EMPTY = new THREE.Color(0x2f6b4a);
+const BIN_FULL = new THREE.Color(0xa0522d);
+const BAGS = [0x1c1e22, 0x2d3a2a, 0x3a3d44];
 
 /** A vehicle's shell and glass (voxels; +z is its front, its right is -x), its wheels (x, z), and its lights' height. */
 interface Model {
@@ -68,6 +74,13 @@ function models(): Record<VehicleKind, Model> {
       wheels: [-1, 1].flatMap((x) => [-1, 1].map((z): [number, number] => [x * 2.85, z * 5.6])),
       lights: 2.6,
     },
+    // A garbage truck: a cab with its windscreen, and the compactor body behind it.
+    truck: {
+      shell: mergeGeometries([box(6.4, 6.2, 6, 0, 0.9, 6.9), box(6.8, 8.4, 13.4, 0, 0.9, -3.2)]),
+      glass: box(6.5, 2.2, 5.2, 0, 4.4, 7.1),
+      wheels: [-1, 1].flatMap((x) => [-1, 1].map((z): [number, number] => [x * 3, z * 6.4])),
+      lights: 2.6,
+    },
     // A community bus: a long box with a roof, its windows (lit) drawn separately.
     bus: {
       shell: mergeGeometries([box(6.6, 9.4, 24, 0, 1, 0), box(6.0, 0.6, 19, 0, 10.4, -0.5)]),
@@ -78,7 +91,7 @@ function models(): Record<VehicleKind, Model> {
   };
 }
 
-const KINDS: VehicleKind[] = ["car", "taxi", "van", "bus"];
+const KINDS: VehicleKind[] = ["car", "taxi", "van", "bus", "truck"];
 
 class Part {
   readonly mesh: THREE.InstancedMesh;
@@ -146,6 +159,9 @@ export class LifeView {
   private readonly windows: Part;
   private readonly door: Part;
   private readonly destination: Part;
+  private readonly bin: Part;
+  private readonly pile: Part;
+  private readonly tint = new THREE.Color();
   private readonly shelters = new THREE.Group();
   private readonly m = new THREE.Matrix4();
   private readonly base = new THREE.Matrix4();
@@ -199,13 +215,16 @@ export class LifeView {
     this.windows = new Part(box(6.66, 3.2, 20, 0, 5.6, -0.6), buses, false, glow());
     this.door = new Part(box(0.12, 7.4, 3.4, -3.32, 1.4, 7.6), buses, false, glow());
     this.destination = new Part(box(4.4, 1, 0.15, 0, 8.4, 12.05), buses, false, glow());
+    // A wheelie bin with its lid; a pile of three bags.
+    this.bin = new Part(mergeGeometries([box(2.4, 3.2, 2.4), box(2.6, 0.4, 2.7, 0, 3.2, 0)]), life.waste.bins.length);
+    this.pile = new Part(mergeGeometries([box(2.2, 1.8, 2, -1.2, 0, 0), box(2, 1.6, 2.2, 1.1, 0, 0.4), box(1.8, 1.5, 1.8, 0, 1.4, 0.2)]), Math.min(life.waste.bins.length, 6));
     this.buildShelters(life);
     for (const p of [this.torso, this.head, this.hair, this.leg, this.arm, this.seatedLeg, this.pigeon, this.wing, this.cat, ...this.vehicleParts()]) this.group.add(p.mesh);
     this.group.add(this.shelters);
   }
 
   private vehicleParts(): Part[] {
-    return [this.phone, ...KINDS.flatMap((k) => [this.shells[k], this.glasses[k]]).filter((p, i, a) => a.indexOf(p) === i), this.wheel, this.lamp, this.taxiSign, this.windows, this.door, this.destination];
+    return [this.phone, ...KINDS.flatMap((k) => [this.shells[k], this.glasses[k]]).filter((p, i, a) => a.indexOf(p) === i), this.wheel, this.lamp, this.taxiSign, this.windows, this.door, this.destination, this.bin, this.pile];
   }
 
   /** A bus shelter at each stop: a canopy on two posts, a glass back, and a sign in the route's color. */
@@ -314,6 +333,14 @@ export class LifeView {
         this.door.add(base, v.activity === "stand" ? INTERIOR : DOOR);
         this.destination.add(base, v.color);
       }
+    }
+
+    // The bins, tinted by how full they are, and the piles beside them (behind, away from the road).
+    let bag = 0;
+    for (const b of this.life.waste.bins) {
+      base.makeRotationY(b.heading).setPosition(b.x - half, b.y, b.z - half);
+      this.bin.add(base, this.tint.copy(BIN_EMPTY).lerp(BIN_FULL, b.fill).getHex());
+      if (b.pile) this.pile.add(m.multiplyMatrices(base, t.makeTranslation(2.6, 0, -2.2)), BAGS[bag++ % BAGS.length]);
     }
 
     for (const p of parts) p.end();

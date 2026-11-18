@@ -65,7 +65,9 @@ export type ParkPropKind =
   | "broadleaf"
   | "conifer"
   | "blossom"
-  | "shrub";
+  | "shrub"
+  // Along the streets (streetProps.ts).
+  | "streetlamp";
 
 export interface ParkProp {
   kind: ParkPropKind;
@@ -80,6 +82,8 @@ export interface ParkProp {
   seed: number;
   /** When it appears in its park's build, 0–1. */
   delay: number;
+  /** A street lamp's glow (its district's). */
+  color?: number;
 }
 
 export interface Park {
@@ -99,6 +103,8 @@ export interface Parks {
   /** 1 for paved park ground: paths, the court, terraces, niches and wall copings. */
   path: Uint8Array;
   parks: Park[];
+  /** The street lamps (see streetProps.ts), planned after the parks; their `delay` is their own start (0–1), outward from the plaza. */
+  street: ParkProp[];
 }
 
 type Layout = "cross" | "loop" | "grand";
@@ -200,7 +206,7 @@ export function planParks(districts: Districts, ground: Columns, plaza: Plaza | 
     min = Math.min(min, h);
     max = Math.max(max, h);
   }
-  return { ground: { ...ground, height, min, max }, path, parks };
+  return { ground: { ...ground, height, min, max }, path, parks, street: [] };
 }
 
 /** `orig`: the ground as graded for the lots, before the parks. */

@@ -116,6 +116,8 @@ The full dated log with every screenshot is in
 | 2026-11-16    | **Grammar buildings on the city's lots**: every lot in `/world` builds from the grammar, its facades fitted to the room the lot leaves, its district weighting its windows, shops, signs, balconies and roof |
 | 2026-11-16    | **Denser lots**: party walls between lots and buildings, deeper lots and a backfill step, so footprints cover 81% of each lot (63% before) |
 | 2026-11-16/17 | **Buildings at the people's scale**: the city's buildings, the Landmark included, are drawn at 0.75, as its people are, so a storey stands about 1.75 people tall |
+| 2026-11-17    | **The city as a simulation** (Class 09): everyone has a home and a job and goes round a cycle of their own, with no clock; garbage trucks empty the bins into the incinerator, and a missed bin spills a pile that draws the pigeons; a Waste ground color, and the path ahead of any agent you click |
+| 2026-11-18    | **Street lamps**: a few along every street, side to side, one every 48 m on each side; amber in the homes, cyan in the core |
 
 | Version 1, rainy night (Oct 7) | Districts and parks (Oct 12) |
 |---|---|
@@ -166,7 +168,18 @@ commercial ground floors lowered to 4.75–5.25 m:
 
 ![The plaza, the Landmark and its shop fronts at the people's scale](site/src/world/screenshots/2026-11-17-plaza-landmark-scale.webp)
 
-Plans: [terrain plan](docs/plans/terrain-plan.md) · [town plan](docs/plans/town-plan.md) · [shader studio plan](docs/plans/shader-studio-plan.md) · [city controls plan](docs/plans/city-controls-plan.md) · [building grammar plan](docs/plans/building-grammar-plan.md) · [grammar city plan](docs/plans/grammar-city-plan.md) · [city simulation plan](docs/plans/city-simulation-plan.md)
+The city as a simulation (Nov 17): every building tinted by how full its bin is, and a selected
+bus with the blue line of the way it means to take:
+
+| The Waste ground color | A bus and the line of its way ahead |
+|---|---|
+| ![Blueprint City with every building tinted by its bin, green (empty) to red (full)](site/src/world/screenshots/2026-11-17-waste-tint.webp) | ![A bus turning a corner, the blue line of its way ahead](site/src/world/screenshots/2026-11-18-bus-path.webp) |
+
+Street lamps (Nov 18):
+
+![A street lamp at the top of a stepped street, its amber lantern over the road](site/src/world/screenshots/2026-11-18-street-lamp.webp)
+
+Plans: [terrain plan](docs/plans/terrain-plan.md) · [town plan](docs/plans/town-plan.md) · [shader studio plan](docs/plans/shader-studio-plan.md) · [city controls plan](docs/plans/city-controls-plan.md) · [building grammar plan](docs/plans/building-grammar-plan.md) · [grammar city plan](docs/plans/grammar-city-plan.md) · [city simulation plan](docs/plans/city-simulation-plan.md) · [street furniture plan](docs/plans/street-furniture-plan.md)
 
 ---
 
