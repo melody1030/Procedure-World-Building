@@ -13,8 +13,15 @@ import { NO_PATH, type Path } from "./ahead";
  * - The road graph: every street is two lanes, one each way, offset to the right of its center
  *   line and trimmed back from the junctions. At a junction each lane coming in is joined to every
  *   lane going out (not back the way it came) by a link, a smooth curve from one to the other. A
- *   street that ends short of the diorama's edge (at the plaza, which is for people only) turns
- *   round; one that runs off the edge is where traffic leaves the island and comes back on.
+ *   street that ends short of the diorama's edge turns round; one that runs off the edge is where
+ *   traffic leaves the island and comes back on.
+ * - The plaza, where two or more streets meet it, is a roundabout: a one-way ring round the
+ *   Landmark (on its left, keeping right), midway between it and the plaza's edge, with a junction
+ *   at the middle of each side. Those on the ring go first; one coming on needs room for one more
+ *   behind it, so the ring never fills; one whose way off has no room goes round again. Buses and
+ *   garbage trucks are too long to turn between the Landmark and the plaza's edge: they turn round
+ *   where a street meets the plaza instead. A street too short between the plaza and its next
+ *   junction (two junctions that close hold each other up) keeps turning round there too.
  * - Driving: each vehicle follows the one ahead by the Intelligent Driver Model (it keeps a time gap,
  *   brakes harder the faster it closes in), slows for the bends, and stops dead where it means to
  *   (a stop line, a bus stop, a fare). Cars and vans take turns at random (off the island now and
@@ -100,6 +107,13 @@ const ROOM = 70;
 const PER_JUNCTION = 3;
 /** What turning round costs a route, as so many voxels of driving. */
 const ROUND_COST = 400;
+/** The ring round the Landmark: its lanes' street (none of the streets'), and how far (voxels) they are trimmed back from the plaza's sides. */
+const RING = -2;
+const RING_TRIM = 6;
+/** Coming onto the ring takes room for this much more (voxels: about a car and its gap) on the ring past it. */
+const RING_SPARE = 20;
+/** A street from the plaza joins the ring only if its lanes would be at least this long (voxels: two vans). */
+const RING_JOIN = 34;
 /** Dead ends shorter than this (voxels) are kept out of. */
 const STUB = 40;
 /** Bus: riders, the least and most time at a stop (s), the chance a rider gets off at each stop. */
@@ -144,6 +158,12 @@ export interface Seg {
   on: Vehicle[];
   /** Connected part of the road graph (lanes reach each other only within one). */
   part: number;
+  /**
+   * Who may drive it: everyone; only the small (the ring round the Landmark and the links onto it:
+   * a bus or a garbage truck is too long to turn between the Landmark and the plaza's edge); or
+   * only the big (turning round where a street meets the plaza, instead of the ring).
+   */
+  fits: "all" | "small" | "big";
 }
 
 export interface RoadNode {
@@ -248,6 +268,14 @@ export interface TrafficCounts {
   buses: number;
 }
 
+/** The plaza, driven round its Landmark: its center, half its side, and half the Landmark's (columns). */
+export interface Roundabout {
+  x: number;
+  z: number;
+  half: number;
+  inner: number;
+}
+
 export interface TrafficHooks {
   /** People near (x, z), for braking. */
   near(x: number, z: number, r: number): Person[];
@@ -273,6 +301,8 @@ export class Traffic {
   private readonly fares: Fare[] = [];
   /** The largest part of the road graph (the buses' and the garbage trucks'), and the garbage trucks' depot on it. */
   main = 0;
+  /** True if traffic goes round the Landmark (the plaza is a roundabout). */
+  ring = false;
   depot: { seg: number; s: number } | null = null;
   private readonly rng: Rng;
   private time = 0;
@@ -283,9 +313,10 @@ export class Traffic {
     seed: number,
     count: TrafficCounts,
     private readonly hooks: TrafficHooks,
+    roundabout: Roundabout | null = null,
   ) {
     this.rng = new Rng(seed ^ 0x7aff1c);
-    this.buildGraph(streets);
+    this.buildGraph(streets, roundabout);
     this.buildCurbs();
     this.buildRoutes();
     for (const k of this.curbs) if (this.segs[this.curbSpot.get(k)!.seg].part === this.main) this.taxiCurbs.push(k);
@@ -320,7 +351,7 @@ export class Traffic {
 
   /* ---------- The road graph ---------- */
 
-  private buildGraph(streets: Street[]) {
+  private buildGraph(streets: Street[], roundabout: Roundabout | null) {
     const { n } = this.map;
     const nodeAt = (p: P2) => {
       const i = this.nodes.findIndex((q) => Math.hypot(q.x - p.x, q.z - p.z) < 3);
@@ -334,10 +365,35 @@ export class Traffic {
       const edge = N.x < 2 || N.z < 2 || N.x > n - 3 || N.z > n - 3;
       N.kind = degree[i] >= 3 ? "junction" : degree[i] === 2 ? "bend" : edge ? "exit" : "end";
     });
+    // The plaza's sides: the middle of each is a junction on the ring round the Landmark, whether
+    // a street comes in there or not.
+    // The plaza's sides: the middle of each is a junction on the ring round the Landmark, whether
+    // a street comes in there or not. A street from the plaza joins the ring only if its lanes
+    // would be long enough between the plaza and its other end (two junctions too close each hold
+    // the other up); one too short stays a dead end at the plaza, where traffic turns round. With
+    // fewer than two streets to join, there is no ring: it would take no one anywhere new.
+    const arc = (c: P2[]) => c.reduce((t, p, j) => (j ? t + Math.hypot(p.x - c[j - 1].x, p.z - c[j - 1].z) : 0), 0);
+    const apart = (st: Street, N: RoadNode) => (N.kind === "junction" ? st.width / 2 + TRIM_JUNCTION : N.kind === "exit" ? 0 : TRIM_BEND);
+    const mids = roundabout ? this.plazaSides(roundabout) : [];
+    const atSide = (e: number) => mids.some((p) => Math.hypot(this.nodes[e].x - p.x, this.nodes[e].z - p.z) < 3);
+    const short = new Set<number>();
+    let joining = 0;
+    streets.forEach((st, i) => {
+      const at = ends[i].findIndex(atSide);
+      if (at < 0 || st.curve.length < 2) return;
+      if (arc(st.curve) - (st.width / 2 + TRIM_JUNCTION) - apart(st, this.nodes[ends[i][1 - at]]) < RING_JOIN) short.add(i);
+      else joining++;
+    });
+    const sides = roundabout && joining >= 2 ? mids.map((p) => nodeAt(p)) : [];
+    for (const i of sides) this.nodes[i].kind = "junction";
+    this.ring = sides.length > 0;
+    if (!this.ring) short.clear();
     // Lanes: offset right of the curve, trimmed back from the nodes.
     const trim = (N: RoadNode, width: number) => (N.kind === "junction" ? width / 2 + TRIM_JUNCTION : N.kind === "exit" ? 0 : TRIM_BEND);
     streets.forEach((st, i) => {
       if (st.curve.length < 2) return;
+      // (A short one turns round at the plaza: trimmed there as at a dead end.)
+      const trimAt = (k: number) => (short.has(i) && sides.includes(k) ? TRIM_BEND : trim(this.nodes[k], st.width));
       for (const dir of [1, -1]) {
         const curve = dir > 0 ? st.curve : [...st.curve].reverse();
         const a = ends[i][dir > 0 ? 0 : 1];
@@ -351,11 +407,12 @@ export class Traffic {
           const m = Math.hypot(tx, tz) || 1;
           return { x: p.x - (tz / m) * off, z: p.z + (tx / m) * off };
         });
-        const pts = cut(shifted, trim(this.nodes[a], st.width), trim(this.nodes[b], st.width));
+        const pts = cut(shifted, trimAt(a), trimAt(b));
         if (pts.length < 2) continue;
         this.addSeg(pts, null, a, b, false, i, dir, st.kind === "main" ? MAIN : SIDE);
       }
     });
+    if (roundabout && this.ring) this.buildRing(roundabout, sides);
     // Links: at each node, every lane in to every lane out (not back the same street, except where
     // the street ends and traffic turns round).
     const lanes = this.segs.length;
@@ -366,8 +423,14 @@ export class Traffic {
       for (let M = 0; M < lanes; M++) {
         const out = this.segs[M];
         if (out.a !== into.b) continue;
-        const round = out.street === into.street;
-        if (round !== (N.kind === "end")) continue;
+        // (On round the ring, from one of its lanes to the next; and where a street meets the
+        // plaza, turning round for the big, who can't take the ring.)
+        const round = out.street === into.street && into.street !== RING;
+        const plazaRound = round && sides.includes(into.b);
+        if (round !== (N.kind === "end") && !plazaRound) continue;
+        // (A street too short for the ring: only turning round, for everyone.)
+        const shortHere = (k: number) => k >= 0 && short.has(k) && sides.includes(into.b);
+        if ((shortHere(into.street) || shortHere(out.street)) && !round) continue;
         const p0 = into.pts[into.pts.length - 1];
         const p1 = out.pts[0];
         const t0 = tangent(into.pts, into.pts.length - 1);
@@ -379,6 +442,7 @@ export class Traffic {
         const y0 = into.y[into.y.length - 1];
         const y1 = out.y[0];
         const id = this.addSeg(pts, (t) => y0 + (y1 - y0) * t, into.b, into.b, true, -1, 0, limit);
+        this.segs[id].fits = plazaRound && !short.has(into.street) ? "big" : into.street === RING || out.street === RING ? "small" : "all";
         into.next.push(id);
         this.segs[id].next.push(M);
       }
@@ -418,20 +482,80 @@ export class Traffic {
     });
   }
 
+  /** The middle of each side of the plaza, in the order the ring runs (the Landmark on the left, keeping right). */
+  private plazaSides(r: Roundabout): P2[] {
+    // +x, −z, −x, +z: counterclockwise seen from above (x right, z toward the viewer), so with
+    // the lanes' right at (−tz, tx) the Landmark is on the left.
+    return [
+      { x: r.x + r.half, z: r.z },
+      { x: r.x, z: r.z - r.half },
+      { x: r.x - r.half, z: r.z },
+      { x: r.x, z: r.z + r.half },
+    ];
+  }
+
+  /**
+   * The ring round the Landmark: one lane each from the middle of a side of the plaza to the next,
+   * midway between the Landmark and the plaza's edge, round each corner on a curve about the
+   * Landmark's corner (so a vehicle's body clears it), trimmed back from the junctions at the sides.
+   */
+  private buildRing(r: Roundabout, sides: number[]) {
+    const R = (r.inner + r.half) / 2;
+    const bend = R - r.inner;
+    const mids = this.plazaSides(r);
+    for (let i = 0; i < 4; i++) {
+      const a = mids[i];
+      const b = mids[(i + 1) % 4];
+      // From the side's middle (at R) along the side to the corner, round it, and on to the next side's middle.
+      const ax = Math.sign(a.x - r.x);
+      const az = Math.sign(a.z - r.z);
+      const bx = Math.sign(b.x - r.x);
+      const bz = Math.sign(b.z - r.z);
+      const start = { x: r.x + ax * R, z: r.z + az * R };
+      const end = { x: r.x + bx * R, z: r.z + bz * R };
+      // The corner between them, and the Landmark's corner the curve goes round.
+      const cx = ax || bx;
+      const cz = az || bz;
+      const pivot = { x: r.x + cx * r.inner, z: r.z + cz * r.inner };
+      const pts: P2[] = [];
+      // Along the first side to the curve's start.
+      const c0 = { x: pivot.x + (ax ? ax * bend : 0), z: pivot.z + (az ? az * bend : 0) };
+      const c1 = { x: pivot.x + (bx ? bx * bend : 0), z: pivot.z + (bz ? bz * bend : 0) };
+      const line = (p: P2, q: P2) => {
+        const steps = Math.max(1, Math.ceil(Math.hypot(q.x - p.x, q.z - p.z)));
+        for (let s = 0; s < steps; s++) pts.push({ x: p.x + ((q.x - p.x) * s) / steps, z: p.z + ((q.z - p.z) * s) / steps });
+      };
+      line(start, c0);
+      const t0 = Math.atan2(c0.z - pivot.z, c0.x - pivot.x);
+      let t1 = Math.atan2(c1.z - pivot.z, c1.x - pivot.x);
+      while (t1 - t0 > Math.PI) t1 -= 2 * Math.PI;
+      while (t0 - t1 > Math.PI) t1 += 2 * Math.PI;
+      const arc = Math.max(4, Math.ceil(Math.abs(t1 - t0) * bend));
+      for (let s = 0; s < arc; s++) {
+        const t = t0 + ((t1 - t0) * s) / arc;
+        pts.push({ x: pivot.x + Math.cos(t) * bend, z: pivot.z + Math.sin(t) * bend });
+      }
+      line(c1, end);
+      pts.push(end);
+      const lane = cut(pts, RING_TRIM, RING_TRIM);
+      if (lane.length >= 2) this.segs[this.addSeg(lane, null, sides[i], sides[(i + 1) % 4], false, RING, 1, LINK_STRAIGHT)].fits = "small";
+    }
+  }
+
   private addSeg(pts: P2[], level: ((t: number) => number) | null, a: number, b: number, link: boolean, street: number, dir: number, limit: number) {
     const { n, y } = this.map;
     const cum = new Float32Array(pts.length);
     for (let i = 1; i < pts.length; i++) cum[i] = cum[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z);
     const len = cum[pts.length - 1];
     const ground = Float32Array.from(pts, (p, i) => (level ? level(len ? cum[i] / len : 0) : y[Math.min(n - 1, Math.max(0, p.z | 0)) * n + Math.min(n - 1, Math.max(0, p.x | 0))]));
-    this.segs.push({ pts, y: level ? ground : ride(ground), cum, len, a, b, link, street, dir, next: [], limit, conflicts: new Set(), on: [], part: -1 });
+    this.segs.push({ pts, y: level ? ground : ride(ground), cum, len, a, b, link, street, dir, next: [], limit, conflicts: new Set(), on: [], part: -1, fits: "all" });
     return this.segs.length - 1;
   }
 
-  /** Lanes (not links), optionally of one part; not the stubs. */
+  /** Lanes (not links), optionally of one part; not the stubs, nor the ring round the Landmark. */
   private lanes(part = -1) {
     const out: number[] = [];
-    this.segs.forEach((s, i) => !s.link && !this.stub(s) && (part < 0 || s.part === part) && out.push(i));
+    this.segs.forEach((s, i) => !s.link && s.street !== RING && !this.stub(s) && (part < 0 || s.part === part) && out.push(i));
     return out;
   }
 
@@ -444,7 +568,7 @@ export class Traffic {
   private buildCurbs() {
     const { n } = this.map;
     this.segs.forEach((s, i) => {
-      if (s.link || s.len < 30) return;
+      if (s.link || s.street === RING || s.len < 30) return;
       for (let d = 12; d < s.len - 12; d += 6) {
         const p = this.at(s, d);
         const r = right(this.dirAt(s, d));
@@ -470,7 +594,7 @@ export class Traffic {
     // Streets with a lane each way, long enough, not leaving the island: farthest apart first.
     const streets = new Map<number, number[]>();
     this.segs.forEach((s, i) => {
-      if (s.link || s.part !== part || s.len < SHELTER_LANE || this.nodes[s.a].kind === "exit" || this.nodes[s.b].kind === "exit") return;
+      if (s.link || s.street === RING || s.part !== part || s.len < SHELTER_LANE || this.nodes[s.a].kind === "exit" || this.nodes[s.b].kind === "exit") return;
       streets.set(s.street, [...(streets.get(s.street) ?? []), i]);
     });
     const pairs = [...streets.values()].filter((l) => l.length === 2);
@@ -508,7 +632,7 @@ export class Traffic {
       for (let i = 0; i < lanes.length; i++) {
         const from = lanes[i];
         const to = lanes[(i + 1) % lanes.length];
-        const path = this.path(from, this.segs[from].len / 2, to, this.segs[to].len / 2, true);
+        const path = this.path(from, this.segs[from].len / 2, to, this.segs[to].len / 2, true, true);
         if (!path) {
           route.segs = [];
           break;
@@ -546,15 +670,18 @@ export class Traffic {
 
   /**
    * The shortest way (by length) from distance `fromS` on segment `from` to `toS` on `to`, as the
-   * segments in order (both ends included); null if there is none. With `stay`, never off the island.
+   * segments in order (both ends included); null if there is none. With `stay`, never off the island;
+   * with `big` (a bus or a garbage truck), never round the ring.
    */
-  path(from: number, fromS: number, to: number, toS: number, stay = false): number[] | null {
+  path(from: number, fromS: number, to: number, toS: number, stay = false, big = false): number[] | null {
+    const barred = (j: number) => this.segs[j].fits === (big ? "small" : "big");
     if (from === to && toS > fromS + 4) return [from];
     const count = this.segs.length;
     const dist = new Float64Array(count).fill(Infinity);
     const prev = new Int32Array(count).fill(-1);
     const done = new Uint8Array(count);
     for (const j of this.segs[from].next) {
+      if (barred(j)) continue;
       dist[j] = this.segs[from].len - fromS;
       prev[j] = from;
     }
@@ -567,8 +694,9 @@ export class Traffic {
       const s = this.segs[best];
       if ((stay && !s.link && this.nodes[s.b].kind === "exit") || this.stub(s)) continue;
       for (const j of s.next) {
-        // (Turning round at a dead end, into the plaza's crowd, only if there is no other way.)
-        const d = dist[best] + s.len + (this.segs[j].link && this.nodes[this.segs[j].a].kind === "end" ? ROUND_COST : 0);
+        if (barred(j)) continue;
+        // (Turning round at a dead end, or where a street meets the plaza, only if there is no other way.)
+        const d = dist[best] + s.len + (this.segs[j].link && this.segs[j].limit === LINK_ROUND ? ROUND_COST : 0);
         if (d < dist[j]) {
           dist[j] = d;
           prev[j] = best;
@@ -699,14 +827,16 @@ export class Traffic {
         continue;
       }
       // A turn at random: off the island now and then (cars and vans only), seldom into a dead end.
+      const big = v.kind === "truck";
       const weights = last.next.map((j): number => {
+        if (this.segs[j].fits === (big ? "small" : "big")) return 0;
         const lane = this.segs[j].link ? this.segs[this.segs[j].next[0]] : this.segs[j];
         const to = this.nodes[lane.b].kind;
         return to === "exit" ? (v.kind === "taxi" || v.kind === "truck" ? 0 : 0.3) : to === "end" ? (this.stub(lane) ? 0.001 : 0.25) : 1;
       });
       const total = weights.reduce((a, b) => a + b, 0);
       let r = this.rng.next() * total;
-      let pick = last.next[0];
+      let pick = last.next.find((_, i) => weights[i] > 0) ?? last.next[0];
       for (let i = 0; i < weights.length; i++) if ((r -= weights[i]) <= 0) [pick, r] = [last.next[i], Infinity];
       v.plan.push(pick);
     }
@@ -730,15 +860,25 @@ export class Traffic {
       // Let in only once at the line, so it holds the junction no longer than it must (and until
       // then it keeps no one waiting: it may be stuck behind someone who is), in the order they got there.
       for (const v of N.queue) if (v.ready < 0 && this.segs[v.seg].len - v.s - v.length / 2 < ENTER + v.v) v.ready = this.time;
-      const ready = N.queue.filter((v) => v.ready >= 0).sort((a, b) => a.ready - b.ready);
+      // (Round the ring, as at any roundabout: those on it first.)
+      const onRing = (v: Vehicle) => this.segs[v.seg].street === RING;
+      const ready = N.queue.filter((v) => v.ready >= 0).sort((a, b) => Number(onRing(b)) - Number(onRing(a)) || a.ready - b.ready);
+      const ringComing = N.queue.some(onRing);
       // Links in use (following someone onto the same link is fine), and links wanted by those before.
       const taken = new Set(N.holders.map((h) => h.granted));
       const wanted = new Set<number>();
       for (const v of ready) {
+        // Off the ring with no room on the street out: round once more instead (as at any
+        // roundabout), so it doesn't stand on the ring and hold up everyone behind it.
+        if (onRing(v) && this.segs[this.segs[v.asked].next[0]]?.street !== RING && !this.room(v.asked, v.length)) this.goRound(v);
         const link = v.asked;
         const conflicts = this.segs[link].conflicts;
         // Not into the junction unless there is room beyond it (so no one stops in it and blocks it).
-        if (!this.room(link, v.length)) continue;
+        // Onto the ring from a street: only with no one coming round it, and room for one more
+        // behind, so the ring never fills (full, everyone on it would wait for everyone else).
+        const entering = !onRing(v) && this.segs[this.segs[link].next[0]]?.street === RING;
+        if (entering && ringComing) continue;
+        if (!this.room(link, v.length + (entering ? RING_SPARE : 0))) continue;
         if ([...taken].some((t) => conflicts.has(t)) || [...wanted].some((t) => t === link || conflicts.has(t))) {
           wanted.add(link);
           continue;
@@ -835,6 +975,21 @@ export class Traffic {
   }
 
   /** Follows `route` (from its current segment) from here on. */
+  /** A vehicle at the line on the ring: on round it instead of off (if there is room, and, going somewhere, a way there from the next lane). */
+  private goRound(v: Vehicle) {
+    const on = this.segs[v.seg].next.find((j) => this.segs[this.segs[j].next[0]]?.street === RING);
+    if (on === undefined || !this.room(on, v.length)) return;
+    const lane = this.segs[on].next[0];
+    const plan = [on, lane];
+    if (v.halt) {
+      const route = this.path(lane, 0, v.halt.seg, v.halt.s, true);
+      if (!route) return;
+      plan.push(...route.slice(1));
+    }
+    v.plan = plan;
+    v.asked = on;
+  }
+
   private reroute(v: Vehicle, route: number[]) {
     this.leaveQueue(v);
     v.plan = route.slice(1);
@@ -870,7 +1025,7 @@ export class Traffic {
           v.why = "back on the island";
           if ((v.kind === "taxi" || v.kind === "truck") && v.halt) {
             // Towed with a fare aboard (or on a round): on to where it was going.
-            const route = this.path(v.seg, v.s, v.halt.seg, v.halt.s, true);
+            const route = this.path(v.seg, v.s, v.halt.seg, v.halt.s, true, v.kind === "truck");
             if (route) this.reroute(v, route);
             else v.halt = { ...v.halt, seg: v.seg, s: Math.min(this.segs[v.seg].len - 1, v.s + 20) };
           }
@@ -1178,7 +1333,7 @@ export class Traffic {
       v.why = why;
       return true;
     }
-    const route = this.path(v.seg, v.s, spot.seg, spot.s, true);
+    const route = this.path(v.seg, v.s, spot.seg, spot.s, true, true);
     if (!route) return false;
     this.reroute(v, route);
     v.halt = { seg: spot.seg, s: spot.s, kind };

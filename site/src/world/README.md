@@ -1983,3 +1983,35 @@ shapes are unchanged.
 - The lines fade out where a cube covers fewer than about 4 pixels, as on the ground. The lights
   (lit windows, neon, signs, headlights) stay clean.
 - Look › Grid sets the strength of both, the ground's and this.
+
+## 2026-11-18: The plaza is a roundabout
+
+Traffic jammed where the avenues meet the plaza: each ended there, and every vehicle turned
+round at the plaza's edge, slowly, in the way of the next. Now, where two or more streets meet
+the plaza, it is a roundabout (`life/traffic.ts`):
+
+- **The ring.** A one-way lane round the Landmark, the Landmark on its left (keeping right),
+  midway between it and the plaza's edge, round each corner on a curve about the Landmark's
+  corner. The middle of each side is a junction, where the streets come on and off it.
+- **As at any roundabout.** Those on the ring go first. One coming on from a street needs room
+  for one more behind it, so the ring never fills (full, everyone on it would wait for everyone
+  else). One whose way off has no room goes round again instead of standing on the ring.
+- **Not for the big.** A bus (6 m) or a garbage truck (5 m) can't turn in the 3 m between the
+  Landmark and the plaza's edge without cutting its corner: they turn round where a street meets
+  the plaza, as before, and route without the ring.
+- **Not for a street too short.** One whose lanes would be shorter than two vans between the
+  plaza and its next junction keeps turning round at the plaza: two junctions that close each
+  hold the other up. With fewer than two streets left to join it, there is no ring.
+- **People meet elsewhere.** The plaza's chat circles stood on the ring; with a ring they are
+  gone, and people meet at the parks' fountains and pavilions.
+
+Over 900 s of the simulation, the share of the time vehicles within 22 m of the plaza stood
+still:
+
+| Seed | Before | After | Towed before → after |
+|---|---|---|---|
+| `blueprint` | 51% | 9% | 1 → 0 |
+| `8ahsrz` | 66% | 40% | 12 → 11 |
+| `neon7` | 29% | 29% (no ring: one street joins) | — |
+
+No vehicle's body came inside the Landmark's footprint.

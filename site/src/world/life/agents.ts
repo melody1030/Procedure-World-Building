@@ -337,12 +337,15 @@ export class Life {
     this.rng = new Rng(seed ^ 0x11fe);
     const map = (this.map = walkMap(claim, parks, plans));
     const { n, y, walk } = map;
+    // The plaza is driven round its Landmark (a ring midway between it and the plaza's edge).
+    const landmark = plans.find((p) => p.lot < 0);
+    const roundabout = plaza && landmark ? { x: plaza.x, z: plaza.z, half: plaza.half, inner: voxels(landmark.width) / 2 } : null;
     this.traffic = new Traffic(map, streets, seed, count, {
       near: (x, z, r) => this.near(x, z, r, this.ahead),
       alight: (p, x, z, heading) => this.alight(p, x, z, heading),
       getOff: (p, st) => (p.dest >= 0 ? this.bestStop(st.route, p.dest) === st : null),
       serve: (v) => this.waste.serve(v),
-    });
+    }, roundabout);
     this.city = new City(plans, map);
     this.waste = new Waste(this.city, plans, this.traffic, map, seed);
 
@@ -381,9 +384,8 @@ export class Life {
       this.addRoost(park.x, park.z, 22);
     }
     if (plaza) {
-      const landmark = plans.find((p) => p.lot < 0);
-      const inner = landmark ? voxels(landmark.width) / 2 + 3 : 4;
-      ring(plaza.x, plaza.z, inner, plaza.half - 2, 3);
+      // People meet on the plaza only where no traffic goes round it (no Landmark, no ring).
+      if (!this.traffic.ring) ring(plaza.x, plaza.z, landmark ? voxels(landmark.width) / 2 + 3 : 4, plaza.half - 2, 3);
       this.addRoost(plaza.x, plaza.z, plaza.half);
     }
     this.sources.set("rest", rest);
