@@ -102,6 +102,10 @@ const BREAKS = 0.5;
 /** The longest a break and the time out after work last (s). */
 const BREAK = 30;
 const OUT_AFTER = 45;
+/** On a time out, the walk to a seat, a drink or company doesn't count against it for its first OUT_WALK s. */
+const OUT_WALK = 60;
+/** With every seat at the nearest bench taken: on along the paths to a free one, up to SEAT_WALK columns away (12 m). */
+const SEAT_WALK = voxels(12);
 /** The share who stop for something on the way out of work (the rest go straight home). */
 const AFTER_WORK = 0.7;
 /** Its door group's field is asked for this long (s) before someone inside comes out. */
@@ -321,6 +325,8 @@ export class Life {
   private readonly vending: Spot[] = [];
   /** Each building's local field, for the last steps to its door (made when first needed). */
   private readonly locals = new Map<number, LocalField>();
+  /** A field round each bench's path column, for walking on to it from a full one nearby (made when first needed). */
+  private readonly seatFields = new Map<number, LocalField>();
   private readonly roosts: Roost[] = [];
   private readonly sky: Int16Array;
   private readonly skyN: number;
@@ -685,7 +691,9 @@ export class Life {
     p.motion = "stand";
     p.timer -= dt;
     p.since += dt;
-    p.left -= dt;
+    // A time out waits while it walks to a seat, a drink or company (up to OUT_WALK s of the walk):
+    // the nearest is often across the city, and it would give up on the way.
+    if (!(p.day === "out" && p.activity === "walk" && p.leg === "field" && p.need && p.need !== "home" && p.since < OUT_WALK)) p.left -= dt;
     if (p.activity === "away") {
       this.indoors(p);
       return;
@@ -864,6 +872,25 @@ export class Life {
     into(p, "walk", why);
   }
 
+  /** The field round a bench's path column k. */
+  private seatField(k: number): LocalField {
+    let f = this.seatFields.get(k);
+    if (!f) {
+      f = new LocalField(this.map, k, SEAT_WALK);
+      this.seatFields.set(k, f);
+    }
+    return f;
+  }
+
+  /** The column a person walking to the seat at path column k heads for next on its bench's field, or -1 (none made, or none lower). */
+  private seatStep(p: Person, k: number): number {
+    const f = this.seatFields.get(k);
+    if (!f) return -1;
+    const { n } = this.map;
+    const here = Math.min(n - 1, Math.max(0, p.z | 0)) * n + Math.min(n - 1, Math.max(0, p.x | 0));
+    return f.at(here) < FAR ? f.downhill(here) : -1;
+  }
+
   /** Building b's local field. */
   private local(b: number): LocalField {
     let f = this.locals.get(b);
@@ -892,6 +919,35 @@ export class Life {
       const st = p.seat;
       if (!st) return NO_PATH;
       const k = p.leg === "onto" ? -1 : st.k;
+      // Walking on to a seat at another bench: along its bench's field, as in walking.
+      const sf = p.leg === "front" ? this.seatFields.get(st.k) : undefined;
+      if (sf) {
+        const pts: number[] = [];
+        let j = Math.min(n - 1, Math.max(0, p.z | 0)) * n + Math.min(n - 1, Math.max(0, p.x | 0));
+        let x = p.x;
+        let z = p.z;
+        let gone = 0;
+        let since = 0;
+        while (sf.at(j) < FAR && j !== st.k) {
+          const next = sf.downhill(j);
+          if (next < 0) break;
+          const nx = (next % n) + 0.5;
+          const nz = ((next / n) | 0) + 0.5;
+          const d = Math.hypot(nx - x, nz - z);
+          if (gone + d > reach) return { pts, end: false };
+          gone += d;
+          since += d;
+          x = nx;
+          z = nz;
+          j = next;
+          if (since >= every) {
+            since = 0;
+            pts.push(x, y[j], z);
+          }
+        }
+        pts.push(x, y[j], z);
+        return { pts, end: j === st.k };
+      }
       return k < 0 ? line(p.x, p.y, p.z, st.x, st.y, st.z, reach, every) : line(p.x, p.y, p.z, (k % n) + 0.5, y[k], ((k / n) | 0) + 0.5, reach, every);
     }
     let k = Math.min(n - 1, Math.max(0, p.z | 0)) * n + Math.min(n - 1, Math.max(0, p.x | 0));
@@ -1092,8 +1148,10 @@ export class Life {
     const tz = ((s.k / n) | 0) + 0.5;
     switch (p.leg) {
       case "front": {
-        // To the path in front of the seat (as any walker).
+        // To the path in front of the seat (as any walker): along the paths from afar (its bench's
+        // field, if it walked on from a full one), straight for the last steps.
         const d = Math.hypot(tx - p.x, tz - p.z);
+        const next = d > 3 ? this.seatStep(p, s.k) : -1;
         if (d < 0.5) this.startLeg(p, "onto", "at the seat");
         else if (p.timer <= 0) {
           // Can't get there: rest later.
@@ -1101,6 +1159,11 @@ export class Life {
           p.seat = null;
           p.needs.rest *= 0.5;
           this.decide(p, "could not reach the seat");
+        } else if (next >= 0) {
+          const nx = (next % n) + 0.5 - p.x;
+          const nz = ((next / n) | 0) + 0.5 - p.z;
+          const nd = Math.hypot(nx, nz) || 1;
+          this.walkToward(p, nx / nd, nz / nd, p.speed, dt);
         } else this.walkToward(p, (tx - p.x) / d, (tz - p.z) / d, Math.min(p.speed, d * 4), dt);
         return;
       }
@@ -1446,17 +1509,36 @@ export class Life {
     switch (p.need) {
       case "rest": {
         const free = this.seats.filter((s) => !s.taken && Math.hypot(s.x - p.x, s.z - p.z) < 10);
-        if (!free.length) {
-          // All taken: rest later.
+        if (free.length) {
+          const s = free.reduce((a, b) => (Math.hypot(a.x - p.x, a.z - p.z) < Math.hypot(b.x - p.x, b.z - p.z) ? a : b));
+          s.taken = true;
+          p.seat = s;
+          p.timer = 8;
+          this.startLeg(p, "front", "found a free seat");
+          return;
+        }
+        // All taken here: on along the paths to the nearest free seat not far off, else rest later.
+        const { n } = this.map;
+        const here = Math.min(n - 1, Math.max(0, p.z | 0)) * n + Math.min(n - 1, Math.max(0, p.x | 0));
+        let best: Seat | null = null;
+        let low = FAR;
+        for (const s of this.seats) {
+          if (s.taken || Math.hypot(s.x - p.x, s.z - p.z) > SEAT_WALK) continue;
+          const d = this.seatField(s.k).at(here);
+          if (d < low) {
+            low = d;
+            best = s;
+          }
+        }
+        if (!best) {
           p.needs.rest *= 0.5;
           this.decide(p, "every seat taken");
           return;
         }
-        const s = free.reduce((a, b) => (Math.hypot(a.x - p.x, a.z - p.z) < Math.hypot(b.x - p.x, b.z - p.z) ? a : b));
-        s.taken = true;
-        p.seat = s;
-        p.timer = 8;
-        this.startLeg(p, "front", "found a free seat");
+        best.taken = true;
+        p.seat = best;
+        p.timer = 8 + (2 * Math.hypot(best.x - p.x, best.z - p.z)) / p.speed;
+        this.startLeg(p, "front", "every seat taken: on to a free one");
         return;
       }
       case "thirst": {

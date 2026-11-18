@@ -26,8 +26,9 @@ seed → noise → shaping → heights → terraces → river → claims → hub
   district, with the Landmark at the plaza, all at the people's scale.
 - **Simulation:** done (`docs/plans/city-simulation-plan.md`): homes and jobs with a cycle for
   everyone (no clock), and the city's waste carried by garbage trucks to the incinerator.
-- **Next:** the town plan's steps 6–9 (`docs/plans/town-plan.md` §9): scatter along the streets,
-  area scatter, bridges, check and tune.
+- **Street lamps:** done (`docs/plans/street-furniture-plan.md`), a few along every street.
+- **Next:** the town plan's steps 7–8 (`docs/plans/town-plan.md` §9): bridges, then check and
+  tune.
 
 Overlays can be opened from the URL: `/world?show=districts,lots,parks`. One ground tint shows at
 a time (`districts`, `claims` or `suitability`); `network` draws the street network on top.
@@ -1936,3 +1937,27 @@ to less than 75% of the straight way (60% before; `BUS_SAVES`). Over 300 s, 36 p
 bus on `blueprint` (20 before) and 124 on `neon7` (58 before), where some buses run nearly full
 (16 of 18 seats).
 
+
+## 2026-11-18: The benches and vending machines get used
+
+The parks' benches stood mostly empty and no one bought a drink. On `blueprint`, over 300 s of
+the simulation, 34 people sat down and 0 used a vending machine. Three causes, and what changed
+(`city/parks.ts`, `life/agents.ts`):
+
+- **No vending machines.** A machine's pad was 1.2 m square round a column 2 columns from the
+  path, so it always reached onto the path and was never placed. Now its pad is shaped like a
+  bench's niche (the column, one either way toward and from the path, and the machine's width
+  across), and every park gets one (only the parks that weren't gardens, 70% of them, before):
+  near where a path comes in from the street if it can, else anywhere along a path clear of the
+  benches, lamps and beds.
+- **The time out ran out on the way.** A break is 30 s, and the nearest bench is often farther
+  than that. Now the walk there doesn't count against the time out for its first 60 s
+  (`OUT_WALK`).
+- **One full bench sent people away.** The way to a seat leads to the nearest bench, and with
+  both its seats taken people gave up. Now they walk on along the paths to the nearest bench with
+  a free seat within 12 m (`SEAT_WALK`), on a small field round that bench made when first
+  needed.
+
+After the change, over 300 s: 74 people sat down on `blueprint` and 92 bought a drink; on `neon7`,
+69 sat down (53 before the last change) and 77 bought a drink, and people giving up because
+every seat was taken fell from 71 to 29.

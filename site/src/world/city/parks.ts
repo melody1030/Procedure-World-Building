@@ -38,7 +38,7 @@ import type { Columns } from "../terrain/voxelize";
  *   picnic tables a few, on the lawn
  *   benches       along the paths, facing them, each in a paved niche, with a litter bin beside some
  *   lamps         along the paths, between the benches
- *   a vending     machine where a path comes in from the street
+ *   a vending     machine in every park, where a path comes in from the street if it can
  *   the fence     around the edge (in the gardens too)
  *   hedges        (some parks) along the edge, open where the paths come in
  *   trees         most along the edge, fewer on the open lawn; each park has a favorite kind
@@ -751,16 +751,25 @@ function planPark(
       lamps.push(a);
       add("lamp", a.x, a.z, s.level, Math.atan2(a.dx, a.dz));
     }
-    // 7. A vending machine beside a path where it comes in from the street, facing the path.
-    if (rng.chance(0.7)) {
-      for (const a of along) {
-        if (distToEdge(a.x, a.z) > voxels(2.5) || distToEdge(a.x, a.z) < 2) continue;
-        const s = survey(a.x, a.z, voxels(0.6), voxels(0.6));
-        if (!s || s.cut > MAX_CUT_SMALL || !meetsPaths(a.x, a.z, voxels(0.6), voxels(0.6), s.level)) continue;
-        terrace(a.x, a.z, voxels(0.6), voxels(0.6), s.level, true);
-        add("vending", a.x, a.z, s.level, Math.atan2(a.dx, a.dz));
-        break;
-      }
+  }
+  // 7. A vending machine beside a path, facing it: in every park, so there is a drink in each (the
+  // people's thirst, life/agents.ts). Where a path comes in from the street if it can (the spots
+  // nearest the edge first), else anywhere along a path clear of the benches, lamps and beds.
+  {
+    const spots = along.filter((a) => distToEdge(a.x, a.z) >= 2).sort((a, b) => distToEdge(a.x, a.z) - distToEdge(b.x, b.z));
+    // Its pad, like a bench's niche: column `a` and one either way toward and from the path (so it
+    // reaches the path's edge), and the machine's width across.
+    const wide = voxels(0.6);
+    for (const a of spots) {
+      if (near(benches, a.x, a.z, voxels(2.5)) || near(lamps, a.x, a.z, voxels(1.5)) || near(beds, a.x, a.z, voxels(2))) continue;
+      const hx = a.dx ? 1.5 : wide;
+      const hz = a.dx ? wide : 1.5;
+      const s = survey(a.x + 0.5, a.z + 0.5, hx, hz);
+      if (!s || s.cut > MAX_CUT_SMALL || !meetsPaths(a.x + 0.5, a.z + 0.5, hx, hz, s.level)) continue;
+      terrace(a.x + 0.5, a.z + 0.5, hx, hz, s.level, true);
+      // (Set back a little: the machine is a touch deeper than its pad.)
+      add("vending", a.x + 0.5 - a.dx * 0.1, a.z + 0.5 - a.dz * 0.1, s.level, Math.atan2(a.dx, a.dz));
+      break;
     }
   }
 

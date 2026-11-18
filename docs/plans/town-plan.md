@@ -1,12 +1,11 @@
-# Town plan: street network and scatter
+# Town plan: street network and street lamps
 
 [← Terrain plan](terrain-plan.md)
 
 The terrain is finished: noise → shaping → heights → terraces → river valley → voxels →
 surfaces → mesh, on a 232 m diorama of 0.25 m voxels (928 × 928 columns). This plan adds the
 first layer of the city on top of it: a **street network** that starts by the river and grows
-automatically, the **scatter** that follows from it (lamps, forest, rocks,
-reeds), and a **district map**: an internal map of what kind of building belongs where, so
+automatically, the **street lamps** that follow from it, and a **district map**: an internal map of what kind of building belongs where, so
 buildings can be scattered onto it later.
 
 **Decisions (2026-10-08):**
@@ -33,8 +32,8 @@ buildings can be scattered onto it later.
 - **The ocean stays removed:** the river is the waterfront.
 
 **Goal, from the reference image:** almost nothing in a city like this is scattered freely. Streets
-wind down the slopes into a plaza; lamps and trees line the streets; forest covers the ground too
-steep to build on. So the order is **network first, then scatter**, and every stage *claims* the
+wind down the slopes into a plaza, and lamps line the streets. So the order is **network first,
+then what stands along it**, and every stage *claims* the
 columns it uses so later ones keep off them.
 
 Sources:
@@ -46,15 +45,14 @@ Sources:
   intersection guidance (right angles, never under 75°); city block sizes (Portland, Barcelona,
   Manhattan, Tokyo);
 - Emilien et al. 2012 (villages grown from interest maps);
-- Horizon Zero Dawn's placement (density maps plus distance fields plus footprints);
-- Bridson's Poisson disk sampling.
+- Horizon Zero Dawn's placement (density maps plus distance fields plus footprints).
 
 ---
 
 ## 1. The pipeline after this plan
 
 ```text
-… terraces → river ─┬─ claims ─ hubs ─ streets (route · plazas · carve) ─ voxelize ─ surfaces ─ mesh ─ districts ─ scatter
+… terraces → river ─┬─ claims ─ hubs ─ streets (route · plazas · carve) ─ voxelize ─ surfaces ─ mesh ─ districts ─ street lamps
                     └─ river distance field (kept)
 ```
 
@@ -67,9 +65,9 @@ Sources:
 | Surfaces (exists) | `surfaces` | columns, claims | adds `road`, `plaza`, `curb` surfaces before the other rules |
 | Mesh (exists) | — | | |
 | **Districts** | — | columns, claims, streets, hubs, river distance | access, frontage, district and density per cell; lots; lot claims |
-| **Scatter** | `scatter` | columns, surfaces, claims, curves, districts | instances per asset |
+| **Street lamps** | — | claims, curves, districts, parks | the lamps along the streets |
 
-Districts and scatter run **after** the mesh: they change no ground, so tuning them never
+Districts and the street lamps run **after** the mesh: they change no ground, so tuning them never
 remeshes it. Streets
 run **before** voxelize because, like the river, they carve the height map.
 
@@ -88,7 +86,7 @@ that it is allowed to share):
 | `road` | inside a road's width |
 | `verge` | the 1.5 m strip along each road edge, where the street lamps stand |
 | `plaza` | inside a plaza |
-| `lot` | a building lot (section 6); scatter keeps off it, except where the district allows greenery |
+| `lot` | a building lot (section 6) |
 | *(later)* `rail` | rail pillars |
 
 **Distance fields beside the claims:** distance to the river channel and distance to the nearest
@@ -129,7 +127,7 @@ Without a river, `river` = 1 and the city starts on the flattest low ground.
 - slope under 15°;
 - at least 3 m from the channel;
 - away from the map edge;
-- on the city's side of the river (the side with the most land), until bridges exist (step 8).
+- on the city's side of the river (the side with the most land), until bridges exist (step 7).
 
 **3. Junction sites, growing outwards like a city:**
 - **Visiting order:** buildable cells are visited by
@@ -706,7 +704,7 @@ the streets.
 
 | # | District | Rule | Base density | Buildings later |
 |---|---|---|---|---|
-| 1 | **Parks** | Not buildable (too steep, too far from a road), **or** a slow noise patch (about 10% of the buildable land, never in the core) | 0 | Trees and forest (area scatter), later hologram trees |
+| 1 | **Parks** | Not buildable (too steep, too far from a road), **or** a slow noise patch (about 10% of the buildable land, never in the core) | 0 | Trees, benches and lamps (`city/parks.ts`) |
 | 2 | **Corporate core** | Access ≤ 45 m from the plaza | 1.0 | Megatowers, a landmark tower, giant billboards |
 | 3 | **Industrial / docks** | Within 30 m of the river **and** in the lowest 35% of buildable ground; or within 30 m of an exit | 0.35 | Wide low halls, warehouses, cranes, tanks, chimneys, piers |
 | 4 | **Neon entertainment strip** | Within 14 m of an avenue, access ≤ 120 m | 0.75 | Mid-rise blocks with stacked neon signs, shops and bars at street level |
@@ -973,67 +971,10 @@ covers 14–42% of the land (was 5–13%); its lots stay 1 cell (8 m) wide, as s
 - **Wealthy next to industrial:** the 40 m gap keeps them apart. If the high ground is all near
   industry, there is no enclave.
 
-## 7. Scatter
+## 7. Street lamps
 
-Two kinds, each a list of **layers**. Every layer has its own seed, and it draws its random
-numbers in the same order whatever its rules say, as in Week 5. So changing one setting never
-reshuffles the rest.
-
-### 7.1 Along paths (sampled along the curves)
-
-| Layer | Rule | Defaults |
-|---|---|---|
-| **Lamps** | Every *Spacing* along each road, alternating sides, on the verge; around each plaza's rim | 12 m on roads, 8 m on plaza rims |
-| **Street trees** | Main streets only, both sides, on the verge, with a Chance per spot | every 9 m, 70% |
-| **Fountain** | The center plaza | one |
-
-Each spot is skipped if it isn't on a verge or plaza rim (another road, the river, a plaza
-interior). Lamps face the road.
-
-### 7.2 Over areas (density maps)
-
-**Candidates** come from Bridson's Poisson disk with the layer's spacing, kept with probability
-`density × noise patches × rules`:
-
-| Layer | Spacing | Where | Notes |
-|---|---|---|---|
-| **Forest** | 3 m | grass, dirt; district None or Park; ≥ 2 m from roads | Density **rises with slope** until rock cliff, then 0: the forest covers what the town can't use (the reference's green cliffs). Parks get a lighter, rounder mix. |
-| **Bushes** | 1.5 m | grass; district None or Park, or the verge edge | Low ground, gentle slope |
-| **Rocks** | 2 m | rock, steep dirt | Size grows with slope |
-| **Reeds** | 0.75 m | bank, and grass next to river water | Dense clumps |
-
-**Variation per copy:**
-- **Size:** each layer's size ± its Size variation.
-- **Rotation:** a seeded turn around the vertical.
-- **Tint:** from the ground under the copy (lighter and yellower higher up, as in Week 5) plus a small jitter.
-
-Copies sit on the center of their column's flat top. Voxel tops are flat, so the notes' "align to
-the surface" doesn't apply here.
-
-**Panel:** an **Asset** dropdown picks the layer, then its controls (Week 5's pattern):
-- On, Spacing, Density, Size, Size variation;
-- the layer's own rules.
-
-A Result line shows candidates, placed copies, and how many each rule rejected.
-
-### 7.3 Assets: small voxel models
-
-Each asset is a few boxes built with `VoxelBatch`, in meters, so the scale is right at 0.25 m per
-voxel. There are two or three variants each, chosen per copy:
-
-| Asset | Size (voxels) |
-|---|---|
-| Round tree | trunk 0.5 × 2 m, blocky canopy about 3 m (2 × 12 × 12-ish, layered) |
-| Tall tree (conifer) | stepped tiers, 5–7 m |
-| Bush | 1 × 0.75 m |
-| Rock | 1–2 m chunks |
-| Reeds | 0.25 m blades, 1–1.5 m tall |
-| Lamp | 0.25 m post, 4 m, a glowing head (emissive, ready for night) |
-| Fountain | 4 m basin, a glowing water column |
-
-**Rendering:** one `InstancedMesh` per asset variant, with a per-instance color for the tint.
-The print material needs one change for instances: the print clamp tests the instance's own
-height (`instanceMatrix[3].y`), so whole copies appear as their layer prints. Shadows on.
+Built as step 6: a few lamps along every street, side to side, and one at each corner of the
+plaza. The rules are in `docs/plans/street-furniture-plan.md`.
 
 ---
 
@@ -1046,7 +987,6 @@ New collapsible sections, after River, all closed by default:
 | **Town** | Show network · Show claims (no settings: the hubs are automatic) | off · off |
 | **Streets** | Main streets · Exits · Main width · Street width · Max grade · Slope cost · Reuse · Embankment · Plaza size | 4 (3–5) · 2 · 6 m · 3.5 m · 15% · 8 · 0.6 · 2 m · 10 m |
 | **Town (districts)** | Show districts · Show lots (no settings: the district rules are fixed) | off · off |
-| **Scatter** | Asset ▾ · (that layer's controls) · Show claims | Forest |
 
 ---
 
@@ -1262,15 +1202,11 @@ New collapsible sections, after River, all closed by default:
    - A lamp every 24 m along each street, side to side; a lamp at each corner of the plaza. Kept
      few: 37 lamps on `blueprint`.
    - *See:* lit streets, amber in the homes and cyan in the core.
-7. **Area scatter.**
-   - Poisson disk, density and rules for forest, bushes, rocks and reeds; the Scatter section and its Result line.
-   - *See:* green slopes and parks, empty lots waiting for buildings, reeds on the banks; no copy
-     on a road, a lot or in the river.
-8. **Bridges.**
+7. **Bridges.**
    - Let A* cross the channel at a Bridge cost. A crossing becomes a deck at bank height (its own
      geometry, claimed as `road`), so the town can grow on both banks.
    - *See:* at least one bridge on most seeds.
-9. **Check and tune.**
+8. **Check and tune.**
    - Five seeds, timings, README with screenshots.
 
 ---
@@ -1290,11 +1226,10 @@ New collapsible sections, after River, all closed by default:
   - lots never overlap roads, the river or each other;
   - every lot faces a road;
   - buildable lots cover roughly 20–35% of the land.
-- **No copy sits where it shouldn't:** nothing on a road, a plaza interior, a lot or in the river.
-  Forest covers the steep ground, the town area is clear.
-- **The same seed gives the same town**, and changing a scatter setting never moves the streets.
-- **Speed:** hubs plus streets under about 150 ms, districts under about 50 ms, scatter under
-  about 100 ms, at about 90 fps.
+- **No lamp stands where it shouldn't:** none on a road, a plaza interior, a lot or in the river.
+- **The same seed gives the same town.**
+- **Speed:** hubs plus streets under about 150 ms, districts under about 50 ms, street lamps under
+  about 20 ms, at about 90 fps.
 
 ## 11. Risks
 
