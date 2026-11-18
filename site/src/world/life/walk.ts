@@ -242,6 +242,91 @@ export class FieldJob {
   }
 }
 
+/**
+ * A field round one place (a building's door) over a square window `r` columns out from it: the
+ * last steps to that one door, where a field over the whole city for every door would be too many.
+ * Outside the window (or where the window gives no way there) it is FAR.
+ */
+export class LocalField {
+  readonly x0: number;
+  readonly z0: number;
+  readonly w: number;
+  private readonly dist: Uint16Array;
+
+  constructor(
+    private readonly map: WalkMap,
+    source: number,
+    r: number,
+  ) {
+    const { n, links } = map;
+    const sx = source % n;
+    const sz = (source / n) | 0;
+    this.x0 = Math.max(0, sx - r);
+    this.z0 = Math.max(0, sz - r);
+    const x1 = Math.min(n - 1, sx + r);
+    const z1 = Math.min(n - 1, sz + r);
+    const w = (this.w = Math.max(x1 - this.x0, z1 - this.z0) + 1);
+    const dist = (this.dist = new Uint16Array(w * w).fill(FAR));
+    const buckets: number[][] = Array.from({ length: 32 }, () => []);
+    const local = (k: number) => {
+      const x = (k % n) - this.x0;
+      const z = ((k / n) | 0) - this.z0;
+      return x < 0 || z < 0 || x >= w || z >= w ? -1 : z * w + x;
+    };
+    dist[local(source)] = 0;
+    buckets[0].push(source);
+    let pending = 1;
+    for (let d = 0; pending > 0; d++) {
+      const bucket = buckets[d % buckets.length];
+      while (bucket.length) {
+        const k = bucket.pop()!;
+        pending--;
+        if (dist[local(k)] !== d) continue;
+        const bits = links[k];
+        for (let i = 0; i < 8; i++) {
+          if (!(bits & (1 << i))) continue;
+          const [dx, dz, diag] = N8[i];
+          const j = k + dz * n + dx;
+          const lj = local(j);
+          if (lj < 0) continue;
+          const c = cost(map, j);
+          const nd = d + (diag ? c + (c >> 1) : c);
+          if (nd < dist[lj] && nd < FAR) {
+            dist[lj] = nd;
+            buckets[nd % buckets.length].push(j);
+            pending++;
+          }
+        }
+      }
+    }
+  }
+
+  at(k: number): number {
+    const { n } = this.map;
+    const x = (k % n) - this.x0;
+    const z = ((k / n) | 0) - this.z0;
+    return x < 0 || z < 0 || x >= this.w || z >= this.w ? FAR : this.dist[z * this.w + x];
+  }
+
+  /** As `downhill`, in this field. */
+  downhill(k: number): number {
+    const { n, links } = this.map;
+    let best = -1;
+    let low = this.at(k);
+    const bits = links[k];
+    for (let i = 0; i < 8; i++) {
+      if (!(bits & (1 << i))) continue;
+      const j = k + N8[i][1] * n + N8[i][0];
+      const v = this.at(j);
+      if (v < low) {
+        low = v;
+        best = j;
+      }
+    }
+    return best;
+  }
+}
+
 /** The whole field at once. */
 export function flowField(map: WalkMap, sources: number[]): Uint16Array {
   return new FieldJob(map, sources).run(Infinity)!;

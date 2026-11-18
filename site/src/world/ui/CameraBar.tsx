@@ -1,5 +1,7 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { isTextEntry } from "../../components/SidePanel";
+import type { Life } from "../life/agents";
+import { clockLabel } from "../life/clock";
 import type { CameraPreset } from "../render/WorldView";
 import { GLASS } from "./kit";
 
@@ -8,7 +10,8 @@ import { GLASS } from "./kit";
  * 1–5). Each button names itself in a tooltip to its left on hover or keyboard focus. The preset
  * the view is at is lit; moving the view by hand clears it. Below them, Follow (key 6) trails
  * whatever is selected in the inspector, lit while it does. It hides with the panels (E). It is
- * drawn 30% larger than the panel's controls, so the places are easy to hit.
+ * drawn 30% larger than the panel's controls, so the places are easy to hit. To its left, the
+ * city's clock (life/clock.ts): the time of day and the day.
  */
 
 const iconProps = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.7, strokeLinecap: "round", strokeLinejoin: "round", className: "h-[21px] w-[21px]" } as const;
@@ -99,7 +102,23 @@ function ToolButton({ label, keyName, icon, active = false, disabled = false, on
   );
 }
 
+/** The time of day on the inhabitants' clock, read four times a second. */
+function ClockReadout({ life }: { life: Life }) {
+  const [time, setTime] = useState(life.clock.time);
+  useEffect(() => {
+    const timer = setInterval(() => setTime(life.clock.time), 250);
+    return () => clearInterval(timer);
+  }, [life]);
+  return (
+    <div role="timer" aria-label={`Time of day ${clockLabel(time)}, day ${Math.floor(time / 24) + 1}`} className={"pointer-events-auto absolute right-[76px] top-4 flex items-baseline gap-2 rounded-2xl border px-3.5 py-2 " + GLASS}>
+      <span className="font-mono text-[19px] leading-none text-white">{clockLabel(time)}</span>
+      <span className="text-[12px] text-[#9db2c8]">Day {Math.floor(time / 24) + 1}</span>
+    </div>
+  );
+}
+
 export function CameraBar({
+  life,
   view,
   available,
   onFly,
@@ -107,6 +126,8 @@ export function CameraBar({
   follow,
   onHelp,
 }: {
+  /** The inhabitants, whose clock the readout shows. */
+  life: Life | null;
   view: CameraPreset | null;
   available: Record<CameraPreset, boolean>;
   onFly: (preset: CameraPreset) => void;
@@ -144,14 +165,17 @@ export function CameraBar({
   if (!shown) return null;
 
   return (
-    <div role="toolbar" aria-label="Camera" aria-orientation="vertical" className={"pointer-events-auto absolute right-4 top-4 flex flex-col gap-[3px] rounded-2xl border p-[5px] " + GLASS}>
-      {PRESETS.map((p) => (
-        <ToolButton key={p.id} label={p.label} keyName={p.key} icon={ICONS[p.id]} active={view === p.id} disabled={!available[p.id]} onClick={() => onFly(p.id)} />
-      ))}
-      <span aria-hidden className="mx-1.5 my-0.5 h-px bg-[#7db4e6]/20" />
-      <ToolButton label={follow.can ? (follow.on ? "Stop following" : "Follow") : "Follow (select someone first)"} keyName="6" icon={FOLLOW_ICON} active={follow.on} disabled={!follow.can} onClick={follow.onToggle} />
-      <span aria-hidden className="mx-1.5 my-0.5 h-px bg-[#7db4e6]/20" />
-      <ToolButton label="Shortcuts" keyName="?" icon={HELP_ICON} onClick={onHelp} />
-    </div>
+    <>
+      {life && <ClockReadout life={life} />}
+      <div role="toolbar" aria-label="Camera" aria-orientation="vertical" className={"pointer-events-auto absolute right-4 top-4 flex flex-col gap-[3px] rounded-2xl border p-[5px] " + GLASS}>
+        {PRESETS.map((p) => (
+          <ToolButton key={p.id} label={p.label} keyName={p.key} icon={ICONS[p.id]} active={view === p.id} disabled={!available[p.id]} onClick={() => onFly(p.id)} />
+        ))}
+        <span aria-hidden className="mx-1.5 my-0.5 h-px bg-[#7db4e6]/20" />
+        <ToolButton label={follow.can ? (follow.on ? "Stop following" : "Follow") : "Follow (select someone first)"} keyName="6" icon={FOLLOW_ICON} active={follow.on} disabled={!follow.can} onClick={follow.onToggle} />
+        <span aria-hidden className="mx-1.5 my-0.5 h-px bg-[#7db4e6]/20" />
+        <ToolButton label="Shortcuts" keyName="?" icon={HELP_ICON} onClick={onHelp} />
+      </div>
+    </>
   );
 }

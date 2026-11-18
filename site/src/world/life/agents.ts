@@ -3,8 +3,10 @@ import type { BuildingPlan } from "../city/placement";
 import type { Plaza, Street } from "../terrain/streets";
 import { Rng } from "../rng";
 import { voxels } from "../scale";
+import { City } from "./city";
+import { Clock, START_HOUR } from "./clock";
 import { BUS_SEATS, Traffic, type Fare, type Stop, type TrafficCounts, type Vehicle } from "./traffic";
-import { CAT_STEP, FAR, FieldJob, GROUND, STEP, canStep, downhill, forPeople, nearestWalk, walkMap, type WalkMap } from "./walk";
+import { CAT_STEP, FAR, FieldJob, GROUND, LocalField, STEP, canStep, downhill, forPeople, nearestWalk, walkMap, type WalkMap } from "./walk";
 
 /**
  * The city's inhabitants (pure: no three.js; the renderer reads the arrays). Three kinds, each
@@ -15,8 +17,10 @@ import { CAT_STEP, FAR, FieldJob, GROUND, STEP, canStep, downhill, forPeople, ne
  *   the most basic need past its threshold wins: thirst, then rest, then company, then home. A
  *   small state machine carries it out: walk there (down the need's flow field), then sit on a
  *   bench, buy a drink at a vending machine, or stand and talk with whoever else came to the
- *   fountain or the plaza; going home, they walk into a door, and someone else comes out of one.
- *   Strolling, they walk to one of a few far points of the city in turn.
+ *   fountain or the plaza. Strolling, they walk to one of a few far points of the city in turn.
+ *   Above the needs is their day (city.ts, clock.ts): each lives in one building and works in
+ *   another, wakes, goes to work, comes out for lunch and again after work, and goes home at
+ *   bedtime (or when the home need is due); the needs run only while they are out.
  *   They have bodies: no one walks into a wall, a prop or another person. Walkers keep their
  *   distance and step to the right of anyone coming the other way; someone who has made no headway
  *   for a while squeezes past the people in the way, and if even that fails, goes somewhere else.
@@ -30,9 +34,10 @@ import { CAT_STEP, FAR, FieldJob, GROUND, STEP, canStep, downhill, forPeople, ne
  *   the cat sits down to wash. People walking by scare cats off.
  * - Traffic (traffic.ts), which people live alongside: someone about to step off the curb waits
  *   while a vehicle is coming and hurries across, and vehicles brake for anyone in front of them;
- *   no one walks into a vehicle. Going home, some walk to a door, some to a bus shelter to wait
- *   for their bus, and some to the curb to hail a taxi; riders get off at other stops, or wherever
- *   their taxi takes them, and walk on from there. Pigeons go up as a vehicle passes.
+ *   no one walks into a vehicle. Going far (to work, or home), some walk, some go to a bus shelter
+ *   to wait for a bus that goes their way, and some to the curb to hail a taxi; riders get off at
+ *   the stop nearest where they are going, or where their taxi drops them, and walk on from there.
+ *   Pigeons go up as a vehicle passes.
  */
 
 /** Walking speeds (voxels per second: 4 is 1 m/s). */
@@ -40,8 +45,9 @@ const WALK = [4.4, 6];
 const CAT_PROWL = 2.6;
 const CAT_STALK = 1.4;
 const CAT_SPRINT = 16;
-/** How close (columns of path cost: 2 per column) counts as there. */
+/** How close (columns of path cost: 2 per column) counts as there; at a door (whose column is against the wall, where a body does not fit), a few steps off. */
 const ARRIVE = 4;
+const AT_DOOR = 20;
 /** The most people that stand talking in one circle. */
 const GROUP = 4;
 /** People keep this far apart (voxels), and are never closer than BODY; a person is RADIUS round (walls, props). */
@@ -78,12 +84,28 @@ const SKY_CELL = 8;
 const STROLLS = 8;
 /** A slice of the fields' work per step (ms). */
 const SLICE = 3;
-/** Going home: the share who take the bus, and who take a taxi (the rest walk to a door). */
-const BY_BUS = 0.25;
-const BY_TAXI = 0.1;
-/** How long someone waits (s) for a bus, for a taxi, and at the curb for a gap in the traffic. */
-const BUS_WAIT = 150;
-const TAXI_WAIT = 90;
+/** Going farther than RIDE_FAR (columns): the share who take the bus (if one goes their way), and who take a taxi (the rest walk); farther than TAXI_FAR, everyone takes a taxi if one is free. */
+const RIDE_FAR = 200;
+const TAXI_FAR = 420;
+const BY_BUS = 0.35;
+const BY_TAXI = 0.12;
+/** A person's hours: waking, lunch, the end of work and bedtime, each drawn from these ranges; the lunch break (hours). */
+const WAKE = [5.6, 7.8];
+const LUNCH_AT = [11.75, 12.5];
+const OFF_AT = [17, 19];
+const BED_AT = [21, 23];
+const LUNCH = 1.2;
+/** The share who stop for something on the way out of work (the rest go straight home). */
+const AFTER_WORK = 0.7;
+/** Homes are picked by their places, falling off by e for every HOME_REACH columns from the job (a long walk eats the day: an hour is 25 s). */
+const HOME_REACH = 70;
+/** A building's local field is followed once its way is at most this times the straight distance (path cost: 2 a column on paving). */
+const DETOUR = 3.2;
+/** On the way to work or home, people walk this much faster. */
+const BRISK = 1.3;
+/** How long someone waits (s) for a bus, for a taxi (about an hour of the clock), and at the curb for a gap in the traffic. */
+const BUS_WAIT = 30;
+const TAXI_WAIT = 25;
 const CROSS_WAIT = 12;
 /** Crossing the road, people walk this much faster; stepping out of a vehicle's way, this fast (voxels per second). */
 const HURRY = 1.35;
@@ -105,6 +127,12 @@ export type Use = "seat" | "vending" | "circle" | "shelter" | "curb";
 export type Leg = "field" | "front" | "onto" | "off" | "door";
 export type Motion = "stand" | "walk" | "step" | "wait-to-cross" | "squeeze" | "wander" | "make-way";
 export type Need = "thirst" | "rest" | "social" | "home";
+/**
+ * A person's day, the state machine above the needs (docs/techniques/agents.md): asleep at home;
+ * commuting to work (or back after lunch); working; out (the needs machine: at lunch, or after
+ * work); going home.
+ */
+export type Day = "asleep" | "commute" | "working" | "out" | "homeward";
 /** Needs in order: the more basic first. */
 const NEEDS: Need[] = ["thirst", "rest", "social", "home"];
 const DUE: Record<Need, string> = { thirst: "thirsty", rest: "tired", social: "wants company", home: "time to go home" };
@@ -140,6 +168,18 @@ export interface Person {
   vehicle: Vehicle | null;
   /** How long it has waited at the curb for a gap in the traffic. */
   cross: number;
+  /** Its home and its job (indices into the city's buildings), the building it is in (or -1), and the one it is on its way to (or -1). */
+  home: number;
+  job: number;
+  inside: number;
+  dest: number;
+  /** Its day: the state, when the next scheduled change is due (clock time), whether this break is lunch, and the day it last had lunch. */
+  day: Day;
+  next: number;
+  lunch: boolean;
+  lunched: number;
+  /** Its own hours. */
+  hours: { wake: number; lunch: number; off: number; bed: number };
   /** Getting on: the goal being measured, the nearest it has come, how long since, how long it may still squeeze past people, and how often it has had to. */
   track: string;
   best: number;
@@ -251,6 +291,8 @@ export class Life {
   readonly people: Person[] = [];
   readonly pigeons: Pigeon[] = [];
   readonly cats: Cat[] = [];
+  readonly clock = new Clock();
+  readonly city: City;
   private readonly rng: Rng;
   private readonly sources = new Map<string, number[]>();
   private readonly fields = new Map<string, Uint16Array>();
@@ -258,7 +300,8 @@ export class Life {
   private job: { name: string; job: FieldJob } | null = null;
   private readonly seats: Seat[] = [];
   private readonly vending: Spot[] = [];
-  private readonly doors: number[] = [];
+  /** Each building's local field, for the last steps to its door (made when first needed). */
+  private readonly locals = new Map<number, LocalField>();
   private readonly roosts: Roost[] = [];
   private readonly sky: Int16Array;
   private readonly skyN: number;
@@ -272,7 +315,9 @@ export class Life {
     this.traffic = new Traffic(map, streets, seed, count, {
       near: (x, z, r) => this.near(x, z, r, this.ahead),
       alight: (p, x, z, heading) => this.alight(p, x, z, heading),
+      getOff: (p, st) => (p.dest >= 0 ? this.bestStop(st.route, p.dest) === st : null),
     });
+    this.city = new City(plans, map);
 
     // Where things are: benches (two seats each), vending machines, doors, places to meet, roosts.
     const social: number[] = [];
@@ -314,17 +359,10 @@ export class Life {
       ring(plaza.x, plaza.z, inner, plaza.half - 2, 3);
       this.addRoost(plaza.x, plaza.z, plaza.half);
     }
-    for (const plan of plans) {
-      if (plan.lot < 0) continue;
-      const fx = Math.sin(plan.rotation);
-      const fz = Math.cos(plan.rotation);
-      const k = nearestWalk(map, plan.x + fx * (voxels(plan.depth) / 2 + 2), plan.z + fz * (voxels(plan.depth) / 2 + 2), 6);
-      if (k >= 0) this.doors.push(k);
-    }
     this.sources.set("rest", rest);
     this.sources.set("thirst", drink);
     this.sources.set("social", social);
-    this.sources.set("home", this.doors);
+    this.city.groups.forEach((doors, g) => this.sources.set(`door${g}`, doors));
     this.sources.set("bus", this.traffic.stops.map((s) => s.k));
     this.sources.set("curb", this.traffic.curbs);
     // Strolls: far apart points on the sidewalks, each the farthest from those picked so far.
@@ -366,11 +404,31 @@ export class Life {
       }
     }
 
-    // People, out already, on the paving.
-    for (let i = 0; i < count.people && paving.length; i++) {
+    // People: each given a home and a job, and their own hours. At START_HOUR most are still
+    // asleep; the early risers are already on their way to work.
+    const homes = this.city.withRole("home");
+    const jobs = this.city.withRole("office", "shop", "works");
+    const all = this.city.buildings;
+    for (let i = 0; i < count.people && paving.length && all.length; i++) {
       const k = paving[Math.floor(this.rng.next() * paving.length)];
-      this.people.push(this.person(k));
+      const p = this.person(k);
+      // The job first (by its places), then a home near it: there are homes to spare.
+      const job = this.weighted(jobs, (b) => b.places);
+      const J = all[job];
+      p.job = job;
+      p.home = this.weighted(homes, (b) => (b === J && homes.length > 1 ? 0 : b.places * Math.exp(-Math.hypot(b.x - J.x, b.z - J.z) / HOME_REACH)));
+      const r = this.rng;
+      p.hours = { wake: r.range(WAKE[0], WAKE[1]), lunch: r.range(LUNCH_AT[0], LUNCH_AT[1]), off: r.range(OFF_AT[0], OFF_AT[1]), bed: r.range(BED_AT[0], BED_AT[1]) };
+      this.people.push(p);
+      if (p.hours.wake < START_HOUR) {
+        p.day = "commute";
+        this.trip(p, p.job, "off to work");
+      } else this.enter(p, p.home, "asleep at home");
     }
+    // Every group's field, worked out while the city is printed: the jobs' groups first (the
+    // morning needs them), then the homes'.
+    for (const p of this.people) this.hint(`door${all[p.job].group}`);
+    for (const p of this.people) this.hint(`door${all[p.home].group}`);
     // Pigeons: one flock per roost, sharing the count.
     const roosts = this.roosts.filter((r) => r.spots.length > 10);
     for (let i = 0; i < count.pigeons && roosts.length; i++) {
@@ -450,6 +508,15 @@ export class Life {
       fare: null,
       vehicle: null,
       cross: 0,
+      home: -1,
+      job: -1,
+      inside: -1,
+      dest: -1,
+      day: "out",
+      next: Infinity,
+      lunch: false,
+      lunched: -1,
+      hours: { wake: 7, lunch: 12, off: 18, bed: 22 },
       track: "",
       best: FAR,
       stuck: 0,
@@ -462,12 +529,27 @@ export class Life {
     };
   }
 
-  /** A field, or null while it waits its turn to be worked out (one per step). */
+  /** A field, or null while it waits its turn to be worked out (one per step); someone is waiting for it, so it goes first. */
   private field(name: string): Uint16Array | null {
     const f = this.fields.get(name);
     if (f) return f;
-    if (!this.wanted.includes(name)) this.wanted.push(name);
+    if (this.job?.name === name) return null;
+    const i = this.wanted.indexOf(name);
+    if (i !== 0) {
+      if (i > 0) this.wanted.splice(i, 1);
+      this.wanted.unshift(name);
+    }
     return null;
+  }
+
+  /** Asks for a field that will be wanted soon, after any already asked for. */
+  private hint(name: string) {
+    if (!this.fields.has(name) && this.job?.name !== name && !this.wanted.includes(name)) this.wanted.push(name);
+  }
+
+  /** Works on the fields without moving anyone (while the city is still being printed). */
+  prepare() {
+    this.work();
   }
 
   /** How many fields are still to be worked out. */
@@ -475,8 +557,15 @@ export class Life {
     return this.wanted.length + (this.job ? 1 : 0);
   }
 
-  /** A slice of the fields' work. */
+  /** A slice of the fields' work: the fields asked for, and, when none is, the next building's local field. */
   private work() {
+    if (!this.job && !this.wanted.length && this.locals.size < this.city.buildings.length) {
+      for (let b = 0; b < this.city.buildings.length; b++) {
+        if (this.locals.has(b)) continue;
+        this.local(b);
+        return;
+      }
+    }
     if (!this.job && this.wanted.length) {
       const name = this.wanted.shift()!;
       this.job = { name, job: new FieldJob(this.map, this.sources.get(name) ?? []) };
@@ -492,6 +581,7 @@ export class Life {
 
   step(dt: number) {
     dt = Math.min(dt, 0.1);
+    this.clock.step(dt);
     this.work();
     this.grid.clear();
     for (const p of this.people) {
@@ -532,23 +622,189 @@ export class Life {
   /* ---------- People ---------- */
 
   private stepPerson(p: Person, dt: number) {
-    for (const need of NEEDS) p.needs[need] = Math.min(1.5, p.needs[need] + p.rates[need] * dt);
     p.moving = false;
     p.motion = "stand";
     p.timer -= dt;
     p.since += dt;
+    if (p.activity === "away") {
+      this.indoors(p);
+      return;
+    }
+    if (p.day === "out") {
+      for (const need of NEEDS) p.needs[need] = Math.min(1.5, p.needs[need] + p.rates[need] * dt);
+      // The break is over: cut short whatever it is doing (getting up off a seat first).
+      if (this.clock.time >= p.next) {
+        if (p.activity === "use" && p.use === "seat") p.timer = Math.min(p.timer, 0);
+        else if ((p.activity === "walk" && p.leg === "field") || (p.activity === "use" && (p.use === "circle" || p.use === "vending"))) this.endBreak(p);
+      }
+    }
     // Right beside a vehicle (or caught by its corner on a turn): step out of its way (unless seated,
     // getting on or aboard).
-    const settled = p.activity === "ride" || p.activity === "away" || (p.activity === "use" ? p.use === "seat" : p.leg === "onto" || p.leg === "door");
+    const settled = p.activity === "ride" || (p.activity === "use" ? p.use === "seat" : p.leg === "onto" || p.leg === "door");
     const away = settled ? null : this.traffic.clearOf(p.x, p.z, RADIUS + 0.8);
     if (away) this.move(p, away.x * MAKE_WAY * dt, away.z * MAKE_WAY * dt);
     if (p.activity === "walk") this.walking(p, dt);
     else if (p.activity === "use") this.using(p, dt);
-    // Away: someone else comes out of a door.
-    else if (p.activity === "away" && p.timer <= 0 && this.doors.length) {
-      Object.assign(p, this.person(this.doors[Math.floor(this.rng.next() * this.doors.length)]), { needs: { thirst: 0.2, rest: 0, social: 0.2, home: 0 }, why: "came out of a door" });
-    }
     if (away) p.motion = "make-way";
+  }
+
+  /* People, the day. */
+
+  /** Inside a building: until the next thing on its day is due (asking for the field it will walk down a little before). */
+  private indoors(p: Person) {
+    const t = this.clock.time;
+    const all = this.city.buildings;
+    if (t >= p.next - 0.5 && p.day !== "out") this.hint(`door${all[p.day === "asleep" ? p.job : p.home].group}`);
+    if (t < p.next) return;
+    if (p.day === "asleep") {
+      this.emerge(p, p.home);
+      p.day = "commute";
+      this.trip(p, p.job, "time for work");
+    } else if (p.day === "working") {
+      this.emerge(p, p.job);
+      p.day = "out";
+      p.needs.home = 0;
+      if (p.lunch) {
+        // Lunch: out to the nearest drink, seat or circle (whichever it wants most), then back.
+        p.lunched = this.clock.day;
+        p.next = t + LUNCH;
+        this.wantOne(p);
+        this.decide(p, "lunch break");
+      } else {
+        // After work: out for a drink, a seat or company first (most do), then home; home by bedtime.
+        p.next = this.clock.next(p.hours.bed);
+        if (p.next - t > 12) p.next = t + 0.5;
+        if (this.rng.chance(AFTER_WORK)) this.wantOne(p);
+        this.decide(p, "work is over");
+      }
+    }
+  }
+
+  /** The break is over: back to work after lunch, or home at bedtime. */
+  private endBreak(p: Person) {
+    if (p.seat) {
+      p.seat.taken = false;
+      p.seat = null;
+    }
+    if (p.lunch) {
+      p.day = "commute";
+      this.trip(p, p.job, "lunch is over");
+    } else this.goHome(p, "bedtime");
+  }
+
+  private goHome(p: Person, why: string) {
+    p.day = "homeward";
+    this.trip(p, p.home, why);
+  }
+
+  /** Out of building b's door, onto the street. */
+  private emerge(p: Person, b: number) {
+    const B = this.city.buildings[b];
+    const { n, y } = this.map;
+    if (p.inside >= 0) this.city.buildings[p.inside].inside--;
+    p.inside = -1;
+    Object.assign(p, { x: (B.door % n) + 0.5, z: ((B.door / n) | 0) + 0.5, y: y[B.door], seat: null, stop: null, fare: null, vehicle: null, cross: 0, track: "" });
+  }
+
+  /** In through building b's door: at work until the next break, or at home until it wakes. */
+  private enter(p: Person, b: number, why: string) {
+    leave(p);
+    const B = this.city.buildings[b];
+    const { n, y } = this.map;
+    Object.assign(p, { x: (B.door % n) + 0.5, z: ((B.door / n) | 0) + 0.5, y: y[B.door], fare: null, vehicle: null, dest: -1, need: null, use: null, leg: "field", ride: "door" });
+    if (p.seat) p.seat.taken = false;
+    p.seat = null;
+    p.inside = b;
+    B.inside++;
+    const t = this.clock.time;
+    if (p.day === "commute") {
+      p.day = "working";
+      // Lunch, if it is still to come today, then the end of the day; past both, out again soon.
+      const lunch = this.clock.today(p.hours.lunch);
+      const off = this.clock.today(p.hours.off);
+      p.lunch = p.lunched < this.clock.day && t < lunch;
+      p.next = p.lunch ? lunch : t < off ? off : t + 0.5;
+    } else {
+      p.day = "asleep";
+      p.next = this.clock.next(p.hours.wake);
+    }
+    into(p, "away", why);
+  }
+
+  /** Off to building b's door: on foot, or, far away, by a bus that goes that way or by taxi. */
+  private trip(p: Person, b: number, why: string) {
+    const B = this.city.buildings[b];
+    p.dest = b;
+    p.need = null;
+    p.use = null;
+    p.leg = "field";
+    p.ride = "door";
+    p.timer = 0;
+    const d = Math.hypot(B.x - p.x, B.z - p.z);
+    if (d > RIDE_FAR) {
+      const r = this.rng.next();
+      if (r < BY_BUS && this.busGoes(p, b)) p.ride = "bus";
+      // A taxi (always, very far) while there are taxis to go round.
+      else if ((r < BY_BUS + BY_TAXI || d > TAXI_FAR) && this.traffic.curbs.length && this.traffic.hailing < this.traffic.taxis) p.ride = "taxi";
+    }
+    p.goal = p.ride === "bus" ? "bus" : p.ride === "taxi" ? "curb" : `door${B.group}`;
+    into(p, "walk", p.ride === "door" ? why : `${why} (by ${p.ride})`);
+  }
+
+  /** On foot the rest of the way. */
+  private walkOn(p: Person, why: string) {
+    leave(p);
+    p.fare = null;
+    p.vehicle = null;
+    p.ride = "door";
+    p.use = null;
+    p.leg = "field";
+    p.goal = `door${this.city.buildings[p.dest].group}`;
+    into(p, "walk", why);
+  }
+
+  /** Building b's local field. */
+  private local(b: number): LocalField {
+    let f = this.locals.get(b);
+    if (!f) {
+      const B = this.city.buildings[b];
+      f = new LocalField(this.map, B.door, B.reach);
+      this.locals.set(b, f);
+    }
+    return f;
+  }
+
+  /** The stop on a route nearest building b. */
+  private bestStop(route: number, b: number): Stop | null {
+    const B = this.city.buildings[b];
+    const stops = this.traffic.routes[route]?.stops ?? [];
+    let best: Stop | null = null;
+    let bd = Infinity;
+    for (const st of stops) {
+      const d = Math.hypot(st.x - B.x, st.z - B.z);
+      if (d < bd) [best, bd] = [st, d];
+    }
+    return best;
+  }
+
+  /** True if the bus from the shelter nearest the walker would take it much nearer building b. */
+  private busGoes(p: Person, b: number): boolean {
+    const stops = this.traffic.stops;
+    if (!stops.length) return false;
+    const from = stops.reduce((a, c) => (Math.hypot(a.x - p.x, a.z - p.z) < Math.hypot(c.x - p.x, c.z - p.z) ? a : c));
+    const to = this.bestStop(from.route, b);
+    const B = this.city.buildings[b];
+    return !!to && to !== from && Math.hypot(from.x - p.x, from.z - p.z) + Math.hypot(to.x - B.x, to.z - B.z) < Math.hypot(B.x - p.x, B.z - p.z) * 0.6;
+  }
+
+  /** A pick among `items`, each as likely as its weight; returns its index in the city's buildings. */
+  private weighted<T>(items: T[], weight: (t: T) => number): number {
+    const w = items.map(weight);
+    const total = w.reduce((a, b) => a + b, 0);
+    let r = this.rng.next() * total;
+    let i = 0;
+    while (i < items.length - 1 && (r -= w[i]) > 0) i++;
+    return this.city.buildings.indexOf(items[i] as never);
   }
 
   /* People, the activities. */
@@ -673,21 +929,41 @@ export class Life {
   /** Down the goal's field: strolling, or to what meets the need. */
   private followField(p: Person, dt: number) {
     const { n } = this.map;
-    if (!p.need && p.timer <= 0) this.decide(p, "strolling on", false);
-    const field = this.field(p.goal);
+    if (!p.need && p.dest < 0 && p.timer <= 0) this.decide(p, "strolling on", false);
     const k = Math.min(n - 1, Math.max(0, p.z | 0)) * n + Math.min(n - 1, Math.max(0, p.x | 0));
-    if (!field) return;
-    if (field[k] <= ARRIVE || field[k] === FAR) {
-      this.reach(p, field[k] === FAR);
+    // On foot to a building: its own local field once that has a short way there (its window may
+    // give only a long way round), its group's field till then.
+    const local = p.dest >= 0 && p.ride === "door" ? this.local(p.dest) : null;
+    const lv = local ? local.at(k) : FAR;
+    // (Once on it, it stays on it.)
+    const onLocal = p.track === `local${p.dest}`;
+    const near = lv < FAR && (onLocal || lv <= DETOUR * Math.hypot(this.city.buildings[p.dest].x - p.x, this.city.buildings[p.dest].z - p.z) + 40);
+    const field = near ? null : this.field(p.goal);
+    if (!near && !field) return;
+    const at = near ? (j: number) => local!.at(j) : (j: number) => field![j];
+    const down = near ? (j: number) => local!.downhill(j) : (j: number) => downhill(this.map, field!, j);
+    const here = at(k);
+    if (here <= (near ? AT_DOOR : ARRIVE) || here === FAR) {
+      if (p.dest >= 0 && p.ride === "door") {
+        // At a neighbor's door: round to its own, on its own field.
+        if (!near && lv < FAR && here <= ARRIVE) {
+          p.track = `local${p.dest}`;
+          p.best = lv;
+          p.stuck = 0;
+          p.tries = 0;
+          return;
+        }
+        this.enter(p, p.dest, here === FAR ? "could not get there on foot: went in nearby" : near ? this.arrived(p) : "went in next door");
+      } else this.reach(p, here === FAR);
       // Nowhere it wants to go can be reached from here: wander.
       if (p.goal === "wander") this.wander(p, dt);
       return;
     }
     let tx = p.x;
     let tz = p.z;
-    const a = downhill(this.map, field, k);
+    const a = down(k);
     if (a >= 0) {
-      const b = downhill(this.map, field, a);
+      const b = down(a);
       const t = b >= 0 ? b : a;
       tx = (t % n) + 0.5;
       tz = ((t / n) | 0) + 0.5;
@@ -705,26 +981,37 @@ export class Life {
     if (!onRoad) p.cross = 0;
     // Headway: nearer the goal than ever, or stuck. Stuck a while, squeeze past people; stuck
     // through that again and again, give up and go elsewhere.
-    if (p.track !== p.goal) {
-      p.track = p.goal;
-      p.best = field[k];
+    const track = near ? `local${p.dest}` : p.goal;
+    if (p.track !== track) {
+      p.track = track;
+      p.best = here;
       p.stuck = 0;
       p.tries = 0;
-    } else if (field[k] < p.best) {
-      p.best = field[k];
+    } else if (here < p.best) {
+      p.best = here;
       p.stuck = 0;
       p.tries = 0;
     } else if ((p.stuck += dt) > STUCK) {
       p.stuck = 0;
       p.squeeze = SQUEEZE;
       if (++p.tries > TRIES) {
+        // On the way somewhere it must go: in at the nearest door (it is lost in the crowd).
+        if (p.dest >= 0) {
+          this.enter(p, p.dest, "stuck in the crowd: went in nearby");
+          return;
+        }
         // Put the need off, and go somewhere else.
         if (p.need) p.needs[p.need] *= 0.5;
         this.stroll(p, "stuck: going elsewhere");
         return;
       }
     }
-    this.walkToward(p, (tx - p.x) / fd, (tz - p.z) / fd, p.speed * (p.need ? 1.1 : 1) * (onRoad ? HURRY : 1), dt);
+    this.walkToward(p, (tx - p.x) / fd, (tz - p.z) / fd, p.speed * (p.dest >= 0 ? BRISK : p.need ? 1.1 : 1) * (onRoad ? HURRY : 1), dt);
+  }
+
+  /** Why it went in, at its own door. */
+  private arrived(p: Person) {
+    return p.day === "commute" ? (p.lunched === this.clock.day && this.clock.hour > p.hours.lunch ? "back from lunch" : "arrived at work") : "home";
   }
 
   /**
@@ -889,28 +1176,50 @@ export class Life {
    * far points if `done`, the end of something). Strolling on, it is still the same walk.
    */
   private decide(p: Person, why: string, done = true) {
+    // Out at lunch with nothing more it needs: back to work early. Past the end of a break: back, or home.
+    if (p.day === "out" && (this.clock.time >= p.next || (p.lunch && done && p.activity !== "away" && !NEEDS.some((n) => n !== "home" && p.needs[n] >= 0.7)))) {
+      this.endBreak(p);
+      return;
+    }
     const was = p.activity === "walk" && p.leg === "field" ? p.need : undefined;
     p.need = null;
     p.use = null;
     p.leg = "field";
     p.timer = this.rng.range(2, 5);
     for (const need of NEEDS) {
-      if (p.needs[need] < (need === "home" ? 1 : 0.7) || !this.sources.get(need)?.length) continue;
+      if (p.needs[need] < (need === "home" ? 1 : 0.7)) continue;
+      // Home, only once work is over (at lunch it waits).
+      if (need === "home") {
+        if (p.day === "out" && !p.lunch) {
+          this.goHome(p, done ? `${why}, ${DUE.home}` : DUE.home);
+          return;
+        }
+        continue;
+      }
+      if (!this.sources.get(need)?.length) continue;
       p.need = need;
       p.goal = need;
-      if (need === "home") {
-        // On foot, by bus or by taxi.
-        const r = this.rng.next();
-        p.ride = r < BY_BUS && this.traffic.stops.length ? "bus" : r < BY_BUS + BY_TAXI && this.traffic.curbs.length ? "taxi" : "door";
-        p.goal = p.ride === "bus" ? "bus" : p.ride === "taxi" ? "curb" : "home";
-      }
       // Why, with what led to it (unless just strolling on).
-      const due = p.ride !== "door" && need === "home" ? `${DUE.home} (by ${p.ride})` : DUE[need];
-      into(p, "walk", done ? `${why}, ${due}` : due);
+      into(p, "walk", done ? `${why}, ${DUE[need]}` : DUE[need]);
+      return;
+    }
+    if (done && this.doneForTheDay(p)) {
+      this.goHome(p, `${why}: going home`);
       return;
     }
     if (done || !p.goal.startsWith("stroll")) p.goal = this.reachableStroll(p);
     if (was !== null) into(p, "walk", why);
+  }
+
+  /** Out after work with nothing more it needs: home (a stroll across the city would take half the night). */
+  private doneForTheDay(p: Person) {
+    return p.day === "out" && !p.lunch;
+  }
+
+  /** Out on a break: a drink, a seat or company, whichever it wants most, is due now. */
+  private wantOne(p: Person) {
+    const want = (["thirst", "rest", "social"] as Need[]).reduce((a, b) => (p.needs[a] >= p.needs[b] ? a : b));
+    p.needs[want] = Math.max(p.needs[want], 0.75);
   }
 
   /** On to a stroll somewhere it can get to. */
@@ -924,6 +1233,14 @@ export class Life {
 
   /** At the end of the field (or nowhere near one): use what is there. */
   private reach(p: Person, lost: boolean) {
+    if (p.dest >= 0) {
+      this.reachRide(p, lost);
+      return;
+    }
+    if (!lost && !p.need && this.doneForTheDay(p)) {
+      this.goHome(p, "strolled there: going home");
+      return;
+    }
     if (lost || !p.need) {
       // Unreachable from here (across the river, say): put the need off and stroll somewhere reachable.
       if (lost && p.need) p.needs[p.need] *= 0.3;
@@ -961,60 +1278,66 @@ export class Life {
         }
         this.startUse(p, "circle", this.rng.range(15, 45), "joined a circle");
         return;
-      case "home": {
-        if (p.ride === "bus") {
-          const st = this.traffic.stops.reduce((a, b) => (Math.hypot(a.x - p.x, a.z - p.z) < Math.hypot(b.x - p.x, b.z - p.z) ? a : b));
-          if (Math.hypot(st.x - p.x, st.z - p.z) >= 12) {
-            this.giveUp(p, "no shelter here");
-            return;
-          }
-          p.stop = st;
-          st.queue.push(p);
-          this.startUse(p, "shelter", BUS_WAIT, "waiting for the bus");
-          return;
-        }
-        if (p.ride === "taxi") {
-          const f = this.traffic.hail(p);
-          if (!f) {
-            this.giveUp(p, "no taxi to hail");
-            return;
-          }
-          p.fare = f;
-          this.startUse(p, "curb", TAXI_WAIT, "hailed a taxi");
-          return;
-        }
-        p.timer = this.rng.range(2, 12);
-        into(p, "away", "went in");
-        return;
-      }
     }
   }
 
-  /** No ride after all: home on foot, to a door. */
+  /** On a trip, at the shelter or the curb: wait for the bus (if it goes that way) or hail a taxi. */
+  private reachRide(p: Person, lost: boolean) {
+    if (lost) {
+      this.walkOn(p, p.ride === "bus" ? "no shelter it can get to: walking" : "no curb it can get to: walking");
+      return;
+    }
+    if (p.ride === "bus") {
+      const st = this.traffic.stops.reduce((a, b) => (Math.hypot(a.x - p.x, a.z - p.z) < Math.hypot(b.x - p.x, b.z - p.z) ? a : b));
+      if (Math.hypot(st.x - p.x, st.z - p.z) >= 12) {
+        this.giveUp(p, "no shelter here");
+        return;
+      }
+      if (this.bestStop(st.route, p.dest) === st) {
+        this.giveUp(p, "the bus from here doesn't go that way");
+        return;
+      }
+      p.stop = st;
+      st.queue.push(p);
+      this.startUse(p, "shelter", BUS_WAIT, "waiting for the bus");
+      return;
+    }
+    const B = this.city.buildings[p.dest];
+    const f = this.traffic.hail(p, { x: B.x, z: B.z });
+    if (!f) {
+      this.giveUp(p, "no taxi to hail");
+      return;
+    }
+    p.fare = f;
+    this.startUse(p, "curb", TAXI_WAIT, "hailed a taxi");
+  }
+
+  /** No ride after all: on foot the rest of the way. */
   private giveUp(p: Person, why: string) {
-    leave(p);
-    p.fare = null;
-    p.vehicle = null;
-    p.need = "home";
-    p.use = null;
-    p.ride = "door";
-    p.goal = "home";
-    p.leg = "field";
-    into(p, "walk", `${why}: walking home`);
+    if (p.dest < 0) {
+      leave(p);
+      p.fare = null;
+      p.vehicle = null;
+      this.stroll(p, why);
+      return;
+    }
+    this.walkOn(p, `${why}: walking`);
   }
 
   /** A rider gets off at (x, z) and walks on from there. */
   private alight(p: Person, x: number, z: number, heading: number) {
     const k = nearestWalk(this.map, x, z, 6);
     if (k < 0) {
-      p.timer = this.rng.range(2, 12);
-      into(p, "away", "got off where there is no path");
+      if (p.dest >= 0) this.enter(p, p.dest, "got off where there is no path: went in");
       return;
     }
     const { n, y } = this.map;
-    Object.assign(p, { x: (k % n) + 0.5, z: ((k / n) | 0) + 0.5, y: y[k], heading, vehicle: null, stop: null, fare: null, ride: "door", cross: 0 });
-    p.needs.home = 0;
-    this.decide(p, "got off");
+    Object.assign(p, { x: (k % n) + 0.5, z: ((k / n) | 0) + 0.5, y: y[k], heading, vehicle: null, stop: null, fare: null, cross: 0 });
+    if (p.dest >= 0) this.walkOn(p, "got off: walking on");
+    else {
+      p.ride = "door";
+      this.decide(p, "got off");
+    }
   }
 
   /** A stroll whose field reaches the walker's column (from a random one on), or "wander". */

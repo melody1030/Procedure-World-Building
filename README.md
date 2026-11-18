@@ -166,7 +166,7 @@ commercial ground floors lowered to 4.75–5.25 m:
 
 ![The plaza, the Landmark and its shop fronts at the people's scale](site/src/world/screenshots/2026-11-17-plaza-landmark-scale.webp)
 
-Plans: [terrain plan](docs/plans/terrain-plan.md) · [town plan](docs/plans/town-plan.md) · [shader studio plan](docs/plans/shader-studio-plan.md) · [city controls plan](docs/plans/city-controls-plan.md) · [building grammar plan](docs/plans/building-grammar-plan.md) · [grammar city plan](docs/plans/grammar-city-plan.md)
+Plans: [terrain plan](docs/plans/terrain-plan.md) · [town plan](docs/plans/town-plan.md) · [shader studio plan](docs/plans/shader-studio-plan.md) · [city controls plan](docs/plans/city-controls-plan.md) · [building grammar plan](docs/plans/building-grammar-plan.md) · [grammar city plan](docs/plans/grammar-city-plan.md) · [city simulation plan](docs/plans/city-simulation-plan.md)
 
 ---
 

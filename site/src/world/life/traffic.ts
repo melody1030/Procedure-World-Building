@@ -163,6 +163,8 @@ export interface Fare {
   taxi: Vehicle | null;
   /** The taxi is standing at the curb for them. */
   ready: boolean;
+  /** Where they are going, if they say (else somewhere else in the city). */
+  to: P2 | null;
 }
 
 interface Halt {
@@ -236,6 +238,8 @@ export interface TrafficHooks {
   near(x: number, z: number, r: number): Person[];
   /** A rider gets off at (x, z), facing `heading`. */
   alight(p: Person, x: number, z: number, heading: number): void;
+  /** Whether a rider gets off the bus at this stop (null: as it likes, by chance). */
+  getOff(p: Person, stop: Stop): boolean | null;
 }
 
 export class Traffic {
@@ -974,7 +978,7 @@ export class Traffic {
       const st = h.stop!;
       st.bus = v;
       // Riders get off.
-      const off = v.riders.filter(() => this.rng.chance(ALIGHT));
+      const off = v.riders.filter((p) => this.hooks.getOff(p, st) ?? this.rng.chance(ALIGHT));
       for (const p of off) {
         v.riders.splice(v.riders.indexOf(p), 1);
         const d = this.door(v);
@@ -1011,9 +1015,12 @@ export class Traffic {
         why = "the fare gave up";
       }
       else if (v.riders.length) {
-        // Aboard: somewhere else in the city.
-        const lanes = this.lanes(this.segs[v.seg].part).filter((i) => this.segs[i].len > 30 && Math.hypot(this.at(this.segs[i], 0).x - v.x, this.at(this.segs[i], 0).z - v.z) > FARE_RIDE);
-        const to = lanes.length ? this.rng.pick(lanes) : this.rng.pick(this.lanes(this.segs[v.seg].part));
+        // Aboard: where they are going (the lane nearest it), or somewhere else in the city.
+        const all = this.lanes(this.segs[v.seg].part);
+        const lanes = all.filter((i) => this.segs[i].len > 30 && Math.hypot(this.at(this.segs[i], 0).x - v.x, this.at(this.segs[i], 0).z - v.z) > FARE_RIDE);
+        const want = f.to;
+        const mid = (i: number) => this.at(this.segs[i], this.segs[i].len / 2);
+        const to = want ? all.reduce((a, b) => (Math.hypot(mid(a).x - want.x, mid(a).z - want.z) < Math.hypot(mid(b).x - want.x, mid(b).z - want.z) ? a : b)) : lanes.length ? this.rng.pick(lanes) : this.rng.pick(all);
         const s = this.segs[to].len / 2;
         const route = this.path(v.seg, v.s, to, s, true);
         this.fares.splice(this.fares.indexOf(f), 1);
@@ -1048,8 +1055,16 @@ export class Traffic {
     return { x: v.x + f.x * along + r.x * (v.width / 2 + 1.4), z: v.z + f.z * along + r.z * (v.width / 2 + 1.4) };
   }
 
+  /** How many fares are waiting for a taxi or riding in one, and how many taxis there are. */
+  get hailing() {
+    return this.fares.length;
+  }
+  get taxis() {
+    return this.vehicles.filter((v) => v.kind === "taxi").length;
+  }
+
   /** Someone at the curb wants a taxi; null if no taxi could get there. */
-  hail(p: Person): Fare | null {
+  hail(p: Person, to: P2 | null = null): Fare | null {
     if (!this.vehicles.some((v) => v.kind === "taxi")) return null;
     const { n } = this.map;
     let best = -1;
@@ -1060,7 +1075,7 @@ export class Traffic {
     }
     if (best < 0 || bd > 8) return null;
     const spot = this.curbSpot.get(best)!;
-    const f: Fare = { person: p, seg: spot.seg, s: spot.s, taxi: null, ready: false };
+    const f: Fare = { person: p, seg: spot.seg, s: spot.s, taxi: null, ready: false, to };
     this.fares.push(f);
     return f;
   }

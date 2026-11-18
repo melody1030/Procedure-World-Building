@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { isTextEntry } from "../../components/SidePanel";
-import type { Life, Need, Person } from "../life/agents";
+import type { Day, Life, Need, Person } from "../life/agents";
+import type { Building, Role } from "../life/city";
+import { clockLabel } from "../life/clock";
 import type { Vehicle } from "../life/traffic";
 import type { WorldView } from "../render/WorldView";
 import type { Selection } from "../render/select";
@@ -58,9 +60,37 @@ const LIMIT: Record<Vehicle["limit"], string> = {
 
 const VEHICLE_ACTIVITY: Record<Vehicle["activity"], string> = { drive: "Driving", stand: "Standing", off: "Off the island" };
 
+/** A person's day, as the card says it. */
+function dayLabel(p: Person, life: Life): string {
+  const labels: Record<Day, string> = {
+    asleep: "Asleep at home",
+    commute: p.lunched === life.clock.day && life.clock.hour > p.hours.lunch ? "Back to work" : "Off to work",
+    working: "At work",
+    out: p.lunch ? "Out for lunch" : "Out for the evening",
+    homeward: "Going home",
+  };
+  return labels[p.day];
+}
+
+/** What comes next on its day, and when. */
+function nextLabel(p: Person): string | null {
+  if (!Number.isFinite(p.next) || p.day === "commute" || p.day === "homeward") return null;
+  const what = p.day === "asleep" ? "wakes" : p.day === "working" ? (p.lunch ? "lunch" : "work ends") : p.lunch ? "back to work" : "bedtime";
+  return `${what} at ${clockLabel(p.next)}`;
+}
+
+const ROLE_LABEL: Record<Role, string> = { home: "flats", office: "offices", shop: "shop", works: "works" };
+const DISTRICT_LABEL = ["Core", "Commercial", "Megablock", "Industrial", "Wealthy"];
+
+function buildingLabel(b: Building | undefined): string {
+  if (!b) return "none";
+  const name = b.signature === "landmark" ? "The Landmark" : b.signature === "megatower" ? "The Megatower" : `${DISTRICT_LABEL[b.district]} ${ROLE_LABEL[b.role]}`;
+  return `${name}, ${b.storeys} storeys`;
+}
+
 function personActivity(p: Person): string {
   if (p.activity === "ride") return p.ride === "taxi" ? "Riding a taxi" : "Riding the bus";
-  if (p.activity === "away") return "Indoors";
+  if (p.activity === "away") return p.day === "asleep" ? "At home" : "At work";
   if (p.activity === "use") {
     switch (p.use) {
       case "seat":
@@ -80,7 +110,7 @@ function personActivity(p: Person): string {
   if (p.leg === "door") return "Getting on";
   if (p.leg === "front" || p.leg === "onto") return "Going to sit";
   if (p.leg === "off") return "Getting up";
-  return p.need ? "Walking" : "Strolling";
+  return p.need || p.dest >= 0 ? "Walking" : "Strolling";
 }
 
 function forHowLong(seconds: number): string {
@@ -99,9 +129,27 @@ function describe(sel: Selection, life: Life | null): { name: string; badges: st
   if (sel.kind === "person") {
     const p = life.people[sel.index];
     if (!p) return null;
-    const badges = [personActivity(p)];
+    const badges = [dayLabel(p, life), personActivity(p)];
     if (p.activity === "walk" || p.activity === "use") badges.push(MOTION[p.motion]);
-    return { name: title("Person", sel.index), badges, why: p.why, since: p.since, body: <NeedMeters person={p} /> };
+    const all = life.city.buildings;
+    const rows: [string, string][] = [
+      ["Home", buildingLabel(all[p.home])],
+      ["Work", buildingLabel(all[p.job])],
+    ];
+    const next = nextLabel(p);
+    if (next) rows.push(["Next", next]);
+    return {
+      name: title("Person", sel.index),
+      badges,
+      why: p.why,
+      since: p.since,
+      body: (
+        <div className="grid gap-3">
+          <Facts rows={rows} />
+          {p.day === "out" && <NeedMeters person={p} />}
+        </div>
+      ),
+    };
   }
   if (sel.kind === "pigeon") {
     const b = life.pigeons[sel.index];

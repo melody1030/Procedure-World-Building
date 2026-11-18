@@ -9,7 +9,8 @@ import type { Streets } from "../terrain/streets";
 import type { RiverPath } from "../terrain/river";
 import { BASE, WORLD_SIZE, voxels } from "../scale";
 import { buildPlinth } from "./base";
-import { makePrintable, type PrintableBuilding } from "../buildings/print";
+import { WINDOWS, makePrintable, type PrintableBuilding } from "../buildings/print";
+import { lightAt } from "../life/clock";
 import { buildingMaterials, buildingObject, disposeBuilding } from "../buildings/render";
 import { fitBuilding, fitGrammar, type BuildingPlan } from "../city/placement";
 import type { Park, Parks } from "../city/parks";
@@ -179,6 +180,10 @@ export class WorldView {
   private lifeShown = true;
   private built = true;
   private readonly clock = new THREE.Clock();
+  /** The sky's lights, set from the inhabitants' clock each frame; and the hour they were last set for. */
+  private readonly hemi: THREE.HemisphereLight;
+  private readonly sun: THREE.DirectionalLight;
+  private lightHour = -1;
   /** What the presets aim at: the river's course, the streets and plaza, and the ground's height. */
   private riverPath: RiverPath | null = null;
   private streetData: Streets | null = null;
@@ -217,8 +222,8 @@ export class WorldView {
       this.onView?.(null);
     });
 
-    const hemi = new THREE.HemisphereLight(SKY.hemisphereSky, SKY.hemisphereGround, SKY.hemisphereIntensity);
-    const sun = new THREE.DirectionalLight(SKY.sun, SKY.sunIntensity);
+    const hemi = (this.hemi = new THREE.HemisphereLight(SKY.hemisphereSky, SKY.hemisphereGround, SKY.hemisphereIntensity));
+    const sun = (this.sun = new THREE.DirectionalLight(SKY.sun, SKY.sunIntensity));
     const az = THREE.MathUtils.degToRad(SKY.sunAzimuth);
     const el = THREE.MathUtils.degToRad(SKY.sunElevation);
     const reach = EXTENT * 1.6;
@@ -255,6 +260,8 @@ export class WorldView {
       if (this.life) {
         this.life.group.visible = this.lifeShown && this.built;
         if (this.life.group.visible) this.life.update(dt);
+        else this.life.life.prepare();
+        this.light(this.life.life.clock.hour);
       }
       this.track();
       this.fly();
@@ -264,6 +271,23 @@ export class WorldView {
       this.renderer.render(this.scene, this.camera);
     };
     loop();
+  }
+
+  /** The sky, the sun (or moon) and the windows at an hour of the inhabitants' clock. */
+  private light(hour: number) {
+    if (Math.abs(hour - this.lightHour) < 0.01) return;
+    this.lightHour = hour;
+    const l = lightAt(hour);
+    (this.scene.background as THREE.Color).setHex(l.background);
+    this.hemi.color.setHex(l.hemisphereSky);
+    this.hemi.groundColor.setHex(l.hemisphereGround);
+    this.hemi.intensity = l.hemisphereIntensity;
+    this.sun.color.setHex(l.sun);
+    this.sun.intensity = l.sunIntensity;
+    const reach = EXTENT * 1.6;
+    this.sun.position.set(l.sunDirection[0] * reach, l.sunDirection[1] * reach, l.sunDirection[2] * reach);
+    this.renderer.toneMappingExposure = l.exposure;
+    WINDOWS.value = l.windows;
   }
 
   /**
@@ -1358,6 +1382,7 @@ transformed = aGrow.xyz + (transformed - aGrow.xyz) * popped;`,
 
   dispose() {
     cancelAnimationFrame(this.frame);
+    WINDOWS.value = 1;
     this.mark.dispose();
     this.setLife(null);
     cancelAnimationFrame(this.cityFrame);

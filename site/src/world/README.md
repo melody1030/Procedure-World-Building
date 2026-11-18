@@ -24,8 +24,9 @@ seed → noise → shaping → heights → terraces → river → claims → hub
   street, parks as their own layer).
 - **Buildings:** done. Every lot builds from the building grammar (`/grammar`), weighted by its
   district, with the Landmark at the plaza, all at the people's scale.
-- **Next:** the town plan's steps 6–9 (`docs/plans/town-plan.md` §9): scatter along the streets
-  (lamps, street trees, the plaza fountain), area scatter, bridges, then check and tune.
+- **Next:** the city as a simulation (`docs/plans/city-simulation-plan.md`): a day clock, homes
+  and jobs, and power, waste and goods carried through the streets. Then the town plan's steps 6–9
+  (`docs/plans/town-plan.md` §9): scatter along the streets, area scatter, bridges, check and tune.
 
 Overlays can be opened from the URL: `/world?show=districts,lots,parks`. One ground tint shows at
 a time (`districts`, `claims` or `suitability`); `network` draws the street network on top.

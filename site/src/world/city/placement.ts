@@ -5,7 +5,7 @@ import { buildGrammar, type Clearance, type GrammarParams, type GrammarStyle } f
 import { LOT_GROUND, STOREY, drawCityGrammar } from "../buildings/lotGrammar";
 import { hash2 } from "../rng";
 import { FIGURE_SCALE, VOXEL_M } from "../scale";
-import type { Districts, Lot } from "../terrain/districts";
+import { DISTRICT, type District, type Districts, type Lot } from "../terrain/districts";
 import type { Streets } from "../terrain/streets";
 import type { Zoning } from "./zoning";
 
@@ -41,6 +41,8 @@ import type { Zoning } from "./zoning";
 
 export interface BuildingPlan {
   lot: number;
+  /** Its lot's district (the Landmark's is the core). */
+  district: District;
   archetype: string;
   seed: number;
   /** The room it must fit in, all of it (along the street, away from it), in meters: the lot less GAP all round. */
@@ -195,6 +197,7 @@ export function planBuildings(districts: Districts, streets: Streets, zoning: Zo
     tallest = Math.max(tallest, height);
     plans.push({
       lot: lot.id,
+      district: lot.district,
       room: { width, depth },
       archetype,
       seed: Math.floor(r(3) * 1e6),
@@ -218,6 +221,7 @@ export function planBuildings(districts: Districts, streets: Streets, zoning: Zo
     if (side >= 10)
       plans.push({
         lot: -1,
+        district: DISTRICT.core,
         room: { width: side + 2 * LANDMARK_RING, depth: side + 2 * LANDMARK_RING },
         archetype: "landmark-tower",
         seed: Math.floor(hash2(seed ^ 0x51ed, -1, 3) * 1e6),

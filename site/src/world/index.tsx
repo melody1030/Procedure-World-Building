@@ -142,6 +142,10 @@ export default function WorldPage() {
     [terrain.parks, terrain.districts, terrain.streets, plans, terrain.seed],
   );
   useEffect(() => viewRef.current?.setLife(life), [life]);
+  // In development, the simulation is at hand in the console (window.life).
+  useEffect(() => {
+    if (import.meta.env.DEV) Object.assign(window, { life });
+  }, [life]);
   useEffect(() => viewRef.current?.setShowLife(state.showLife), [state.showLife]);
   useEffect(() => viewRef.current?.setParks(terrain.parks), [terrain.parks]);
   useEffect(() => {
@@ -194,7 +198,7 @@ export default function WorldPage() {
       {/* The whole interface is drawn at UI_SCALE (80%), so it takes less of the view. */}
       <div className="pointer-events-none absolute inset-0" style={{ zoom: UI_SCALE }}>
         <TerrainPanel terrain={terrain} life={life} ctl={ctl} open={panelOpen} onToggle={() => setPanelOpen((v) => !v)} busy={busy} />
-        <CameraBar view={view} available={available} onFly={flyTo} shown={overlays} follow={follow} onHelp={openHelp} />
+        <CameraBar life={life} view={view} available={available} onFly={flyTo} shown={overlays} follow={follow} onHelp={openHelp} />
         {overlays && (
           <Inspector
             view={viewRef.current}

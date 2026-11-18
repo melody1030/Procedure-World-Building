@@ -33,6 +33,9 @@ export interface PrintableBuilding {
 
 const ease = (t: number) => 1 - (1 - t) * (1 - t);
 
+/** How bright every building's windows and signs are, 0–1: the world's clock dims them by day (life/clock.ts). */
+export const WINDOWS = { value: 1 };
+
 function patch(glow: boolean, frame: { value: number }, clad: { value: number }) {
   return (shader: THREE.WebGLProgramParametersWithUniforms) => {
     shader.uniforms.uFrameTop = frame;
@@ -41,6 +44,7 @@ function patch(glow: boolean, frame: { value: number }, clad: { value: number })
     shader.uniforms.uSteel = { value: STEEL };
     shader.uniforms.uWorkLight = { value: WORK_LIGHT };
     shader.uniforms.uConcrete = { value: CONCRETE };
+    shader.uniforms.uWindows = WINDOWS;
     shader.vertexShader = shader.vertexShader
       .replace("#include <common>", "#include <common>\nuniform float uFrameTop;\nvarying vec3 vSitePos;\nvarying float vUnclad;\nvarying float vDeck;")
       .replace(
@@ -49,11 +53,11 @@ function patch(glow: boolean, frame: { value: number }, clad: { value: number })
       );
     shader.fragmentShader = shader.fragmentShader.replace(
       "#include <common>",
-      "#include <common>\nuniform float uFrameTop;\nuniform float uCladTop;\nuniform vec3 uScaffold;\nuniform vec3 uSteel;\nuniform vec3 uWorkLight;\nuniform vec3 uConcrete;\nvarying vec3 vSitePos;\nvarying float vUnclad;\nvarying float vDeck;",
+      "#include <common>\nuniform float uWindows;\nuniform float uFrameTop;\nuniform float uCladTop;\nuniform vec3 uScaffold;\nuniform vec3 uSteel;\nuniform vec3 uWorkLight;\nuniform vec3 uConcrete;\nvarying vec3 vSitePos;\nvarying float vUnclad;\nvarying float vDeck;",
     );
     if (glow) {
       // A window lights up once the facade has been clad up past it.
-      shader.fragmentShader = shader.fragmentShader.replace("#include <color_fragment>", "#include <color_fragment>\nif (vUnclad > uCladTop + 0.001) discard;");
+      shader.fragmentShader = shader.fragmentShader.replace("#include <color_fragment>", "#include <color_fragment>\nif (vUnclad > uCladTop + 0.001) discard;\ndiffuseColor.rgb *= uWindows;");
     } else {
       // Above the cladding: scaffolding, poles along each face (x + z runs along whichever face this
       // is), ledgers up it, a brace on the diagonal; and work lights in a strip under the frame top.
