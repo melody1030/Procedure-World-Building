@@ -23,6 +23,7 @@ function geometry(data: GeometryData): THREE.BufferGeometry {
   g.setAttribute("position", new THREE.BufferAttribute(data.position, 3));
   g.setAttribute("normal", new THREE.BufferAttribute(data.normal, 3));
   g.setAttribute("color", new THREE.BufferAttribute(data.color, 3));
+  if (data.voxel) g.setAttribute("aVoxel", new THREE.BufferAttribute(data.voxel, 4));
   g.setIndex(new THREE.BufferAttribute(data.index, 1));
   g.computeBoundingSphere();
   return g;

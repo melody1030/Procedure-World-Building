@@ -16,6 +16,7 @@ import { incineratorPlan } from "../life/waste";
 import { fitBuilding, fitGrammar, type BuildingPlan } from "../city/placement";
 import type { Park, Parks } from "../city/parks";
 import { buildParkModel, type ParkModel } from "../city/parkModels";
+import { VOXEL_LOOK, patchVoxelLook } from "./voxelLook";
 import { BUILD_PHASES, PAVING_FROM, PAVING_TO, type BuildUp } from "../terrain/buildup";
 import { createLookUniforms, createPrintUniforms, printDepthMaterial, printMaterial } from "./print";
 import { LifeView } from "./life";
@@ -47,6 +48,7 @@ function toGeometry(data: GeometryData): THREE.BufferGeometry {
   geometry.setAttribute("position", new THREE.BufferAttribute(data.position, 3));
   geometry.setAttribute("normal", new THREE.BufferAttribute(data.normal, 3));
   geometry.setAttribute("color", new THREE.BufferAttribute(data.color, 3));
+  if (data.voxel) geometry.setAttribute("aVoxel", new THREE.BufferAttribute(data.voxel, 4));
   geometry.setIndex(new THREE.BufferAttribute(data.index, 1));
   geometry.computeBoundingSphere();
   return geometry;
@@ -846,6 +848,8 @@ export class WorldView {
     const patch = (material: THREE.Material, key: string) => {
       const m = material.clone();
       m.onBeforeCompile = (shader) => {
+        // The props drawn as voxels (render/voxelLook.ts); their lights stay clean.
+        if (key === "park-solid") patchVoxelLook(shader);
         shader.uniforms.uParkRaise = this.parkRaise;
         shader.vertexShader = shader.vertexShader
           .replace("#include <common>", "#include <common>\nuniform float uParkRaise;\nattribute vec4 aGrow;")
@@ -1341,6 +1345,7 @@ transformed = aGrow.xyz + (transformed - aGrow.xyz) * popped;`,
   /** The voxel grid's strength (0 off). Live: nothing is rebuilt. */
   setLook(grid: number) {
     this.look.uLookGrid.value = grid;
+    VOXEL_LOOK.uVoxelGrid.value = grid;
   }
 
   /** The claim map for Show claims: one byte per column, `n` columns per side. */

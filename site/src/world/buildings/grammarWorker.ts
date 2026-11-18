@@ -28,6 +28,6 @@ scope.onmessage = (e) => {
   const { model, stats } = buildGrammar(params, seed);
   // The fixtures are for clash checks, which the page doesn't run.
   const done: GrammarDone = { key, model: { ...model, fixtures: [] }, vertices: stats.vertices, ms: stats.ms };
-  const buffers = [model.solid, model.glow].flatMap((g) => [g.position.buffer, g.normal.buffer, g.color.buffer, g.index.buffer]);
+  const buffers = [model.solid, model.glow].flatMap((g) => [g.position.buffer, g.normal.buffer, g.color.buffer, g.index.buffer, ...(g.voxel ? [g.voxel.buffer] : [])]);
   scope.postMessage(done, buffers as Transferable[]);
 };

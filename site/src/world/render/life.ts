@@ -2,6 +2,8 @@ import * as THREE from "three";
 import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 import type { Life } from "../life/agents";
 import type { VehicleKind } from "../life/traffic";
+import { FINE } from "../buildings/kit";
+import { patchVoxelLook, voxelBox, withVoxelLook } from "./voxelLook";
 
 /**
  * Draws the inhabitants (life/agents.ts) with instanced meshes: a few draw calls for the whole
@@ -26,9 +28,12 @@ import type { VehicleKind } from "../life/traffic";
  *   dozen instances in all.
  */
 
-/** A box of size (w, h, d) whose base center (or, with `top`, top center) is at the origin, moved by (x, y, z). */
+/**
+ * A box of size (w, h, d) whose base center (or, with `top`, top center) is at the origin, moved by
+ * (x, y, z); drawn as fine voxels (render/voxelLook.ts).
+ */
 function box(w: number, h: number, d: number, x = 0, y = 0, z = 0, top = false) {
-  return new THREE.BoxGeometry(w, h, d).translate(x, y + (top ? -h / 2 : h / 2), z);
+  return voxelBox(new THREE.BoxGeometry(w, h, d), w, h, d, FINE).translate(x, y + (top ? -h / 2 : h / 2), z);
 }
 
 const material = () => new THREE.MeshStandardMaterial({ roughness: 0.85, metalness: 0 });
@@ -99,6 +104,11 @@ class Part {
   private readonly color = new THREE.Color();
 
   constructor(geometry: THREE.BufferGeometry, max: number, shadow = true, look: THREE.Material = material()) {
+    // Lit parts drawn as voxels; the lights stay clean.
+    if (look instanceof THREE.MeshStandardMaterial) {
+      look.onBeforeCompile = patchVoxelLook;
+      look.customProgramCacheKey = () => "life-voxel";
+    }
     this.mesh = new THREE.InstancedMesh(geometry, look, Math.max(1, max));
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.mesh.setColorAt(0, this.color);
@@ -232,7 +242,7 @@ export class LifeView {
     const frame = mergeGeometries([box(0.4, 9, 0.4, -3.4, 0, -1.6), box(0.4, 9, 0.4, 3.4, 0, -1.6), box(7.6, 0.4, 3.6, 0, 9, -0.6), box(6.4, 0.6, 1.2, 0, 2, -1.6)]);
     const pane = box(6.4, 5.4, 0.15, 0, 3.2, -1.75);
     const sign = box(0.3, 1.8, 1.8, 3.4, 9.6, -1.6);
-    const dark = new THREE.MeshStandardMaterial({ color: 0x2c3038, roughness: 0.6, metalness: 0.4 });
+    const dark = withVoxelLook(new THREE.MeshStandardMaterial({ color: 0x2c3038, roughness: 0.6, metalness: 0.4 }), "shelter-voxel");
     const glass = new THREE.MeshStandardMaterial({ color: 0x9fc4d6, roughness: 0.1, metalness: 0.2, transparent: true, opacity: 0.35 });
     const half = this.half;
     for (const st of life.traffic.stops) {

@@ -14,6 +14,9 @@ import { voxels } from "../scale";
 /** Meters → voxels, rounded to a quarter voxel so boxes line up. */
 export const m = (meters: number) => Math.round(voxels(meters) * 4) / 4;
 
+/** The fine voxel (a quarter voxel): what parts smaller than a voxel are drawn in (render/voxelLook.ts). */
+export const FINE = 0.25;
+
 /** One storey (3 m). */
 export const FLOOR = m(3);
 
@@ -119,7 +122,10 @@ export class Kit {
   box(x: number, y: number, z: number, w: number, h: number, d: number, color: Hex | RGB, faces = this.grounded ? ALL_BUT_BOTTOM : facesFor(y)) {
     if (this.clip) [x, z, w, d, faces] = this.cut(x, z, w, d, faces);
     if (w <= 0 || h <= 0 || d <= 0) return;
+    // Drawn as voxels if it is a voxel or more every way, else as fine voxels (a quarter voxel).
+    this.solid.cubes([x, y, z, w, h, d], Math.min(w, h, d) >= 0.9 ? 1 : FINE);
     put(this.solid, x, y, z, w, h, d, typeof color === "number" ? lin(color) : color, faces);
+    this.solid.cubes(null);
     this.top = Math.max(this.top, y + h);
   }
 

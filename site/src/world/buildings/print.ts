@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { patchVoxelLook } from "../render/voxelLook";
 import { FLOOR } from "./kit";
 
 /**
@@ -37,6 +38,8 @@ const ease = (t: number) => 1 - (1 - t) * (1 - t);
 
 function patch(glow: boolean, frame: { value: number }, clad: { value: number }, tint: { value: THREE.Vector4 }) {
   return (shader: THREE.WebGLProgramParametersWithUniforms) => {
+    // The walls drawn as voxels (render/voxelLook.ts); the lights stay clean.
+    if (!glow) patchVoxelLook(shader);
     shader.uniforms.uFrameTop = frame;
     shader.uniforms.uCladTop = clad;
     shader.uniforms.uScaffold = { value: SCAFFOLD };

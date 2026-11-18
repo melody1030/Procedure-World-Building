@@ -11,6 +11,11 @@ export interface GeometryData {
   normal: Float32Array;
   color: Float32Array;
   index: Uint32Array;
+  /**
+   * Per vertex, where it lies on its box's cubes (x, y, z in cubes from the box's corner, and 1),
+   * for the voxel look (render/voxelLook.ts); only from builders that were given boxes.
+   */
+  voxel?: Float32Array;
 }
 
 const linearCache = new Map<number, RGB>();
@@ -35,8 +40,26 @@ export class GeometryBuilder {
   private nor = new Float32Array(3 * 4096);
   private col = new Float32Array(3 * 4096);
   private idx = new Uint32Array(6 * 1024);
+  private vox: Float32Array | null = null;
   private v = 0;
   private i = 0;
+  /** The box the next quads belong to: its corner and cubes per unit along each axis (see `cubes`). */
+  private frame: number[] | null = null;
+
+  /**
+   * The quads from here on belong to the box at (x, y, z) of size (w, h, d), drawn as cubes of
+   * about `cell` (a whole number along each axis, so no cube is cut); null for none.
+   */
+  cubes(box: [number, number, number, number, number, number] | null, cell = 1) {
+    if (!box) {
+      this.frame = null;
+      return;
+    }
+    const [x, y, z, w, h, d] = box;
+    const per = (size: number) => Math.max(1, Math.round(size / cell)) / size;
+    this.frame = [x, y, z, per(w), per(h), per(d)];
+    this.vox ??= new Float32Array((this.pos.length / 3) * 4);
+  }
 
   private reserve(nv: number, ni: number) {
     if (this.v + nv > this.pos.length / 3) {
@@ -49,6 +72,7 @@ export class GeometryBuilder {
       this.pos = grow(this.pos, 3);
       this.nor = grow(this.nor, 3);
       this.col = grow(this.col, 3);
+      if (this.vox) this.vox = grow(this.vox, 4);
     }
     if (this.i + ni > this.idx.length) {
       const b = new Uint32Array(Math.max(this.idx.length * 2, this.i + ni));
@@ -78,6 +102,14 @@ export class GeometryBuilder {
       this.col[o] = rgb[0];
       this.col[o + 1] = rgb[1];
       this.col[o + 2] = rgb[2];
+      if (this.vox) {
+        const f = this.frame;
+        const q = (v + j) * 4;
+        this.vox[q] = f ? (c[j * 3] - f[0]) * f[3] : 0;
+        this.vox[q + 1] = f ? (c[j * 3 + 1] - f[1]) * f[4] : 0;
+        this.vox[q + 2] = f ? (c[j * 3 + 2] - f[2]) * f[5] : 0;
+        this.vox[q + 3] = f ? 1 : 0;
+      }
     }
     const i = this.i;
     this.idx[i] = v;
@@ -119,6 +151,7 @@ export class GeometryBuilder {
       normal: this.nor.slice(0, this.v * 3),
       color: this.col.slice(0, this.v * 3),
       index: this.idx.slice(0, this.i),
+      ...(this.vox ? { voxel: this.vox.slice(0, this.v * 4) } : {}),
     };
   }
 }

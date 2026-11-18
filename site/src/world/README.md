@@ -1967,3 +1967,19 @@ every seat was taken fell from 71 to 29.
 There were too many pigeons: 150, shared among the flocks (one at the plaza and one at each park's
 court), some 25 a flock on `blueprint`. Now there are 60 (`LIFE` in `index.tsx`), about 10 a
 flock.
+
+## 2026-11-18: The voxel look on everything
+
+Only the ground read as voxels: its shader draws a line round every cube and tints each a
+little, and nothing else had it. Now the buildings, the park props, the people, the animals and
+the vehicles have it too (`render/voxelLook.ts`; M1 of `docs/plans/voxel-look-plan.md`). Their
+shapes are unchanged.
+
+- Each vertex carries where it lies on its own box's cubes (`aVoxel`), so a building turned to
+  its lot or a walking person's swinging arm still shows cubes square to its own edges. A box is
+  a whole number of cubes along each axis: voxels for a box a voxel or more every way, fine
+  voxels (a quarter voxel, `FINE` in `buildings/kit.ts`) for smaller parts and for everything
+  alive.
+- The lines fade out where a cube covers fewer than about 4 pixels, as on the ground. The lights
+  (lit windows, neon, signs, headlights) stay clean.
+- Look › Grid sets the strength of both, the ground's and this.
