@@ -39,11 +39,14 @@ Blade signs (`pierSign`) hang centered on a pier or corner column, so they alway
 ## Keeping it free of flicker
 
 Two faces in the same plane flicker against each other (z-fighting). The kit avoids that by
-construction: parts that meet a wall stand `PROUD` (0.12 voxel) in front of it, bands stand in
+construction: parts that meet a wall stand `PROUD` (one fine voxel) in front of it, bands stand in
 front of the piers, corner columns twice as far and drawn once per corner, roof parapets sit on the
-slab, and neighbors never share a wall plane. Boxes off the ground draw their undersides; masses
-standing on something skip them. `findOverlaps(model)` reports what is left: under 0.5 m² on ten of the eleven, about 4 m² on the
-Vertical Neighborhood (not yet tracked down).
+slab, and neighbors never share a wall plane. Every box is snapped to the fine voxels, which puts
+some details back in the plane of what they sit on; so each face drawn is checked against the
+faces already in its plane, and where it overlaps one it is drawn a layer (0.02 voxel) in front
+(`Kit.layer`). Boxes off the ground draw their undersides; masses standing on something skip
+them. `findOverlaps(model)` reports what is left: under 1 m² a building on average, nearly all of
+it slivers a layer wide.
 
 ## Keeping parts from running into each other
 

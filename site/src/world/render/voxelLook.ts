@@ -6,11 +6,13 @@ import * as THREE from "three";
  * the people, the animals and the vehicles.
  *
  * The ground works its cubes out from the world position. Everything else turns and moves, so
- * each vertex carries where it lies on its own box's cubes instead (`aVoxel`: x, y, z in cubes
- * from the box's corner, and 1; 0 for none). A box is a whole number of cubes along each axis,
- * so none is cut: voxels (0.25 m) for a box a voxel or more every way, fine voxels (a quarter
- * voxel) for smaller parts (buildings/kit.ts, `GeometryBuilder.cubes`; `voxelBox` here for the
- * life models).
+ * each vertex carries where it lies on its cubes instead (`aVoxel`: x, y, z in cubes, and 1; 0
+ * for none):
+ * - a building or a park prop, on a grid from its own origin, every box snapped to it
+ *   (buildings/kit.ts, `GeometryBuilder.grid`), so neighboring boxes' cubes line up: voxels
+ *   (0.25 m) for a box a voxel or more every way, fine voxels (a quarter voxel) for smaller parts;
+ * - a part of a person, an animal or a vehicle, from its own box's corner, a whole number of fine
+ *   voxels along each axis (`voxelBox` here).
  *
  * On a face, the axis across it doesn't change, so it is skipped. The lines fade out where a
  * cube covers fewer than about 4 pixels, as on the ground, so nothing shimmers from afar.

@@ -262,8 +262,9 @@ export function massBoxes(lots: Lot[]): { lot: number; box: number[] }[] {
   for (const lot of lots) {
     if (!lot.body || !lot.grammar) continue;
     const [bx0, bz0, bx1, bz1] = lot.body.map(voxels);
-    const W = bx1 - bx0;
-    const D = bz1 - bz0;
+    // (As the grammar rounds them: whole voxels.)
+    const W = Math.round(bx1 - bx0);
+    const D = Math.round(bz1 - bz0);
     const plan = massing(lot.grammar.shape, W, D, lot.floors);
     const g = voxels(GROUND);
     const level = (j: number) => (j === 0 ? 0 : g + (j - 1) * voxels(STOREY));

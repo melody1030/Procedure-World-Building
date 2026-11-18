@@ -12,8 +12,8 @@ export interface GeometryData {
   color: Float32Array;
   index: Uint32Array;
   /**
-   * Per vertex, where it lies on its box's cubes (x, y, z in cubes from the box's corner, and 1),
-   * for the voxel look (render/voxelLook.ts); only from builders that were given boxes.
+   * Per vertex, where it lies on the cubes it is drawn as (x, y, z in cubes, and 1; 0 for none),
+   * for the voxel look (render/voxelLook.ts); only from builders that were given a grid.
    */
   voxel?: Float32Array;
 }
@@ -43,21 +43,19 @@ export class GeometryBuilder {
   private vox: Float32Array | null = null;
   private v = 0;
   private i = 0;
-  /** The box the next quads belong to: its corner and cubes per unit along each axis (see `cubes`). */
+  /** The grid the next quads are drawn on: its origin and cubes per unit along each axis (see `grid`). */
   private frame: number[] | null = null;
 
   /**
-   * The quads from here on belong to the box at (x, y, z) of size (w, h, d), drawn as cubes of
-   * about `cell` (a whole number along each axis, so no cube is cut); null for none.
+   * The quads from here on are drawn as cubes of side `cell` on a grid from the builder's own origin
+   * (before `place` turns and moves them), so neighboring boxes' cubes line up; 0 for none.
    */
-  cubes(box: [number, number, number, number, number, number] | null, cell = 1) {
-    if (!box) {
+  grid(cell: number) {
+    if (!cell) {
       this.frame = null;
       return;
     }
-    const [x, y, z, w, h, d] = box;
-    const per = (size: number) => Math.max(1, Math.round(size / cell)) / size;
-    this.frame = [x, y, z, per(w), per(h), per(d)];
+    this.frame = [0, 0, 0, 1 / cell, 1 / cell, 1 / cell];
     this.vox ??= new Float32Array((this.pos.length / 3) * 4);
   }
 

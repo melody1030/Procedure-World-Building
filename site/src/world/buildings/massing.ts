@@ -1,4 +1,4 @@
-import { m, type Side } from "./kit";
+import { m, whole, type Side } from "./kit";
 
 /**
  * The building grammar's massing (docs/plans/building-grammar-plan.md, M3): the footprint's plan
@@ -55,7 +55,8 @@ const MIN_WING = 6;
 const MIN_COURT = 4;
 const MIN_PLAN = 6;
 
-const quarter = (v: number) => Math.floor(v * 4) / 4;
+/** Down to a whole voxel: the stages' plans stay on the voxels' grid. */
+const down = (v: number) => Math.floor(v);
 
 /** Stepped rises in this many stages, each this far back from the one below (meters). */
 export const STEPPED_STAGES = 3;
@@ -71,10 +72,10 @@ export const STEPPED_SETBACK = 2;
  */
 export function massing(shape: Shape, W: number, D: number, floors: number): Massing {
   // The wings' depth, then whether the court shape fits; if not, a bar.
-  let wing = m(Math.min(12, Math.max(MIN_WING, Math.round(Math.min(W, D) * 0.25 * 0.35 * 2) / 2)));
+  let wing = whole(Math.min(12, Math.max(MIN_WING, Math.round(Math.min(W, D) * 0.25 * 0.35 * 2) / 2)));
   const fits = (t: number) =>
     shape === "l" ? W >= t + m(MIN_COURT) && D >= t + m(MIN_COURT) : shape === "u" ? W >= 2 * t + m(MIN_COURT) && D >= t + m(MIN_COURT) : true;
-  if (!fits(wing)) wing = m(MIN_WING);
+  if (!fits(wing)) wing = whole(MIN_WING);
   const built: Shape = fits(wing) ? shape : "bar";
   const setback = m(STEPPED_SETBACK);
 
@@ -91,7 +92,7 @@ export function massing(shape: Shape, W: number, D: number, floors: number): Mas
   let prev = 0;
   for (let i = 0; i < count; i++) {
     const j1 = j0 + split[i];
-    const want = quarter(Math.max(0, Math.min(most, i * setback)));
+    const want = down(Math.max(0, Math.min(most, i * setback)));
     const inset = want - prev < m(1) ? prev : want;
     prev = inset;
     stages.push({ rects: plan(built, W, D, wing, inset), j0, j1, inset });

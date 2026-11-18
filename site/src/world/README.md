@@ -2015,3 +2015,26 @@ still:
 | `neon7` | 29% | 29% (no ring: one street joins) | — |
 
 No vehicle's body came inside the Landmark's footprint.
+
+## 2026-11-18: The buildings on the grid
+
+The buildings had the voxel look, but their boxes fell anywhere: a wall 20.3 voxels wide, a
+frame standing 0.12 voxel proud of it. Now every box is on the grid (`buildings/kit.ts`), as the
+ground is, so the lines drawn on them run on from box to box:
+
+- **Masses on whole voxels.** Footprints, wings, storeys, ground floors and parapets are rounded to
+  whole voxels (`whole()` in `buildings/grammar.ts`, `massing.ts` and `block.ts`).
+- **Every box on fine voxels.** `Kit.box` and `Kit.light` move each face of a box to the nearest
+  fine voxel (a quarter voxel); a box thinner than one is one thick. `PROUD`, the step a part
+  stands out from a wall, is now one fine voxel (was 0.12 voxel).
+- **One grid per building.** The cubes are counted from the building's own origin, not from each
+  box's corner (`GeometryBuilder.grid`), so neighboring boxes' cubes line up.
+- **No flicker from it.** Snapped to the grid, many details landed in the plane of the wall,
+  frame or pane drawn before them: the flicker check (`findOverlaps`) went from 20 m² to 3,300 m²
+  over the eleven archetypes × 8 seeds. So each face drawn is checked against the faces already in
+  its plane, looking the same way, and where it overlaps one it is drawn a layer (0.02 voxel, about
+  4 mm) in front of the frontmost it overlaps, at most five layers: the later part, the detail,
+  shows. Now 70 m², nearly all of it slivers a layer wide along the sides of parts that moved out.
+
+Building a building now takes about 6 ms instead of 2 (the layer check); the parts never run into
+each other (`findClashes` stays at zero).

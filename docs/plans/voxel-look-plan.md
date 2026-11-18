@@ -1,6 +1,6 @@
 # Plan: everything in voxels
 
-**Drafted 2026-11-18. M1 built 2026-11-18; M2–M6 to come.** Only the ground reads as voxels; the buildings, the park
+**Drafted 2026-11-18. M1–M2 built 2026-11-18; M3–M6 to come.** Only the ground reads as voxels; the buildings, the park
 props, the people, the animals and the vehicles read as smooth boxes. This plan makes all of it
 read as the same voxel world.
 
@@ -71,6 +71,13 @@ time was not measured (the browser pane runs at about 1 fps).
   rounds to a quarter voxel, so mostly it is the odd `PROUD` offsets and the `FIGURE_SCALE`
   products.
 - Check the grammar's clash checks (`buildings/overlaps.ts`) and the Simulation page still pass.
+
+**Built 2026-11-18.** Every box is snapped to the fine voxels in `Kit.box` and `Kit.light`, so no
+part needed its own rounding; masses use `whole()`. The cubes are counted from each building's
+origin. Snapping put many details in the plane of what they sit on, so a face that overlaps one
+already in its plane is drawn a layer (0.02 voxel) in front of it. The flicker check is at 70 m²
+over 88 test buildings (20 before, 3,300 snapped without layers); the clash check stays at zero; a
+building takes about 6 ms to build instead of 2.
 
 ## M3. People and animals as voxel models
 

@@ -13,6 +13,8 @@ import { voxels } from "../scale";
 
 /** Meters → voxels, rounded to a quarter voxel so boxes line up. */
 export const m = (meters: number) => Math.round(voxels(meters) * 4) / 4;
+/** Meters → whole voxels: the masses (footprints, storeys, wings) stand on the voxels' grid (render/voxelLook.ts). */
+export const whole = (meters: number) => Math.round(voxels(meters));
 
 /** The fine voxel (a quarter voxel): what parts smaller than a voxel are drawn in (render/voxelLook.ts). */
 export const FINE = 0.25;
@@ -72,9 +74,21 @@ const facesFor = (y: number) => (y > 0.01 ? ALL : ALL_BUT_BOTTOM);
 
 /**
  * The gap that keeps two surfaces out of the same plane, in voxels. Parts that meet a wall stand
- * this far proud of it, so no two faces ever share a plane and flicker against each other.
+ * this far proud of it, so no two faces ever share a plane and flicker against each other: one
+ * fine voxel, so they stay on the grid.
  */
-export const PROUD = 0.12;
+export const PROUD = 0.25;
+/**
+ * Snapped to the grid, a detail often ends in the same plane as the wall, frame or pane drawn
+ * before it, and the two would flicker against each other. So each face drawn is checked against
+ * the faces already in its plane, looking the same way: where it overlaps one, it is drawn a LAYER
+ * in front of the frontmost it overlaps, the box growing out to it. The later part (the detail)
+ * shows. In voxels; at most LAYERS deep.
+ */
+const LAYER = 0.02;
+const LAYERS = 5;
+/** The squares faces are filed in, by plane, for the LAYER check (voxels). */
+const BIN = 8;
 
 export class Kit {
   readonly solid = new GeometryBuilder();
@@ -93,6 +107,8 @@ export class Kit {
   clip: [number, number, number, number] | null = null;
   /** Cuts so far: each is pulled in by its own hair, so no two cut faces share a plane. */
   private cuts = 0;
+  /** Faces drawn so far, by plane, the way they look and square (see BIN): [u0, u1, v0, v1, layer] each (see LAYER). */
+  private planes = new Map<number, Map<number, number[][]>>();
   /**
    * Space taken by things fixed to facades, as world boxes [x0, y0, z0, x1, y1, z1] with what
    * they are, so signs and screens can find room that doesn't run into them.
@@ -120,19 +136,84 @@ export class Kit {
 
   /** A box at (x, y, z) of size (w, h, d), into the solid bucket. */
   box(x: number, y: number, z: number, w: number, h: number, d: number, color: Hex | RGB, faces = this.grounded ? ALL_BUT_BOTTOM : facesFor(y)) {
+    if (w <= 0 || h <= 0 || d <= 0) return;
+    [x, y, z, w, h, d] = this.snap(x, y, z, w, h, d);
     if (this.clip) [x, z, w, d, faces] = this.cut(x, z, w, d, faces);
     if (w <= 0 || h <= 0 || d <= 0) return;
     // Drawn as voxels if it is a voxel or more every way, else as fine voxels (a quarter voxel).
-    this.solid.cubes([x, y, z, w, h, d], Math.min(w, h, d) >= 0.9 ? 1 : FINE);
+    const cell = Math.min(w, h, d) >= 0.9 ? 1 : FINE;
+    [x, y, z, w, h, d] = this.layer(x, y, z, w, h, d, faces);
+    this.solid.grid(cell);
     put(this.solid, x, y, z, w, h, d, typeof color === "number" ? lin(color) : color, faces);
-    this.solid.cubes(null);
+    this.solid.grid(0);
     this.top = Math.max(this.top, y + h);
+  }
+
+  /** A box on the fine voxels' grid: each face moved to the nearest fine voxel (a box thinner than one is one thick). */
+  private snap(x: number, y: number, z: number, w: number, h: number, d: number): [number, number, number, number, number, number] {
+    const on = (a: number, s: number): [number, number] => {
+      const a0 = Math.round(a / FINE) * FINE;
+      return [a0, Math.max(FINE, Math.round((a + s) / FINE) * FINE - a0)];
+    };
+    const [sx, sw] = on(x, w);
+    const [sy, sh] = on(y, h);
+    const [sz, sd] = on(z, d);
+    return [sx, sy, sz, sw, sh, sd];
+  }
+
+  /**
+   * A box grown out of each drawn face that overlaps one already in its plane (see LAYER). (Growing
+   * a face widens the faces beside it by a LAYER or so; those slivers are left, as finding them
+   * again pushes long bands to the back of every layer.)
+   */
+  private layer(x: number, y: number, z: number, w: number, h: number, d: number, faces: number): [number, number, number, number, number, number] {
+    const lo = [x, y, z];
+    const hi = [x + w, y + h, z + d];
+    const out = [...lo, ...hi];
+    for (let axis = 0; axis < 3; axis++) {
+      const [u, v] = axis === 0 ? [1, 2] : axis === 1 ? [0, 2] : [0, 1];
+      for (const up of [true, false]) {
+        // Bits follow `put`: +x 1, −x 2, +y 4, −y 8, +z 16, −z 32.
+        if (!(faces & (1 << (axis * 2 + (up ? 0 : 1))))) continue;
+        const plane = Math.round((up ? hi : lo)[axis] * 1000) * 8 + axis * 2 + (up ? 1 : 0);
+        const rect = [lo[u], hi[u], lo[v], hi[v], 0];
+        // The plane in squares of BIN voxels, so a face is checked only against the faces near it;
+        // a face over more than a few squares (a wall) goes in the plane's list of large ones (key -1).
+        let squares = this.planes.get(plane);
+        if (!squares) this.planes.set(plane, (squares = new Map([[-1, []]])));
+        const i0 = Math.floor(rect[0] / BIN);
+        const i1 = Math.floor(rect[1] / BIN);
+        const j0 = Math.floor(rect[2] / BIN);
+        const j1 = Math.floor(rect[3] / BIN);
+        const larges = squares.get(-1)!;
+        rect[4] = above(larges, rect, 0);
+        if ((i1 - i0 + 1) * (j1 - j0 + 1) > 4) larges.push(rect);
+        else {
+          for (let i = i0; i <= i1; i++) {
+            for (let j = j0; j <= j1; j++) {
+              const square = (i + 1024) * 2048 + j + 1024;
+              const list = squares.get(square);
+              if (list) {
+                rect[4] = above(list, rect, rect[4]);
+                list.push(rect);
+              } else squares.set(square, [rect]);
+            }
+          }
+        }
+        if (up) out[axis + 3] += rect[4] * LAYER;
+        else out[axis] -= rect[4] * LAYER;
+      }
+    }
+    return [out[0], out[1], out[2], out[3] - out[0], out[4] - out[1], out[5] - out[2]];
   }
 
   /** A box into the glow bucket. `strength` dims it (0–1) without changing its hue. */
   light(x: number, y: number, z: number, w: number, h: number, d: number, color: Hex, strength = 1, faces = facesFor(y)) {
+    if (w <= 0 || h <= 0 || d <= 0) return;
+    [x, y, z, w, h, d] = this.snap(x, y, z, w, h, d);
     if (this.clip) [x, z, w, d, faces] = this.cut(x, z, w, d, faces);
     if (w <= 0 || h <= 0 || d <= 0) return;
+    [x, y, z, w, h, d] = this.layer(x, y, z, w, h, d, faces);
     put(this.glow, x, y, z, w, h, d, shade(lin(color), strength), faces);
     this.top = Math.max(this.top, y + h);
   }
@@ -159,6 +240,12 @@ export class Kit {
   finish(): { solid: GeometryData; glow: GeometryData } {
     return { solid: this.solid.finish(), glow: this.glow.finish() };
   }
+}
+
+/** The layer a face [u0, u1, v0, v1, layer] goes on: in front of every face in `list` it overlaps, and of `layer`. */
+function above(list: number[][], rect: number[], layer: number) {
+  for (const r of list) if (r[0] < rect[1] - 1e-3 && r[1] > rect[0] + 1e-3 && r[2] < rect[3] - 1e-3 && r[3] > rect[2] + 1e-3) layer = Math.max(layer, Math.min(r[4] + 1, LAYERS));
+  return layer;
 }
 
 /** Faces: +x, −x, +y, −y, +z, −z as bits 0–5. */

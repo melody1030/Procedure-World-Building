@@ -1,5 +1,5 @@
 import { tierOf, type BuildingModel, type Tier } from "./config";
-import { FLOOR, Kit, PAL, PROUD, m, sideBounds, sideBox, sides, type Hex, type Side } from "./kit";
+import { FLOOR, Kit, PAL, PROUD, m, sideBounds, sideBox, sides, whole, type Hex, type Side } from "./kit";
 import { antenna, billboard, dish, duct, garden, helipad, hvac, machine, solar, stairHut, tank } from "./parts";
 import { massing, outline, reach, stretches, SHAPES, type Edge, type Rect, type Shape } from "./massing";
 import { VOXEL_M } from "../scale";
@@ -402,8 +402,9 @@ export function buildGrammar(
   const start = performance.now();
   const p = validateGrammar(params);
   const k = new Kit(seed ^ 0x6a17);
-  const W = m(p.frontage);
-  const D = m(p.depth);
+  // The masses on whole voxels (render/voxelLook.ts).
+  const W = whole(p.frontage);
+  const D = whole(p.depth);
   // The room, in the plan's voxels (the street at +z), and how far out from an edge's line it reaches.
   const room: [number, number, number, number] | null = clearance
     ? [-m(clearance.left), -m(clearance.back), W + m(clearance.right), D + m(clearance.front)]
@@ -411,9 +412,9 @@ export function buildGrammar(
   k.clip = room;
   const roomOut = (e: Edge) =>
     !room ? Infinity : e.dir === 0 ? room[3] - e.line : e.dir === 1 ? room[2] - e.line : e.dir === 2 ? e.line - room[1] : e.line - room[0];
-  const gh = m(p.groundFloor);
+  const gh = whole(p.groundFloor);
   const H = gh + (p.floors - 1) * FLOOR;
-  const parapet = m(p.parapet);
+  const parapet = whole(p.parapet);
   const counts = { windows: 0, lit: 0 };
   // Floor j's foot and head.
   const foot = (j: number) => (j === 0 ? 0 : gh + (j - 1) * FLOOR);
