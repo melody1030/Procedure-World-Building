@@ -4,6 +4,7 @@ import type { Life } from "../life/agents";
 import type { VehicleKind } from "../life/traffic";
 import { FINE } from "../buildings/kit";
 import { patchVoxelLook, voxelBox, withVoxelLook } from "./voxelLook";
+import { VoxelModel } from "./voxelModel";
 
 /**
  * Draws the inhabitants (life/agents.ts) with instanced meshes: a few draw calls for the whole
@@ -18,6 +19,9 @@ import { patchVoxelLook, voxelBox, withVoxelLook } from "./voxelLook";
  *   ground and their hands on their knees; hailing a taxi, they hold a glowing phone up.
  * - Pigeons: they bob as they peck; flying, they beat their wings and pitch with the climb.
  * - Cats: they crouch to stalk, stretch out to sprint, and sit up to rest.
+ * The animals, vehicles, bins and shelters are voxel models (render/voxelModel.ts) on the fine
+ * voxels, colored per cube and tinted per instance; the people are boxes, each drawn as fine voxels.
+ *
  * - Vehicles (life/traffic.ts): kei cars, vans, taxis and community buses, pitched with the street.
  *   Headlights always on, tail lights flaring when they brake; a taxi's roof light is lit while it
  *   is free; a bus's windows are lit from inside and its door lights up while it stands open.
@@ -39,7 +43,8 @@ function box(w: number, h: number, d: number, x = 0, y = 0, z = 0, top = false) 
 const material = () => new THREE.MeshStandardMaterial({ roughness: 0.85, metalness: 0 });
 /** Unlit, for what glows (lights, signs, lit windows). */
 const glow = () => new THREE.MeshBasicMaterial();
-const paint = () => new THREE.MeshStandardMaterial({ roughness: 0.45, metalness: 0.25 });
+/** Matte, as the ground and buildings are. */
+const paint = () => new THREE.MeshStandardMaterial({ roughness: 0.8, metalness: 0.05 });
 const GLASS = 0x1a2029;
 const HEADLIGHT = 0xfff1d0;
 const TAIL = 0x6e1414;
@@ -53,47 +58,164 @@ const BIN_EMPTY = new THREE.Color(0x2f6b4a);
 const BIN_FULL = new THREE.Color(0xa0522d);
 const BAGS = [0x1c1e22, 0x2d3a2a, 0x3a3d44];
 
-/** A vehicle's shell and glass (voxels; +z is its front, its right is -x), its wheels (x, z), and its lights' height. */
+/**
+ * A vehicle (fine voxels, render/voxelModel.ts; +z is its front, its right is -x): its shell in
+ * its paint, with the wheels, bumpers and trim shaded into it; its glass; and for a bus, its lit
+ * windows, door and destination sign. `lamp` is where its lights go: across (±x), up, and its
+ * front end (the lights stand just out of it), in voxels.
+ */
 interface Model {
   shell: THREE.BufferGeometry;
   glass: THREE.BufferGeometry;
-  wheels: [number, number][];
-  lights: number;
+  windows?: THREE.BufferGeometry;
+  door?: THREE.BufferGeometry;
+  sign?: THREE.BufferGeometry;
+  lamp: { x: number; y: number; z: number };
+}
+
+/** Shades of the paint, and the dark parts every vehicle has. */
+const TRIM = 0x6a6a6a;
+const SKIRT = 0xb4b4b4;
+const TIRE = 0x161616;
+const HUB = 0x5a5a5a;
+
+/** A vehicle `w` × `l` fine voxels on four wheels, the axles at `axles` (z), `h` high to the wheel tops. */
+function chassis(w: number, l: number, axles: number[], h: number) {
+  const v = new VoxelModel();
+  /** The wheels (a hub on the outside) and the bumpers, over the body once it is filled in. */
+  const wheels = () => {
+    for (const z of axles) {
+      for (const x of [0, w - 3]) {
+        v.fill(x, 0, z - 4, x + 3, h, z + 4, TIRE);
+        v.fill(x ? x + 2 : x, Math.floor(h / 2) - 1, z - 1, x ? x + 3 : x + 1, Math.floor(h / 2) + 1, z + 1, HUB);
+      }
+    }
+    v.fill(1, 3, 0, w - 1, 6, 1, TRIM);
+    v.fill(1, 3, l - 1, w - 1, 6, l, TRIM);
+  };
+  return { v, wheels };
 }
 
 function models(): Record<VehicleKind, Model> {
-  // A kei car: low body, a cabin set back, glass round it.
-  const car: Model = {
-    shell: mergeGeometries([box(5.6, 2.4, 13.6, 0, 0.9, 0), box(5.2, 2.4, 7.4, 0, 3.3, -0.8)]),
-    glass: box(5.3, 1.6, 7.5, 0, 3.6, -0.8),
-    wheels: [-1, 1].flatMap((x) => [-1, 1].map((z): [number, number] => [x * 2.45, z * 4.3])),
-    lights: 2.3,
+  const model = (v: VoxelModel, w: number, l: number, lampY: number, extras = false): Model => {
+    const o: [number, number, number] = [w / 2, 0, l / 2];
+    return {
+      shell: v.mesh("solid", o),
+      glass: v.mesh("glass", o),
+      ...(extras ? { windows: v.mesh("window", o), door: v.mesh("door", o), sign: v.mesh("sign", o) } : {}),
+      lamp: { x: (w / 2 - 3) * FINE, y: lampY * FINE, z: (l / 2) * FINE },
+    };
   };
-  return {
-    car,
-    taxi: car,
-    // A box van, windscreen and cab windows at the front.
-    van: {
-      shell: box(6.4, 6.2, 16.8, 0, 0.9, 0),
-      glass: box(6.5, 1.9, 6.2, 0, 4.4, 5.35),
-      wheels: [-1, 1].flatMap((x) => [-1, 1].map((z): [number, number] => [x * 2.85, z * 5.6])),
-      lights: 2.6,
-    },
-    // A garbage truck: a cab with its windscreen, and the compactor body behind it.
-    truck: {
-      shell: mergeGeometries([box(6.4, 6.2, 6, 0, 0.9, 6.9), box(6.8, 8.4, 13.4, 0, 0.9, -3.2)]),
-      glass: box(6.5, 2.2, 5.2, 0, 4.4, 7.1),
-      wheels: [-1, 1].flatMap((x) => [-1, 1].map((z): [number, number] => [x * 3, z * 6.4])),
-      lights: 2.6,
-    },
-    // A community bus: a long box with a roof, its windows (lit) drawn separately.
-    bus: {
-      shell: mergeGeometries([box(6.6, 9.4, 24, 0, 1, 0), box(6.0, 0.6, 19, 0, 10.4, -0.5)]),
-      glass: box(6.0, 4.4, 0.2, 0, 4.8, 12.02),
-      wheels: [-1, 1].flatMap((x) => [-1, 1].map((z): [number, number] => [x * 2.9, z * 8.2])),
-      lights: 2.8,
-    },
-  };
+
+  // A kei car, 22 × 54: a low body, a cabin set back, glass round it.
+  const car = (() => {
+    const { v, wheels } = chassis(22, 54, [12, 42], 7);
+    v.fill(0, 3, 0, 22, 12, 54);
+    v.fill(0, 3, 1, 22, 4, 53, SKIRT);
+    v.fill(1, 12, 9, 21, 21, 39);
+    // Side windows (a pillar in the middle), the windscreen and the back window.
+    for (const x of [1, 20]) v.fill(x, 14, 11, x + 1, 20, 23, 0xffffff, "glass").fill(x, 14, 25, x + 1, 20, 37, 0xffffff, "glass");
+    v.fill(2, 14, 38, 20, 20, 39, 0xffffff, "glass");
+    v.fill(2, 14, 9, 20, 20, 10, 0xffffff, "glass");
+    wheels();
+    return model(v, 22, 54, 8);
+  })();
+
+  // A box van, 26 × 67: windscreen and cab windows at the front, a seam down the back doors.
+  const van = (() => {
+    const { v, wheels } = chassis(26, 67, [14, 53], 8);
+    v.fill(0, 3, 0, 26, 28, 67);
+    v.fill(0, 3, 1, 26, 4, 66, SKIRT);
+    v.fill(12, 5, 0, 14, 26, 1, TRIM);
+    v.fill(2, 17, 66, 24, 24, 67, 0xffffff, "glass");
+    v.fill(0, 17, 53, 1, 24, 64, 0xffffff, "glass").fill(25, 17, 53, 26, 24, 64, 0xffffff, "glass");
+    wheels();
+    return model(v, 26, 67, 10);
+  })();
+
+  // A garbage truck, 27 × 80: a cab with its windscreen, the chassis, the compactor body behind.
+  const truck = (() => {
+    const { v, wheels } = chassis(27, 80, [13, 65], 9);
+    v.fill(1, 3, 56, 26, 28, 80);
+    v.fill(3, 3, 54, 24, 8, 56, TRIM);
+    v.fill(0, 3, 0, 27, 37, 54);
+    v.fill(0, 9, 1, 27, 11, 53, SKIRT);
+    v.fill(0, 3, 0, 27, 20, 2, TRIM);
+    v.fill(3, 17, 79, 24, 25, 80, 0xffffff, "glass");
+    v.fill(1, 17, 66, 2, 25, 77, 0xffffff, "glass").fill(25, 17, 66, 26, 25, 77, 0xffffff, "glass");
+    wheels();
+    return model(v, 27, 80, 10);
+  })();
+
+  // A community bus, 26 × 96: a long box with a roof; its windows along both sides and the back,
+  // lit from inside, with pillars between; its front door on its right; the windscreen, and the
+  // destination sign above it.
+  const bus = (() => {
+    const { v, wheels } = chassis(26, 96, [15, 81], 9);
+    v.fill(0, 4, 0, 26, 42, 96);
+    v.fill(2, 42, 6, 24, 44, 90);
+    v.fill(0, 4, 1, 26, 5, 95, SKIRT);
+    for (const x of [0, 25]) for (let z = 6; z < 86; z += 10) v.fill(x, 22, z + 1, x + 1, 35, z + 10, 0xffffff, "window");
+    v.fill(3, 22, 0, 23, 35, 1, 0xffffff, "window");
+    v.fill(0, 6, 71, 1, 36, 85, 0xffffff, "door");
+    v.fill(2, 18, 95, 24, 34, 96, 0xffffff, "glass");
+    v.fill(4, 35, 95, 22, 40, 96, 0xffffff, "sign");
+    wheels();
+    return model(v, 26, 96, 11, true);
+  })();
+
+  return { car, taxi: car, van, bus, truck };
+}
+
+/** A pigeon, 3 × 8 fine voxels and 6 high: body, folded wings, tail, pink feet, a green sheen at the neck, eyes and beak. */
+function pigeon() {
+  const v = new VoxelModel();
+  v.fill(0, 1, 0, 3, 3, 5);
+  for (const x of [0, 2]) v.fill(x, 2, 1, x + 1, 3, 4, 0x9a9a9a).fill(x, 0, 2, x + 1, 1, 3, 0xd07080);
+  v.fill(0, 2, -2, 3, 3, 0, 0x8a8a8a);
+  v.fill(0, 3, 3, 3, 4, 5, 0x9ad0b0);
+  v.fill(0, 4, 3, 3, 6, 5);
+  for (const x of [0, 2]) v.fill(x, 4, 4, x + 1, 5, 5, 0x202020);
+  v.fill(1, 4, 5, 2, 5, 6, 0x505050);
+  return v.mesh("solid", [1.5, 0, 2.5]);
+}
+
+/** A pigeon's wing, out from the shoulder along +x, its tip darker. */
+function wing() {
+  return new VoxelModel().fill(0, 0, 0, 5, 1, 3).fill(3, 0, 0, 5, 1, 3, 0xa0a0a0).mesh("solid", [0, 0.5, 1.5]);
+}
+
+/** A cat, 3 × 11 fine voxels: legs, a striped back, the head with ears, eyes and nose, the tail up behind. */
+function cat() {
+  const v = new VoxelModel();
+  for (const x of [0, 2]) for (const z of [1, 5]) v.fill(x, 0, z, x + 1, 2, z + 1);
+  v.fill(0, 2, 0, 3, 4, 7);
+  for (const z of [1, 3, 5]) v.fill(0, 3, z, 3, 4, z + 1, 0x9a9a9a);
+  v.fill(0, 3, 7, 3, 6, 10);
+  for (const x of [0, 2]) v.fill(x, 6, 7, x + 1, 7, 8).fill(x, 5, 9, x + 1, 6, 10, 0x262626);
+  v.fill(1, 4, 9, 2, 5, 10, 0xd08080);
+  v.fill(1, 3, -1, 2, 7, 0).fill(1, 7, -2, 2, 8, -1);
+  return v.mesh("solid", [1.5, 0, 3.5]);
+}
+
+/** A wheelie bin, 10 × 10 fine voxels and 14 high: a band near the top, the lid over it, two wheels and a handle at the back (-z). */
+function bin() {
+  const v = new VoxelModel();
+  v.fill(0, 0, 0, 10, 12, 10);
+  v.fill(0, 10, 0, 10, 11, 10, 0xb4b4b4);
+  v.fill(-1, 12, 0, 11, 14, 11, 0xc8c8c8);
+  v.fill(1, 12, -1, 9, 13, 0, TRIM);
+  for (const x of [0, 8]) v.fill(x, 0, -1, x + 2, 2, 1, TIRE);
+  return v.mesh("solid", [5, 0, 5]);
+}
+
+/** A pile of three bags, each tied at the top. */
+function pile() {
+  const v = new VoxelModel();
+  v.fill(-9, 0, -4, -1, 7, 4).fill(-6, 7, -1, -4, 8, 1);
+  v.fill(0, 0, -3, 8, 6, 6).fill(3, 6, 1, 5, 7, 3);
+  v.fill(-4, 5, -3, 3, 11, 4).fill(-1, 11, 0, 1, 12, 2);
+  return v.mesh("solid", [0, 0, 0]);
 }
 
 const KINDS: VehicleKind[] = ["car", "taxi", "van", "bus", "truck"];
@@ -109,6 +231,8 @@ class Part {
       look.onBeforeCompile = patchVoxelLook;
       look.customProgramCacheKey = () => "life-voxel";
     }
+    // A voxel model's colors, times the instance's.
+    if (geometry.getAttribute("color")) (look as THREE.MeshStandardMaterial).vertexColors = true;
     this.mesh = new THREE.InstancedMesh(geometry, look, Math.max(1, max));
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.mesh.setColorAt(0, this.color);
@@ -163,7 +287,6 @@ export class LifeView {
   private readonly shells = {} as Record<VehicleKind, Part>;
   private readonly glasses = {} as Record<VehicleKind, Part>;
   private readonly models = models();
-  private readonly wheel: Part;
   private readonly lamp: Part;
   private readonly taxiSign: Part;
   private readonly windows: Part;
@@ -193,21 +316,9 @@ export class LifeView {
     // voxels up) clear of the seat's front edge.
     this.seatedLeg = new Part(mergeGeometries([box(0.58, 0.6, 1.7, 0, 0, 0.6), box(0.56, 2.5, 0.6, 0, 0.6, 1.2, true)]), people * 2);
     const birds = life.pigeons.length;
-    // Body, head and tail; and a wing, out from the shoulder along +x.
-    this.pigeon = new Part(mergeGeometries([box(0.55, 0.5, 1, 0, 0.25, 0), box(0.38, 0.4, 0.4, 0, 0.6, 0.55), box(0.4, 0.12, 0.5, 0, 0.45, -0.7)]), birds);
-    this.wing = new Part(box(1.3, 0.08, 0.6, 0.65, 0, 0), birds * 2);
-    // Legs, body, head with ears, and the tail up behind.
-    this.cat = new Part(
-      mergeGeometries([
-        ...[-1, 1].flatMap((sx) => [-1, 1].map((sz) => box(0.22, 0.6, 0.22, sx * 0.22, 0, sz * 0.65))),
-        box(0.7, 0.55, 1.8, 0, 0.55, 0),
-        box(0.7, 0.6, 0.6, 0, 0.9, 1.05),
-        box(0.16, 0.22, 0.16, -0.22, 1.5, 1.0),
-        box(0.16, 0.22, 0.16, 0.22, 1.5, 1.0),
-        box(0.16, 1.1, 0.16, 0, 0.9, -0.95),
-      ]),
-      life.cats.length,
-    );
+    this.pigeon = new Part(pigeon(), birds);
+    this.wing = new Part(wing(), birds * 2);
+    this.cat = new Part(cat(), life.cats.length);
     this.phone = new Part(box(0.4, 0.65, 0.12), people, false, glow());
     // Vehicles: a shell and glass per kind; wheels, lamps and the rest shared.
     const traffic = life.traffic;
@@ -218,30 +329,37 @@ export class LifeView {
     }
     const fleet = traffic.vehicles.length;
     const buses = count("bus");
-    this.wheel = new Part(box(1, 2, 2), fleet * 4, true, new THREE.MeshStandardMaterial({ color: 0x15161a, roughness: 0.9 }));
-    this.lamp = new Part(box(1.1, 0.6, 0.15), fleet * 4, false, glow());
-    this.taxiSign = new Part(box(2.2, 0.8, 1), count("taxi"), false, glow());
-    // The bus's windows, lit from inside, along both sides and the back; its front door, on its right.
-    this.windows = new Part(box(6.66, 3.2, 20, 0, 5.6, -0.6), buses, false, glow());
-    this.door = new Part(box(0.12, 7.4, 3.4, -3.32, 1.4, 7.6), buses, false, glow());
-    this.destination = new Part(box(4.4, 1, 0.15, 0, 8.4, 12.05), buses, false, glow());
-    // A wheelie bin with its lid; a pile of three bags.
-    this.bin = new Part(mergeGeometries([box(2.4, 3.2, 2.4), box(2.6, 0.4, 2.7, 0, 3.2, 0)]), life.waste.bins.length);
-    this.pile = new Part(mergeGeometries([box(2.2, 1.8, 2, -1.2, 0, 0), box(2, 1.6, 2.2, 1.1, 0, 0.4), box(1.8, 1.5, 1.8, 0, 1.4, 0.2)]), Math.min(life.waste.bins.length, 6));
+    // A light, 3 × 2 fine voxels and one deep, standing out of the vehicle's end from the origin.
+    this.lamp = new Part(new VoxelModel().fill(0, 0, 0, 3, 2, 1).mesh("solid", [1.5, 0, 0]), fleet * 4, false, glow());
+    this.taxiSign = new Part(new VoxelModel().fill(0, 0, 0, 8, 3, 4).mesh("solid", [4, 0, 2]), count("taxi"), false, glow());
+    // The bus's windows, lit from inside, its front door and its destination sign (in the bus's model).
+    const bus = this.models.bus;
+    this.windows = new Part(bus.windows!, buses, false, glow());
+    this.door = new Part(bus.door!, buses, false, glow());
+    this.destination = new Part(bus.sign!, buses, false, glow());
+    this.bin = new Part(bin(), life.waste.bins.length);
+    this.pile = new Part(pile(), Math.min(life.waste.bins.length, 6));
     this.buildShelters(life);
     for (const p of [this.torso, this.head, this.hair, this.leg, this.arm, this.seatedLeg, this.pigeon, this.wing, this.cat, ...this.vehicleParts()]) this.group.add(p.mesh);
     this.group.add(this.shelters);
   }
 
   private vehicleParts(): Part[] {
-    return [this.phone, ...KINDS.flatMap((k) => [this.shells[k], this.glasses[k]]).filter((p, i, a) => a.indexOf(p) === i), this.wheel, this.lamp, this.taxiSign, this.windows, this.door, this.destination, this.bin, this.pile];
+    return [this.phone, ...KINDS.flatMap((k) => [this.shells[k], this.glasses[k]]).filter((p, i, a) => a.indexOf(p) === i), this.lamp, this.taxiSign, this.windows, this.door, this.destination, this.bin, this.pile];
   }
 
-  /** A bus shelter at each stop: a canopy on two posts, a glass back, and a sign in the route's color. */
+  /** A bus shelter at each stop (fine voxels): a canopy on two posts, a bench, a glass back, and a sign in the route's color. */
   private buildShelters(life: Life) {
-    const frame = mergeGeometries([box(0.4, 9, 0.4, -3.4, 0, -1.6), box(0.4, 9, 0.4, 3.4, 0, -1.6), box(7.6, 0.4, 3.6, 0, 9, -0.6), box(6.4, 0.6, 1.2, 0, 2, -1.6)]);
-    const pane = box(6.4, 5.4, 0.15, 0, 3.2, -1.75);
-    const sign = box(0.3, 1.8, 1.8, 3.4, 9.6, -1.6);
+    const v = new VoxelModel();
+    for (const x of [-14, 12]) v.fill(x, 0, -7, x + 2, 36, -5);
+    v.fill(-15, 36, -10, 15, 38, 5);
+    v.fill(-12, 8, -9, 12, 10, -4);
+    for (const x of [-11, 10]) v.fill(x, 0, -8, x + 1, 8, -7);
+    v.fill(-12, 12, -7, 12, 34, -6, 0xffffff, "pane");
+    v.fill(13, 38, -10, 14, 45, -3, 0xffffff, "sign");
+    const frame = v.mesh("solid");
+    const pane = v.mesh("pane");
+    const sign = v.mesh("sign");
     const dark = withVoxelLook(new THREE.MeshStandardMaterial({ color: 0x2c3038, roughness: 0.6, metalness: 0.4 }), "shelter-voxel");
     const glass = new THREE.MeshStandardMaterial({ color: 0x9fc4d6, roughness: 0.1, metalness: 0.2, transparent: true, opacity: 0.35 });
     const half = this.half;
@@ -307,7 +425,7 @@ export class LifeView {
         this.pigeon.add(base, b.color);
         const beat = Math.sin(b.flap) * (b.activity === "land" ? 0.5 : 0.9);
         for (const s of [-1, 1]) {
-          m.multiplyMatrices(base, t.makeTranslation(s * 0.25, 0.5, 0.05)).multiply(r.makeRotationZ(s > 0 ? beat : Math.PI - beat));
+          m.multiplyMatrices(base, t.makeTranslation(s * 0.375, 0.6, 0.1)).multiply(r.makeRotationZ(s > 0 ? beat : Math.PI - beat));
           this.wing.add(m, b.color);
         }
       } else {
@@ -331,13 +449,13 @@ export class LifeView {
       base.makeRotationY(v.heading).setPosition(v.x - half, v.y, v.z - half).multiply(r.makeRotationX(-v.pitch));
       this.shells[v.kind].add(base, v.color);
       this.glasses[v.kind].add(base, GLASS);
-      for (const [x, z] of model.wheels) this.wheel.add(m.multiplyMatrices(base, t.makeTranslation(x, 0, z)), 0x15161a);
-      const lx = v.width / 2 - 1;
+      const { x: lx, y: ly, z: lz } = model.lamp;
       for (const s of [-1, 1]) {
-        this.lamp.add(m.multiplyMatrices(base, t.makeTranslation(s * lx, model.lights, v.length / 2 + 0.02)), HEADLIGHT);
-        this.lamp.add(m.multiplyMatrices(base, t.makeTranslation(s * lx, model.lights, -v.length / 2 - 0.02)), v.braking ? BRAKE : TAIL);
+        this.lamp.add(m.multiplyMatrices(base, t.makeTranslation(s * lx, ly, lz)), HEADLIGHT);
+        this.lamp.add(m.multiplyMatrices(base, t.makeTranslation(s * lx, ly, -lz - FINE)), v.braking ? BRAKE : TAIL);
       }
-      if (v.kind === "taxi") this.taxiSign.add(m.multiplyMatrices(base, t.makeTranslation(0, 5.7, -0.8)), v.fare ? TAXI_HIRED : TAXI_FREE);
+      // On the cabin's roof.
+      if (v.kind === "taxi") this.taxiSign.add(m.multiplyMatrices(base, t.makeTranslation(0, 5.25, -0.75)), v.fare ? TAXI_HIRED : TAXI_FREE);
       if (v.kind === "bus") {
         this.windows.add(base, INTERIOR);
         this.door.add(base, v.activity === "stand" ? INTERIOR : DOOR);

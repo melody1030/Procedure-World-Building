@@ -2038,3 +2038,24 @@ ground is, so the lines drawn on them run on from box to box:
 
 Building a building now takes about 6 ms instead of 2 (the layer check); the parts never run into
 each other (`findClashes` stays at zero).
+
+## 2026-11-18: Animals and vehicles as voxel models
+
+The pigeons, cats, vehicles, bins, bag piles and bus shelters were a few smooth boxes each, of any
+size. Now each is a small voxel model on the fine voxels (`render/voxelModel.ts`), as in a voxel
+editor: boxes of cubes filled in, each cube with a color and a kind (paint, glass, a lit window).
+At load, each kind is meshed once: only the faces no other cube covers, merged into as few
+rectangles as the colors allow, with the cubes for the voxel look.
+
+- **Pigeons** (3 × 8 fine voxels): wing bars, a green neck, pink feet, eyes and a beak. The wings
+  are still their own part, to flap.
+- **Cats** (3 × 11): a striped back, ears, eyes and a nose, the tail up behind.
+- **Vehicles**: each in one model, the wheels (with a hub), bumpers and skirts shaded into the
+  paint, and the glass. The bus's lit windows (with pillars between), door and destination sign
+  come from the same model, so they sit in its sides instead of over them. The lights and the taxi
+  sign stand a fine voxel out. The paint is matte now, as the ground is.
+- **Bins** with a band, a lid, wheels and a handle; **bag piles** of three tied bags; **bus
+  shelters** with posts, a canopy, a bench, the glass back and the sign.
+
+A model's colors are multiplied by each one's own (a car's paint, a pigeon's gray), so they still
+vary as before. The people stay as they are.

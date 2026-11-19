@@ -1,6 +1,6 @@
 # Plan: everything in voxels
 
-**Drafted 2026-11-18. M1–M2 built 2026-11-18; M3–M6 to come.** Only the ground reads as voxels; the buildings, the park
+**Drafted 2026-11-18. M1–M4 built 2026-11-18; M5–M6 to come.** Only the ground reads as voxels; the buildings, the park
 props, the people, the animals and the vehicles read as smooth boxes. This plan makes all of it
 read as the same voxel world.
 
@@ -79,28 +79,30 @@ already in its plane is drawn a layer (0.02 voxel) in front of it. The flicker c
 over 88 test buildings (20 before, 3,300 snapped without layers); the clash check stays at zero; a
 building takes about 6 ms to build instead of 2.
 
-## M3. People and animals as voxel models
+## M3. Animals as voxel models
 
-- **Models from small voxel grids.**
-  - A person about 21 fine voxels tall:
-    - head 4 × 4 × 4, hair as cubes on it;
-    - torso 5 × 7 × 3;
-    - arms 2 wide, legs 2 wide each.
-  - A pigeon about 5 long, a cat about 7.
-  - Each model is written as layers of characters (like MagicaVoxel slices) and greedy-meshed to
-    boxes once at load.
-- **Same parts and poses.** Torso, head, hair, legs, arms, the seated legs and the pigeon's wings
-  stay separate instanced parts, so the walk, sit and flap animations keep working unchanged.
-- **Colors per cube from the model** (skin, shirt, trousers, shoes), still tinted per person as
-  now.
+- **Models from small voxel grids.** A pigeon 3 × 8 fine voxels, a cat 3 × 11, filled in as boxes
+  of cubes and meshed once at load: only the faces no other cube covers, merged into as few
+  rectangles as the colors allow.
+- **Same parts and poses.** The pigeon's body and wings and the cat stay separate instanced parts,
+  so the peck, flap and the cat's stalk and sprint keep working unchanged.
+- **Colors per cube from the model** (a pigeon's wing bars, green neck, pink feet, eyes and beak;
+  a cat's stripes, eyes and nose), times the color of each one as now.
+
+**Built 2026-11-18** (`render/voxelModel.ts`, `render/life.ts`). The people stay as they are.
 
 ## M4. Vehicles, bins and shelters as voxel models
 
-- Car, taxi, van, bus and garbage truck rebuilt on the fine grid:
-  - square wheels 6 × 6 fine voxels;
-  - lights and the taxi sign as glow cubes.
+- Car, taxi, van, bus and garbage truck rebuilt on the fine grid, in one model each: the wheels
+  (8 × 8, a hub on the outside), bumpers and skirts shaded into the paint; the glass; for a bus,
+  its lit windows with pillars between, its door and its destination sign, drawn from the same
+  model.
+- Lights and the taxi sign as glow cubes, standing a fine voxel out of the body.
 - Matte paint (roughness 0.8, metalness 0.05), so they sit with the ground.
-- The wheelie bins, bag piles and bus shelters likewise.
+- The wheelie bins (a band, the lid, two wheels and a handle), bag piles (three tied bags) and bus
+  shelters likewise.
+
+**Built 2026-11-18.**
 
 ## M5. Park props and street lamps
 
@@ -125,5 +127,6 @@ building takes about 6 ms to build instead of 2.
 | `buildings/render.ts` | The solid material gets the look |
 | `buildings/massing.ts`, `block.ts`, `parts.ts` … | Sizes rounded to the two grids (M2) |
 | `city/parkModels.ts` | Props on the grids (M5) |
-| `render/life.ts` | Voxel models for people, animals and vehicles, with `aVoxel` (M1, M3, M4) |
+| `render/life.ts` | `aVoxel` on the people (M1); voxel models for the animals and vehicles (M3, M4) |
+| `render/voxelModel.ts` | Voxel models filled in as boxes of cubes and meshed (M3, M4) |
 | `render/WorldView.ts` | The park materials patched with the look |
