@@ -12,7 +12,8 @@ export interface GeometryData {
   color: Float32Array;
   index: Uint32Array;
   /**
-   * Per vertex, where it lies on the cubes it is drawn as (x, y, z in cubes, and 1; 0 for none),
+   * Per vertex, where it lies on the cubes it is drawn as (x, y, z in cubes, and how much each cube's
+   * shade varies, 1 as a rule; 0 for none),
    * for the voxel look (render/voxelLook.ts); only from builders that were given a grid.
    */
   voxel?: Float32Array;
@@ -48,14 +49,15 @@ export class GeometryBuilder {
 
   /**
    * The quads from here on are drawn as cubes of side `cell` on a grid from the builder's own origin
-   * (before `place` turns and moves them), so neighboring boxes' cubes line up; 0 for none.
+   * (before `place` turns and moves them), so neighboring boxes' cubes line up; 0 for none. `tint`
+   * scales how much each cube's shade varies (render/voxelLook.ts): more for leaves.
    */
-  grid(cell: number) {
+  grid(cell: number, tint = 1) {
     if (!cell) {
       this.frame = null;
       return;
     }
-    this.frame = [0, 0, 0, 1 / cell, 1 / cell, 1 / cell];
+    this.frame = [0, 0, 0, 1 / cell, 1 / cell, 1 / cell, tint];
     this.vox ??= new Float32Array((this.pos.length / 3) * 4);
   }
 
@@ -106,7 +108,7 @@ export class GeometryBuilder {
         this.vox[q] = f ? (c[j * 3] - f[0]) * f[3] : 0;
         this.vox[q + 1] = f ? (c[j * 3 + 1] - f[1]) * f[4] : 0;
         this.vox[q + 2] = f ? (c[j * 3 + 2] - f[2]) * f[5] : 0;
-        this.vox[q + 3] = f ? 1 : 0;
+        this.vox[q + 3] = f ? f[6] : 0;
       }
     }
     const i = this.i;

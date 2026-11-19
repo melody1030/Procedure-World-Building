@@ -1,6 +1,6 @@
 # Plan: everything in voxels
 
-**Drafted 2026-11-18. M1–M4 built 2026-11-18; M5–M6 to come.** Only the ground reads as voxels; the buildings, the park
+**Drafted 2026-11-18. M1–M5 built 2026-11-18; M6 to come.** Only the ground reads as voxels; the buildings, the park
 props, the people, the animals and the vehicles read as smooth boxes. This plan makes all of it
 read as the same voxel world.
 
@@ -110,6 +110,14 @@ building takes about 6 ms to build instead of 2.
   separate cubes).
 - Benches, bins, vending machines, lamps and street lamps on fine voxels.
 
+**Built 2026-11-18.** The benches, bins, vending machines, lamps and street lamps were on fine
+voxels already, drawn with the building kit since M2. Each plant (tree, shrub, hedge) is now one
+set of whole voxels (`voxelGrid.ts`, shared with the life models): its blocks fill in cubes and
+only the outside is drawn, so overlapping blocks show no patches or seams and nothing flickers.
+Leaves vary per cube three times as much (`LEAFY`, carried in `aVoxel`'s fourth value). The voxel
+look rounds, not floors, the cube across a face, so a face on a whole voxel no longer speckles.
+The flicker check is zero on every plant.
+
 ## M6. Check and tune
 
 - Screenshots at three distances (street, park, whole city) on `blueprint` and `neon7`.
@@ -126,7 +134,7 @@ building takes about 6 ms to build instead of 2.
 | `buildings/kit.ts` | `aVoxel` per vertex, the box's grid, `PROUD` |
 | `buildings/render.ts` | The solid material gets the look |
 | `buildings/massing.ts`, `block.ts`, `parts.ts` … | Sizes rounded to the two grids (M2) |
-| `city/parkModels.ts` | Props on the grids (M5) |
+| `city/parkModels.ts` | Plants on whole voxels, leaves leafy (M5) |
 | `render/life.ts` | `aVoxel` on the people (M1); voxel models for the animals and vehicles (M3, M4) |
-| `render/voxelModel.ts` | Voxel models filled in as boxes of cubes and meshed (M3, M4) |
+| `voxelGrid.ts`, `render/voxelModel.ts` | Cubes filled in as boxes, their outside merged into rectangles (M3–M5) |
 | `render/WorldView.ts` | The park materials patched with the look |

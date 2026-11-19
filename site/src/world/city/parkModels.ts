@@ -1,6 +1,7 @@
 import { Kit, m, PAL, type Hex } from "../buildings/kit";
-import type { GeometryData, RGB } from "../geometry";
+import { lin, shade, type GeometryData, type RGB } from "../geometry";
 import { Rng } from "../rng";
+import { VoxelGrid } from "../voxelGrid";
 import { FENCE_HEIGHT, type Park, type ParkProp } from "./parks";
 
 /**
@@ -33,6 +34,8 @@ const NEEDLE = [0x2b4c3b, 0x325843, 0x274536] as const;
 const BLOSSOM = [0xd88cb0, 0xc46e98, 0xe6a6c4] as const;
 const FLOWERS = [0xd94c8a, 0xe8c547, 0xe8e4f0, 0xc8423c, 0x8a5ad0, 0xf08a3c] as const;
 const LAMP_COLORS = [PAL.amber, PAL.warm, PAL.cyan] as const;
+/** How much more a leaf cube's shade varies than another's (render/voxelLook.ts), so leaves read as separate cubes. */
+const LEAFY = 3;
 
 export function buildParkModel(park: Park, seed: number): ParkModel {
   const k = new Kit(seed);
@@ -262,7 +265,6 @@ function flowerbed(k: Kit, r: Rng, length: number) {
   }
 }
 
-/** A clipped hedge along x, `length` voxels, in blocks of slightly different height. */
 /**
  * A low iron fence along x, `length` voxels: a post at each end and about every 2 m, a rail near
  * the foot and one near the top, and a picket every voxel between the posts, poking above the top rail.
@@ -281,40 +283,53 @@ function fence(k: Kit, length: number) {
   }
 }
 
+/** A clipped hedge along x, `length` voxels, 4 deep, in blocks of whole voxels of slightly different height, each topped lighter. */
 function hedge(k: Kit, r: Rng, length: number) {
-  const D = m(0.45);
-  let x = -length / 2;
-  while (x < length / 2 - 0.01) {
-    const w = Math.min(length / 2 - x, r.range(3, 6));
-    const h = m(0.9) + r.range(-0.4, 0.4);
-    k.box(x, 0, -D, w, h, D * 2, k.vary(LEAF[2], 0.08));
-    k.box(x + 0.15, h, -D + 0.15, w - 0.3, 0.2, D * 2 - 0.3, k.vary(LEAF[0], 0.08));
+  const { box, done } = plant(k);
+  const D = 2;
+  const end = Math.round(length / 2);
+  for (let x = -end; x < end; ) {
+    const w = Math.min(end - x, r.int(3, 6));
+    const h = 3 + r.int(0, 1);
+    box(x, 0, -D, w, h - 1, D * 2, k.vary(LEAF[2], 0.08), true);
+    box(x, h - 1, -D, w, 1, D * 2, k.vary(LEAF[0], 0.08), true);
     x += w;
   }
+  done();
 }
 
 /**
- * Boxes for a plant's blocks, which land anywhere: each snapped to a quarter voxel, then grown by
- * a different hair (0.015 voxel more for each block), so no two of a plant's faces ever lie in one
- * plane and flicker against each other.
+ * A plant as a set of whole voxels (voxelGrid.ts): `box` fills in a block, which lands anywhere,
+ * moved to whole voxels (at least one each way); `done` draws the plant's outside. The blocks
+ * overlap, so drawn as boxes their faces would meet in one plane and show as patches; as one set
+ * of cubes, only the outside is drawn, each cube the color of the last block over it. Leaves vary
+ * in shade per cube LEAFY times as much as the wood (the bottom on the ground is left out).
  */
 function plant(k: Kit) {
-  let i = 0;
-  const snap = (v: number) => Math.round(v * 4) / 4;
-  return (x: number, y: number, z: number, w: number, h: number, d: number, color: Hex | RGB) => {
-    const e = 0.015 * ++i;
-    const X = snap(x);
-    const Y = snap(y);
-    const Z = snap(z);
-    // (The bottom stays on the ground where it starts there.)
-    const lift = Y > 0 ? e : 0;
-    k.box(X - e, Y - lift, Z - e, Math.max(0.25, snap(x + w) - X) + 2 * e, Math.max(0.25, snap(y + h) - Y) + e + lift, Math.max(0.25, snap(z + d) - Z) + 2 * e, color);
+  const cubes = new VoxelGrid<RGB>();
+  const box = (x: number, y: number, z: number, w: number, h: number, d: number, color: Hex | RGB, leaves = false) => {
+    const [X, Y, Z] = [Math.round(x), Math.round(y), Math.round(z)];
+    const rgb = typeof color === "number" ? lin(color) : color;
+    cubes.fill(X, Y, Z, X + Math.max(1, Math.round(x + w) - X), Y + Math.max(1, Math.round(y + h) - Y), Z + Math.max(1, Math.round(z + d) - Z), rgb, leaves ? "leaf" : "wood");
   };
+  const done = () => {
+    for (const kind of ["wood", "leaf"]) {
+      k.solid.grid(1, kind === "leaf" ? LEAFY : 1);
+      cubes.faces(kind, (corners, axis, side, c) => {
+        if (axis === 1 && side < 0 && corners[0][1] === 0) return;
+        const [nx, ny, nz] = [axis === 0 ? side : 0, axis === 1 ? side : 0, axis === 2 ? side : 0];
+        // Tops a little lighter, as the kit's boxes.
+        k.solid.quad(corners.flat(), nx, ny, nz, ny > 0 ? shade(c, 1.08) : c);
+      });
+      k.solid.grid(0);
+    }
+  };
+  return { box, done };
 }
 
 /** A round-headed tree `size` voxels tall: a trunk, a branch or two, and a crown of overlapping lobes. */
 function broadleaf(k: Kit, r: Rng, size: number, leaves: readonly Hex[], bark: Hex, petals = false) {
-  const box = plant(k);
+  const { box, done } = plant(k);
   const t = Math.max(1, size * 0.06);
   const trunk = size * 0.42;
   box(-t / 2, 0, -t / 2, t, trunk + size * 0.15, t, bark);
@@ -326,17 +341,18 @@ function broadleaf(k: Kit, r: Rng, size: number, leaves: readonly Hex[], bark: H
   // The crown: a core and lobes around and over it, smaller toward the top, so it reads round.
   const R = size * r.range(0.24, 0.3);
   const mid = trunk + R * 0.9;
-  box(-R * 0.75, mid - R * 0.6, -R * 0.75, R * 1.5, R * 1.3, R * 1.5, k.vary(leaves[0], 0.08));
+  box(-R * 0.75, mid - R * 0.6, -R * 0.75, R * 1.5, R * 1.3, R * 1.5, k.vary(leaves[0], 0.08), true);
   const lobes = 8;
   for (let i = 0; i < lobes; i++) {
     const a = (i / lobes) * Math.PI * 2 + r.range(-0.3, 0.3);
     const up = i % 2 ? 0.35 : -0.15;
     const s = R * r.range(0.7, 0.95);
     const d = R * 0.65;
-    box(Math.cos(a) * d - s / 2, mid + up * R - s / 2, Math.sin(a) * d - s / 2, s, s * 0.9, s, k.vary(r.pick(leaves), 0.1));
+    box(Math.cos(a) * d - s / 2, mid + up * R - s / 2, Math.sin(a) * d - s / 2, s, s * 0.9, s, k.vary(r.pick(leaves), 0.1), true);
   }
   const s = R * 0.9;
-  box(-s / 2 + r.range(-0.2, 0.2) * R, mid + R * 0.45, -s / 2 + r.range(-0.2, 0.2) * R, s, s * 0.7, s, k.vary(leaves[2], 0.08));
+  box(-s / 2 + r.range(-0.2, 0.2) * R, mid + R * 0.45, -s / 2 + r.range(-0.2, 0.2) * R, s, s * 0.7, s, k.vary(leaves[2], 0.08), true);
+  done();
   if (petals)
     for (let i = 0; i < 9; i++) {
       const a = r.range(0, Math.PI * 2);
@@ -347,28 +363,30 @@ function broadleaf(k: Kit, r: Rng, size: number, leaves: readonly Hex[], bark: H
 
 /** A conifer `size` voxels tall: a short trunk under slim tiers narrowing to a point. */
 function conifer(k: Kit, r: Rng, size: number) {
-  const box = plant(k);
+  const { box, done } = plant(k);
   const t = Math.max(1, size * 0.05);
   box(-t / 2, 0, -t / 2, t, size * 0.3, t, PAL.trunk);
   const tiers = 5;
   for (let i = 0; i < tiers; i++) {
     const w = size * (0.32 - i * 0.055);
     const y = size * (0.16 + i * 0.14);
-    box(-w / 2, y, -w / 2, w, size * 0.15, w, k.vary(r.pick(NEEDLE), 0.08));
+    box(-w / 2, y, -w / 2, w, size * 0.15, w, k.vary(r.pick(NEEDLE), 0.08), true);
   }
   const tip = Math.max(0.6, size * 0.04);
-  box(-tip / 2, size * 0.86, -tip / 2, tip, size * 0.14, tip, NEEDLE[1]);
+  box(-tip / 2, size * 0.86, -tip / 2, tip, size * 0.14, tip, NEEDLE[1], true);
+  done();
 }
 
 /** A bush: a few blocks, now and then in flower. */
 function shrub(k: Kit, r: Rng, size: number) {
-  const box = plant(k);
+  const { box, done } = plant(k);
   const bloom = r.chance(0.3) ? r.pick(FLOWERS) : null;
   for (let i = 0; i < 3; i++) {
     const s = size * r.range(0.55, 0.85);
     const ox = r.range(-0.25, 0.25) * size;
     const oz = r.range(-0.25, 0.25) * size;
-    box(ox - s / 2, 0, oz - s / 2, s, s * 0.8, s, k.vary(r.pick(LEAF), 0.12));
+    box(ox - s / 2, 0, oz - s / 2, s, s * 0.8, s, k.vary(r.pick(LEAF), 0.12), true);
     if (bloom) box(ox - 0.3, s * 0.8, oz - 0.3, 0.6, 0.3, 0.6, bloom);
   }
+  done();
 }

@@ -2059,3 +2059,25 @@ rectangles as the colors allow, with the cubes for the voxel look.
 
 A model's colors are multiplied by each one's own (a car's paint, a pigeon's gray), so they still
 vary as before. The people stay as they are.
+
+## 2026-11-18: Trees on whole voxels
+
+The park props and street lamps were drawn with the building kit, so since the buildings went on
+the grid they have been on fine voxels too. The plants were the odd ones out: each block snapped
+to a quarter voxel and grown by its own hair, so they read as fine, smooth-ish blocks.
+
+- **Each plant one set of cubes.** Tree crowns, lobes, trunks, conifer tiers and shrubs fill in
+  whole voxels, at least one each way, in one `VoxelGrid` per plant (`voxelGrid.ts`, the core of
+  the life models' `VoxelModel`), and only its outside is drawn, merged into rectangles. Drawn as
+  overlapping boxes, the blocks' faces met in one plane: pushed a layer apart (M2) they showed as
+  patches of another shade, and the hedges as a seam. Now there is nothing inside to show.
+- **Hedges of whole voxels**: 4 deep, in blocks 3–6 long and 3–4 high, each with a lighter top
+  layer.
+- **Leaves read as cubes.** Leaves vary their shade per cube three times as much as anything else
+  (`LEAFY`), carried as the fourth value of `aVoxel` to the voxel look's shader.
+- **No speckle on whole voxels.** The shader picked each cube's shade from `floor()` of its cube
+  coordinates; across a face lying exactly on a whole voxel, that coordinate wobbles round the
+  whole number from pixel to pixel, so the shade flipped between the cubes on either side. It is
+  rounded instead.
+
+The flicker check is zero on every plant (8 seeds each); a tree is 50–140 quads.

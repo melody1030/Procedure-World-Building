@@ -6,8 +6,9 @@ import * as THREE from "three";
  * the people, the animals and the vehicles.
  *
  * The ground works its cubes out from the world position. Everything else turns and moves, so
- * each vertex carries where it lies on its cubes instead (`aVoxel`: x, y, z in cubes, and 1; 0
- * for none):
+ * each vertex carries where it lies on its cubes instead (`aVoxel`: x, y, z in cubes, and how much
+ * each cube's shade varies: 1 as a rule, more for leaves (city/parkModels.ts, LEAFY) so they read as
+ * separate cubes; 0 for none):
  * - a building or a park prop, on a grid from its own origin, every box snapped to it
  *   (buildings/kit.ts, `GeometryBuilder.grid`), so neighboring boxes' cubes line up: voxels
  *   (0.25 m) for a box a voxel or more every way, fine voxels (a quarter voxel) for smaller parts;
@@ -35,10 +36,12 @@ const FRAGMENT = /* glsl */ `
     float line = max(edge.x, max(edge.y, edge.z));
     float pixelsPerCube = 1.0 / max(max(fw.x * along.x, fw.y * along.y), max(fw.z * along.z, 1e-4));
     float fade = smoothstep(3.0, 6.0, pixelsPerCube);
-    // The cube this pixel is on (across the face, its coordinate is the face's, the same all over it).
-    vec3 cube = floor(q);
+    // The cube this pixel is on. Across the face, its coordinate is the face's, on a whole cube (or
+    // a layer off it, buildings/kit.ts): rounded, not floored, or it would flip from pixel to pixel
+    // between the cubes on either side, and the shade with it.
+    vec3 cube = mix(floor(q + 0.5), floor(q), along);
     float h = fract(sin(dot(cube, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
-    diffuseColor.rgb *= (1.0 - uVoxelGrid * 0.35 * line * fade) * (1.0 + uVoxelGrid * 0.12 * (h - 0.5) * fade);
+    diffuseColor.rgb *= (1.0 - uVoxelGrid * 0.35 * line * fade) * (1.0 + uVoxelGrid * 0.12 * vVoxel.w * (h - 0.5) * fade);
   }`;
 
 /** Adds the voxel look to a lit material's shader (call it from `onBeforeCompile`). */
