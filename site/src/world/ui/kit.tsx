@@ -18,7 +18,7 @@ export const HEADING = "font-display text-[13px] font-bold uppercase tracking-[0
 /** Small labels (sentence case). */
 export const LABEL = "text-[12px] font-medium text-[#9db2c8]";
 /** Small print. */
-export const NOTE = "text-[11px] leading-snug text-[#6f86a0]";
+export const NOTE = "text-[11px] leading-snug text-[#8ba1b8]";
 /** Values: amber mono. */
 export const VALUE = "font-mono text-[11px] tabular-nums text-[#ffd27a]";
 /** The amber chip a value sits in. */
@@ -54,7 +54,7 @@ export function Section({ icon, title, changed = 0, children }: { icon: ReactNod
         <span className="flex h-3.5 w-3.5 shrink-0 text-[#5ad8ff]/70 [&>svg]:h-full [&>svg]:w-full">{icon}</span>
         <span className="flex-1 transition-colors group-hover:text-white">{title}</span>
         <Badge count={changed} label={changed === 1 ? "setting changed" : "settings changed"} />
-        <svg {...chevron} className={"h-3.5 w-3.5 shrink-0 text-[#6f86a0] transition-transform duration-200 " + (open ? "" : "-rotate-90")}>
+        <svg {...chevron} className={"h-3.5 w-3.5 shrink-0 text-[#8ba1b8] transition-transform duration-200 " + (open ? "" : "-rotate-90")}>
           <path d="M6 9l6 6 6-6" />
         </svg>
       </button>
@@ -72,7 +72,7 @@ export function Subheading({ children, info }: { children: string; info?: string
   const { row, zone, bubble } = useHoverTip(info);
   return (
     <div ref={row.ref}>
-      <h3 className={"m-0 w-fit font-display text-[11px] font-bold uppercase tracking-[0.14em] text-[#6f86a0]" + (info ? " cursor-help" : "")} {...zone}>
+      <h3 className={"m-0 w-fit font-display text-[11px] font-bold uppercase tracking-[0.14em] text-[#8ba1b8]" + (info ? " cursor-help" : "")} {...zone}>
         {children}
       </h3>
       {bubble}
@@ -146,7 +146,7 @@ export function useHoverTip(text: ReactNode) {
         id={id}
         role="tooltip"
         style={pos ? { left: pos.left, top: pos.top } : { left: 0, top: 0, visibility: "hidden" }}
-        className="pointer-events-none fixed z-50 w-[220px] rounded-xl border border-[#7db4e6]/25 bg-[#0e1c30]/75 px-2.5 py-2 text-[11px] leading-snug text-[#9db2c8] shadow-[0_8px_20px_rgba(0,0,0,0.4)] backdrop-blur-sm"
+        className="pointer-events-none fixed z-50 w-[220px] rounded-xl border border-[#7db4e6]/25 bg-[#0e1c30]/75 px-2.5 py-2 text-[11px] leading-snug text-[#9db2c8] shadow-[0_8px_20px_rgba(0,0,0,0.4)] backdrop-blur-md backdrop-brightness-[0.7]"
       >
         {/* The speech-bubble tail: a square turned 45°, showing only its left and bottom edges and
             clipped to the half outside the bubble, so the see-through fill doesn't double up. */}
@@ -197,7 +197,7 @@ export function Tabs<T extends string>({ tabs, value, onChange, label }: { tabs:
               onClick={() => onChange(t.id)}
               className={
                 "-mb-px flex-1 border-b-2 pb-2 pt-1 font-display text-[12px] font-bold uppercase tracking-[0.14em] transition-colors " +
-                (on ? "border-[#5ad8ff] text-[#5ad8ff]" : "border-transparent text-[#6f86a0] hover:text-[#dce8f5]")
+                (on ? "border-[#5ad8ff] text-[#5ad8ff]" : "border-transparent text-[#8ba1b8] hover:text-[#dce8f5]")
               }
             >
               {t.label}
@@ -299,7 +299,7 @@ export function Switch(props: Omit<InputHTMLAttributes<HTMLInputElement>, "type"
   return (
     <input
       type="checkbox"
-      className="relative h-4 w-7 shrink-0 cursor-pointer appearance-none rounded-full bg-[#24384f] transition-colors duration-200 after:absolute after:left-0.5 after:top-0.5 after:h-3 after:w-3 after:rounded-full after:bg-[#dce8f5] after:transition-transform after:duration-200 checked:bg-[#5ad8ff] checked:after:translate-x-3"
+      className="relative h-4 w-7 shrink-0 cursor-pointer appearance-none before:absolute before:-inset-x-1.5 before:-inset-y-2 before:content-[''] rounded-full bg-[#24384f] transition-colors duration-200 after:absolute after:left-0.5 after:top-0.5 after:h-3 after:w-3 after:rounded-full after:bg-[#dce8f5] after:transition-transform after:duration-200 checked:bg-[#5ad8ff] checked:after:translate-x-3"
       {...props}
     />
   );
@@ -314,7 +314,7 @@ export function Select({ children, ...props }: Omit<SelectHTMLAttributes<HTMLSel
       >
         {children}
       </select>
-      <svg {...chevron} className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#6f86a0]">
+      <svg {...chevron} className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#8ba1b8]">
         <path d="M6 9l6 6 6-6" />
       </svg>
     </span>

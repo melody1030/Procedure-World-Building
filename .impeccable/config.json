@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "border-accent-on-rounded",
+        "value": "*",
+        "files": [
+          "site/src/world/ui/Help.tsx"
+        ],
+        "createdAt": "2026-11-18T20:05:39.108Z",
+        "reason": "Claude: the Help.tsx key cap has a 2px bottom ridge in a 40% hairline color to read as a keyboard key, not an accent border; predates this session"
+      }
+    ]
+  }
+}

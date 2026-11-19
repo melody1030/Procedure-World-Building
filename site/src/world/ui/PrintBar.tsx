@@ -126,13 +126,13 @@ export function PrintBar({ replayKey, onChange }: { replayKey: string; onChange:
   }, []);
 
   return (
-    <div className={"pointer-events-auto flex w-[44rem] max-w-full items-center gap-3 rounded-2xl border px-3 py-2.5 " + GLASS}>
+    <div data-tour="timeline" className={"pointer-events-auto flex w-[44rem] max-w-full items-center gap-3 rounded-2xl border px-3 py-2.5 " + GLASS}>
       <button
         onClick={toggle}
         aria-label={playing ? "Pause printing" : "Play printing"}
         aria-keyshortcuts="Space"
         title={(playing ? "Pause" : t >= 1 ? "Print again" : "Play") + " (Space)"}
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[#5ad8ff]/60 bg-[#5ad8ff]/15 text-[#5ad8ff] transition-colors hover:bg-[#5ad8ff]/25"
+        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#5ad8ff]/60 bg-[#5ad8ff]/15 text-[#5ad8ff] transition-colors hover:bg-[#5ad8ff]/25"
       >
         {playing ? <PauseIcon /> : <PlayIcon />}
       </button>
@@ -141,7 +141,7 @@ export function PrintBar({ replayKey, onChange }: { replayKey: string; onChange:
             (so the thumb moves at a steady pace), with small gaps between them: filled in cyan up
             to now, the current stage's remaining part a shade lighter. The range input lies on top,
             transparent but for its thumb. */}
-        <div className="relative flex h-3 min-w-0 items-center">
+        <div className="relative flex h-5 min-w-0 items-center">
           <div className="pointer-events-none absolute inset-x-[5px] flex gap-[3px]" aria-hidden>
             {BUILD_PHASES.map((p, i) => {
               const from = startOf(i);
@@ -162,7 +162,7 @@ export function PrintBar({ replayKey, onChange }: { replayKey: string; onChange:
             aria-label="Generation timeline"
             aria-valuetext={t >= 1 ? "Built" : `${BUILD_PHASES[phase].label}, step ${phase + 1} of ${BUILD_PHASES.length}`}
             title={t >= 1 ? "Built" : BUILD_PHASES[phase].label}
-            className="world-range relative h-3 w-full min-w-0 cursor-pointer appearance-none bg-transparent"
+            className="world-range relative h-5 w-full min-w-0 cursor-pointer appearance-none bg-transparent"
           />
         </div>
         {/* The phases as steps, each name under its own stretch of the track (same inset, gaps
@@ -183,8 +183,8 @@ export function PrintBar({ replayKey, onChange }: { replayKey: string; onChange:
                     aria-current={state === "current" ? "step" : undefined}
                     title={`Play from: ${p.label}`}
                     className={
-                      "flex w-full min-w-0 rounded text-left text-[10px] leading-none transition-colors " +
-                      (state === "current" ? "font-medium text-white" : state === "done" ? "text-[#5ad8ff]/80 hover:text-[#5ad8ff]" : "text-[#6f86a0] hover:text-[#dce8f5]")
+                      "-my-1.5 flex w-full min-w-0 rounded py-2 text-left text-[11px] leading-none transition-colors " +
+                      (state === "current" ? "font-medium text-white" : state === "done" ? "text-[#5ad8ff]/80 hover:text-[#5ad8ff]" : "text-[#8ba1b8] hover:text-[#dce8f5]")
                     }
                   >
                     <span data-step-name className="min-w-0 overflow-hidden whitespace-nowrap">
@@ -196,7 +196,7 @@ export function PrintBar({ replayKey, onChange }: { replayKey: string; onChange:
             })}
           </ol>
           {compact && (
-            <span className="block truncate px-[5px] text-[10px] leading-none text-white" aria-hidden>
+            <span className="block truncate px-[5px] text-[11px] leading-none text-white" aria-hidden>
               {t >= 1 ? "Built" : `${STEP_NAMES[BUILD_PHASES[phase].id]} · ${phase + 1}/${STEPS}`}
             </span>
           )}

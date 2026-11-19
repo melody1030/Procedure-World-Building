@@ -10,7 +10,7 @@ colors:
   rule: "#7db4e6"
   paper-text: "#dce8f5"
   label: "#9db2c8"
-  note: "#6f86a0"
+  note: "#8ba1b8"
   neon-cyan: "#5ad8ff"
   slider-thumb: "#f2f8ff"
   lit-amber: "#ffd27a"
@@ -117,7 +117,7 @@ A cold, muted world lit by two UI accents: the city glows so the chrome does not
 - **Rule** (#7db4e6 at 10 to 25%): Every border and hairline.
 - **Paper Text** (#dce8f5): Headings, selected and primary text.
 - **Label** (#9db2c8): Parameter names.
-- **Note** (#6f86a0): Hints, subheadings, inactive chevrons.
+- **Note** (#8ba1b8): Hints, subheadings, inactive chevrons.
 - **Page** (#070b12) and **Stage** (#0a0f17): Behind the canvas.
 
 ### Scene
@@ -140,7 +140,7 @@ Daylight sky (#b9d3e8), navy plinth strata starting at #243049, muted grass (#46
 - **Heading** (700, 13px, 0.14em tracking, uppercase): Panel sections and titles. Uppercase by CSS, never by typing capitals.
 - **Subheading** (700, 11px, 0.14em, uppercase, Note color): Groups inside a tab.
 - **Label** (500, 12px, Label color): Parameter names in sentence case; buttons.
-- **Note** (400, 11px, 1.375 line height): Hints and hover bubbles.
+- **Note** (400, 11px, 1.375 line height): Hints and hover bubbles. Step names under the timeline are 11px too.
 - **Value** (mono, 11px, tabular figures, amber): Numbers and seeds, fixed decimals so they do not jump.
 
 ### Named Rules
@@ -148,7 +148,7 @@ Daylight sky (#b9d3e8), navy plinth strata starting at #243049, muted grass (#46
 
 ## Layout
 
-A full-height stage with the canvas filling it and floating panels over its edges. Panels are tab or accordion columns, about 16rem wide, scrolling inside themselves, inset 1rem from the stage edge. Section spacing 14px, tight groups 8px, panel padding 20px. `/world` is desktop only: no phone layout is designed or verified. Panels close with the keyboard (`E` in the weeks; keep one shortcut per surface) so the city can be seen whole.
+A full-height stage with the canvas filling it and floating panels over its edges. The whole overlay is drawn at 90% (`UI_SCALE = 0.9` in `site/src/world/index.tsx`, CSS `zoom`), so every size in this file renders 10% smaller than written; panels about 16rem wide come out near 230px. Interactive targets must still reach about 24px on screen: pad the hit area (a taller button, a pseudo-element, or a full-row label) rather than the visible shape. Panels are tab or accordion columns, about 16rem wide, scrolling inside themselves, inset 1rem from the stage edge. Section spacing 14px, tight groups 8px, panel padding 20px. `/world` is desktop only: no phone layout is designed or verified. Panels close with the keyboard (`E` in the weeks; keep one shortcut per surface) so the city can be seen whole.
 
 ## Elevation & Depth
 

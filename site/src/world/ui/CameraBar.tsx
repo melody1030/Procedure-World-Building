@@ -89,7 +89,7 @@ function ToolButton({ label, keyName, icon, active = false, disabled = false, on
       </button>
       <span
         role="tooltip"
-        className="pointer-events-none invisible absolute right-full top-1/2 mr-3 flex -translate-y-1/2 items-center gap-2.5 whitespace-nowrap rounded-[10px] border border-[#7db4e6]/25 bg-[#0e1c30]/75 px-2.5 py-1.5 text-[14px] text-[#dce8f5] opacity-0 shadow-[0_8px_20px_rgba(0,0,0,0.4)] backdrop-blur-sm transition-opacity duration-150 group-hover:visible group-hover:opacity-100 group-has-[:focus-visible]:visible group-has-[:focus-visible]:opacity-100"
+        className="pointer-events-none invisible absolute right-full top-1/2 mr-3 flex -translate-y-1/2 items-center gap-2.5 whitespace-nowrap rounded-[10px] border border-[#7db4e6]/25 bg-[#0e1c30]/75 px-2.5 py-1.5 text-[14px] text-[#dce8f5] opacity-0 shadow-[0_8px_20px_rgba(0,0,0,0.4)] backdrop-blur-md backdrop-brightness-[0.7] transition-opacity duration-150 group-hover:visible group-hover:opacity-100 group-has-[:focus-visible]:visible group-has-[:focus-visible]:opacity-100"
       >
         {label}
         <kbd className="rounded bg-[#ffd27a]/10 px-1.5 font-mono text-[13px] text-[#ffd27a]">{keyName}</kbd>
@@ -144,7 +144,7 @@ export function CameraBar({
   if (!shown) return null;
 
   return (
-    <div role="toolbar" aria-label="Camera" aria-orientation="vertical" className={"pointer-events-auto absolute right-4 top-4 flex flex-col gap-[3px] rounded-2xl border p-[5px] " + GLASS}>
+    <div data-tour="camera" role="toolbar" aria-label="Camera" aria-orientation="vertical" className={"pointer-events-auto absolute right-4 top-4 flex flex-col gap-[3px] rounded-2xl border p-[5px] " + GLASS}>
       {PRESETS.map((p) => (
         <ToolButton key={p.id} label={p.label} keyName={p.key} icon={ICONS[p.id]} active={view === p.id} disabled={!available[p.id]} onClick={() => onFly(p.id)} />
       ))}

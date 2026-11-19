@@ -26,7 +26,7 @@ const KEYS: [ReactNode, string][] = [
   [
     <>
       <Key>1</Key>
-      <span className="text-[#6f86a0]">to</span>
+      <span className="text-[#8ba1b8]">to</span>
       <Key>5</Key>
     </>,
     "Fly to Overview, Plaza, Park, River, Street",
@@ -46,7 +46,7 @@ const POINTER: [ReactNode, string][] = [
 function List({ title, rows }: { title: string; rows: [ReactNode, string][] }) {
   return (
     <section>
-      <h3 className="m-0 font-display text-[11px] font-bold uppercase tracking-[0.14em] text-[#6f86a0]">{title}</h3>
+      <h3 className="m-0 font-display text-[11px] font-bold uppercase tracking-[0.14em] text-[#8ba1b8]">{title}</h3>
       <dl className="m-0 mt-1.5">
         {rows.map(([k, v], i) => (
           <div key={i} className="grid grid-cols-[5.5rem_1fr] items-center gap-3 border-b border-[#7db4e6]/10 py-2 last:border-b-0">
@@ -108,12 +108,14 @@ export function HelpDialog({ open, onClose, onTour }: { open: boolean; onClose: 
         <div className="flex flex-col gap-4 border-t border-[#7db4e6]/10 px-5 pb-1 pt-4">
           <List title="Keys" rows={KEYS} />
           <List title="Mouse" rows={POINTER} />
-          <p className="m-0 text-[12px] leading-snug text-[#6f86a0]">On a touch screen, one finger orbits and two pinch to zoom and pan. Keys don't work while typing in the seed.</p>
+          <p className="m-0 text-[12px] leading-snug text-[#8ba1b8]">On a touch screen, one finger orbits and two pinch to zoom and pan. Keys don't work while typing in the seed.</p>
         </div>
         <footer className="mt-4 flex justify-end border-t border-[#7db4e6]/10 px-5 py-3">
           <button
             type="button"
             onClick={() => {
+              // The tour takes the focus itself; don't hand it back to the opener on close.
+              opener.current = null;
               ref.current?.close();
               onTour();
             }}

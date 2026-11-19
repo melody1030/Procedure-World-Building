@@ -24,7 +24,7 @@ import type { Selection } from "./render/select";
  * plays when a new seed loads. Press E to hide the panels.
  */
 /** The interface's size relative to the weeks' (the panel, the time bar and the note). */
-const UI_SCALE = 0.8;
+const UI_SCALE = 0.9;
 /** How many people, pigeons and cats are out. */
 const LIFE = { people: 420, pigeons: 60, cats: 8, cars: 14, vans: 4, taxis: 10, buses: 4 };
 
@@ -195,7 +195,7 @@ export default function WorldPage() {
   return (
     <div className="relative h-screen w-full overflow-hidden bg-stage">
       <div ref={mountRef} className="absolute inset-0" />
-      {/* The whole interface is drawn at UI_SCALE (80%), so it takes less of the view. */}
+      {/* The whole interface is drawn at UI_SCALE (90%), so it takes less of the view. */}
       <div className="pointer-events-none absolute inset-0" style={{ zoom: UI_SCALE }}>
         <TerrainPanel terrain={terrain} life={life} ctl={ctl} open={panelOpen} onToggle={() => setPanelOpen((v) => !v)} busy={busy} />
         <CameraBar view={view} available={available} onFly={flyTo} shown={overlays} follow={follow} onHelp={openHelp} />

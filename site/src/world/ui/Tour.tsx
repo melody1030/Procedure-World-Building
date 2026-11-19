@@ -59,9 +59,19 @@ const STEPS: Step[] = [
     text: "What is drawn, not what is built: tint the ground by district or claim, and show or hide lots, parks, buildings and people.",
   },
   {
+    target: '[data-tour="timeline"]',
+    title: "Watch it being made",
+    text: "Press Space to print the city again. Click a step's name to replay from there, or drag the bar to scrub through the rules.",
+  },
+  {
+    target: '[data-tour="camera"]',
+    title: "Fly around",
+    text: "Keys 1 to 5 fly to a view. Street level is where the people are; hide Buildings in Layers to see the streets from above.",
+  },
+  {
     target: null,
     title: "Click anyone in the city",
-    text: "A person, a pigeon, a cat or a bus: a card tells you what it is doing and why. Try it now.",
+    text: "A person, a pigeon, a cat or a bus: a card tells you what it is doing and why. Fly to Street first so you can find one.",
   },
 ];
 
@@ -163,8 +173,11 @@ export function Tour({
             arrow.style.left = "";
           } else {
             x = Math.min(Math.max(EDGE, r.left), window.innerWidth - w - EDGE);
-            y = r.bottom + RING + GAP * scale;
-            arrow.dataset.side = "top";
+            // Below the control, or above it when there's no room (the timeline sits at the bottom).
+            const below = r.bottom + RING + GAP * scale;
+            const flip = below + h > window.innerHeight - EDGE;
+            y = flip ? r.top - RING - GAP * scale - h : below;
+            arrow.dataset.side = flip ? "bottom" : "top";
             arrow.style.left = `${Math.min(Math.max(14, (r.left + r.width / 2 - x) / scale - 6), w / scale - 26)}px`;
             arrow.style.top = "";
           }
@@ -208,7 +221,7 @@ export function Tour({
         <span
           ref={arrowRef}
           aria-hidden
-          className="absolute hidden h-3 w-3 rotate-45 border-[#7db4e6]/15 bg-[#0b1626] data-[side=left]:-left-[7px] data-[side=left]:border-b data-[side=left]:border-l data-[side=top]:-top-[7px] data-[side=top]:border-l data-[side=top]:border-t"
+          className="absolute hidden h-3 w-3 rotate-45 border-[#7db4e6]/15 bg-[#0b1626] data-[side=left]:-left-[7px] data-[side=left]:border-b data-[side=left]:border-l data-[side=top]:-top-[7px] data-[side=top]:border-l data-[side=top]:border-t data-[side=bottom]:-bottom-[7px] data-[side=bottom]:border-b data-[side=bottom]:border-r"
         />
         <div className="flex items-center gap-3">
           <ol className="m-0 flex flex-1 list-none gap-1 p-0" aria-hidden>
@@ -216,7 +229,7 @@ export function Tour({
               <li key={i} className={"h-[3px] flex-1 rounded-full transition-colors " + (i <= step ? "bg-[#5ad8ff]" : "bg-[#7db4e6]/20")} />
             ))}
           </ol>
-          <span className="font-mono text-[11px] tabular-nums text-[#6f86a0]">
+          <span className="font-mono text-[11px] tabular-nums text-[#8ba1b8]">
             {step + 1} of {STEPS.length}
           </span>
         </div>
@@ -228,7 +241,7 @@ export function Tour({
         </p>
         <div className="-mx-1 mt-3.5 flex items-center gap-1.5">
           {!last && (
-            <button type="button" onClick={finish} className={button + " px-1 text-[#6f86a0] hover:text-[#dce8f5]"}>
+            <button type="button" onClick={finish} className={button + " px-1 text-[#8ba1b8] hover:text-[#dce8f5]"}>
               Skip tour
             </button>
           )}
