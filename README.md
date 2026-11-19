@@ -17,7 +17,7 @@ traffic move in.
 ## Outline
 
 1. [Concept](#1-concept)
-2. [Technique](#2-technique): [Terrain](docs/techniques/terrain.md) · [Shader](docs/techniques/shader.md) · [Agents](docs/techniques/agents.md) · [Building morphology](docs/techniques/building-morphology.md) · [Network](docs/techniques/network.md)
+2. [Technique](#2-technique): [Terrain](docs/techniques/terrain.md) · [Shader](docs/techniques/shader.md) · [Agents](docs/techniques/agents.md) · [Building morphology](docs/techniques/building-morphology.md) · [Network](docs/techniques/network.md) · [Data and layers](docs/techniques/data-and-layers.md)
 3. [Process log](#3-process-log)
 4. [Class notes and studios](#4-class-notes-and-studios)
 
@@ -66,7 +66,7 @@ code it lives in and the log entries behind it.
 | <img src="site/src/world/screenshots/2026-10-13-building-library.webp" alt="Building library" width="220"> | **[Building morphology](docs/techniques/building-morphology.md)** | Eleven cyberpunk archetypes built from reusable parts, picked by district and sized to their lots; and a shape grammar (`/grammar`) that derives a building rule by rule, with a Simulation page that grows one on every lot of a street grid, its height set by a map |
 | <img src="site/src/world/screenshots/2026-10-09-wfc-streets-districts.webp" alt="Street network" width="220"> | **[Network](docs/techniques/network.md)** | A street network by wave function collapse, districts and lots zoned along it, and the walking and lane graphs the agents move on |
 
-How they fit together, in the order the city is made:
+How they fit together, in the order the city is made (the data behind each box, its scales, its layers and what the agents do on them, are in [Data and layers](docs/techniques/data-and-layers.md)):
 
 ```mermaid
 flowchart TB
@@ -118,6 +118,8 @@ The full dated log with every screenshot is in
 | 2026-11-16/17 | **Buildings at the people's scale**: the city's buildings, the Landmark included, are drawn at 0.75, as its people are, so a storey stands about 1.75 people tall |
 | 2026-11-17    | **The city as a simulation** (Class 09): everyone has a home and a job and goes round a cycle of their own, with no clock; garbage trucks empty the bins into the incinerator, and a missed bin spills a pile that draws the pigeons; a Waste ground color, and the path ahead of any agent you click |
 | 2026-11-18    | **Street lamps**: a few along every street, side to side, one every 48 m on each side; amber in the homes, cyan in the core |
+| 2026-11-18    | **Everything in voxels**: the buildings, plants, people, animals and vehicles share the ground's cube grid and lines, drawn by the shader, with no slower frame; the plaza is a roundabout round the Landmark |
+| 2026-11-19    | **Interface pass**: the overlay at 90%, more readable notes, bigger hit areas, and two new tour steps (the timeline and the camera) |
 
 | Version 1, rainy night (Oct 7) | Districts and parks (Oct 12) |
 |---|---|
@@ -179,7 +181,7 @@ Street lamps (Nov 18):
 
 ![A street lamp at the top of a stepped street, its amber lantern over the road](site/src/world/screenshots/2026-11-18-street-lamp.webp)
 
-Plans: [terrain plan](docs/plans/terrain-plan.md) · [town plan](docs/plans/town-plan.md) · [shader studio plan](docs/plans/shader-studio-plan.md) · [city controls plan](docs/plans/city-controls-plan.md) · [building grammar plan](docs/plans/building-grammar-plan.md) · [grammar city plan](docs/plans/grammar-city-plan.md) · [city simulation plan](docs/plans/city-simulation-plan.md) · [street furniture plan](docs/plans/street-furniture-plan.md)
+Plans: [terrain plan](docs/plans/terrain-plan.md) · [town plan](docs/plans/town-plan.md) · [shader studio plan](docs/plans/shader-studio-plan.md) · [city controls plan](docs/plans/city-controls-plan.md) · [building grammar plan](docs/plans/building-grammar-plan.md) · [grammar city plan](docs/plans/grammar-city-plan.md) · [city simulation plan](docs/plans/city-simulation-plan.md) · [street furniture plan](docs/plans/street-furniture-plan.md) · [voxel look plan](docs/plans/voxel-look-plan.md)
 
 ---
 

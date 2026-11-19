@@ -29,6 +29,7 @@ flowchart TB
 | Effect | How | Code |
 |---|---|---|
 | Voxel grid on merged faces | Block outlines, a slight per-block tint and strata bands worked out per pixel from the world position; lines fade where a voxel is under about 4 pixels, so the ground never shimmers | [`render/print.ts`](../../site/src/world/render/print.ts) |
+| The voxel look on everything else | The same lines and tint on the buildings, park props, plants, animals and vehicles, from each vertex's cube coordinates (`aVoxel`) on the thing's own grid, so a turned car or a walking person shows its cubes square to its edges; plants' leaves vary more per cube | [`render/voxelLook.ts`](../../site/src/world/render/voxelLook.ts) |
 | Overlays | The claim, district and lot maps uploaded as data textures (one texel per column) and tinted in the fragment shader | [`render/print.ts`](../../site/src/world/render/print.ts) |
 | Printing the terrain | A vertex patch pulls every vertex above the print height down to it, so the unprinted part becomes a flat glowing cap; shadows use the same patch | [`render/print.ts`](../../site/src/world/render/print.ts) |
 | Paving the streets | Each column's paving order is one value in a texture; the shader compares it to the timeline, so streets spread out from the plaza with a glowing front | [`terrain/buildup.ts`](../../site/src/world/terrain/buildup.ts) |
@@ -50,4 +51,5 @@ flowchart TB
 - [The build timeline](../../site/src/world/README.md#2026-10-14-the-build-timeline)
 - [Buildings are built, storey by storey](../../site/src/world/README.md#2026-10-26-buildings-are-built-storey-by-storey)
 - [One concrete city](../../site/src/world/README.md#2026-10-27-one-concrete-city-surfaces-rewritten-for-the-cyberpunk-island)
+- [The voxel look on everything](../../site/src/world/README.md#2026-11-18-the-voxel-look-on-everything)
 - Class work it builds on: [Week 4: Shader Studio](../../site/src/weeks/week04-shaders/README.md) · [Shaders class notes](../notes/shaders-notes.md)

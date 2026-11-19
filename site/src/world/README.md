@@ -2081,3 +2081,35 @@ to a quarter voxel and grown by its own hair, so they read as fine, smooth-ish b
   rounded instead.
 
 The flicker check is zero on every plant (8 seeds each); a tree is 50–140 quads.
+
+## 2026-11-18: Checking the voxel look
+
+The last step of the voxel look plan (`docs/plans/voxel-look-plan.md`): the street, a park and the
+whole city on `blueprint` and `neon7`, and the frame against the city before the plan (6cf213d),
+same camera, in the browser pane:
+
+| View | Frame (median) | Draw calls | Triangles |
+|---|---|---|---|
+| Whole city, before | 21.6 ms | 465 | 6.40 M |
+| Whole city, after | 19.7 ms | 389 | 6.40 M |
+| Street, before | 16.7 ms | 308 | 4.34 M |
+| Street, after | 16.6 ms | 252 | 4.35 M |
+
+Everything on the grid costs nothing per frame: the cubes are drawn by the shader, not built as
+geometry, and the voxel models merge their faces into rectangles. The lines fade out before a cube
+gets smaller than a few pixels, so the whole city reads as flat color and nothing shimmers as the
+camera moves.
+
+## 2026-11-19: An interface pass
+
+Week 9's feedback asked for navigation help and a clearer way to see the steps, so the interface got
+a pass (no change to the city):
+
+- **Size:** the overlay is drawn at 90% (`UI_SCALE`, was 80%), and small targets got bigger hit
+  areas without changing how they look: the timeline's track and play button, its step names and
+  the toggles.
+- **Contrast:** the note color went from `#6f86a0` to `#8ba1b8` and the step names from 10 to 11 px;
+  the hover bubbles blur and darken what is behind them. `DESIGN.md` records both.
+- **Tour:** two new steps, the timeline (Space, click a step, drag to scrub) and the camera bar
+  (keys 1 to 5); the card flips above a control when there is no room below it, and the last step
+  says to fly to Street first.

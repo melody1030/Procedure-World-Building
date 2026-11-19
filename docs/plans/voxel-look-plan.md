@@ -1,6 +1,6 @@
 # Plan: everything in voxels
 
-**Drafted 2026-11-18. M1–M5 built 2026-11-18; M6 to come.** Only the ground reads as voxels; the buildings, the park
+**Drafted 2026-11-18. M1–M6 built 2026-11-18.** Only the ground reads as voxels; the buildings, the park
 props, the people, the animals and the vehicles read as smooth boxes. This plan makes all of it
 read as the same voxel world.
 
@@ -123,6 +123,20 @@ The flicker check is zero on every plant.
 - Screenshots at three distances (street, park, whole city) on `blueprint` and `neon7`.
 - Frame time and draw calls before and after; no shimmer when the camera moves.
 - The README's dev log, the techniques docs, `npm run build`.
+
+**Built 2026-11-18.** Measured on `blueprint` against the city before the plan (6cf213d), same
+camera, in the browser pane:
+
+| View | Frame (median) | Draw calls | Triangles |
+|---|---|---|---|
+| Whole city, before | 21.6 ms | 465 | 6.40 M |
+| Whole city, after | 19.7 ms | 389 | 6.40 M |
+| Street, before | 16.7 ms | 308 | 4.34 M |
+| Street, after | 16.6 ms | 252 | 4.35 M |
+
+The frame is no slower, with fewer draw calls (the before also lacks the plaza's roundabout, so
+not all of the difference is this plan's) and the same triangles. The street view runs at the
+display's rate either way.
 
 ---
 
