@@ -1,0 +1,355 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1536" height="1024" viewBox="0 0 1536 1024" font-family="Helvetica Neue, Helvetica, Arial, sans-serif">
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0a0f33"/><stop offset="1" stop-color="#101a48"/></linearGradient>
+<marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#14204a"/></marker>
+<marker id="ahs" viewBox="0 0 10 10" refX="2" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 Z" fill="#14204a"/></marker>
+<marker id="ahl" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#e8eeff"/></marker>
+<linearGradient id="skyg" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#5a2a9a"/><stop offset="1" stop-color="#2a4aa0"/></linearGradient>
+</defs>
+<rect x="0" y="0" width="1536" height="1024" rx="0" fill="url(#bg)" stroke="none" stroke-width="1.5" />
+<rect x="6" y="46" width="22" height="36" rx="2" fill="#4a2a8a" stroke="none" stroke-width="0" />
+<rect x="10" y="52" width="3.5" height="4.5" fill="#ffd96a" opacity=".9"/>
+<rect x="10" y="61" width="3.5" height="4.5" fill="#ffd96a" opacity=".9"/>
+<rect x="18" y="61" width="3.5" height="4.5" fill="#ffffff" opacity=".9"/>
+<rect x="10" y="70" width="3.5" height="4.5" fill="#ff7ad9" opacity=".9"/>
+<rect x="30" y="24" width="26" height="58" rx="2" fill="#2a56b0" stroke="none" stroke-width="0" />
+<rect x="42" y="30" width="3.5" height="4.5" fill="#ff7ad9" opacity=".9"/>
+<rect x="50" y="30" width="3.5" height="4.5" fill="#7fe3ff" opacity=".9"/>
+<rect x="42" y="39" width="3.5" height="4.5" fill="#ffd96a" opacity=".9"/>
+<rect x="50" y="48" width="3.5" height="4.5" fill="#ff7ad9" opacity=".9"/>
+<rect x="34" y="57" width="3.5" height="4.5" fill="#ff7ad9" opacity=".9"/>
+<rect x="42" y="57" width="3.5" height="4.5" fill="#ff7ad9" opacity=".9"/>
+<rect x="34" y="66" width="3.5" height="4.5" fill="#7fe3ff" opacity=".9"/>
+<rect x="42" y="66" width="3.5" height="4.5" fill="#ff7ad9" opacity=".9"/>
+<rect x="50" y="66" width="3.5" height="4.5" fill="#ff7ad9" opacity=".9"/>
+<rect x="34" y="75" width="3.5" height="4.5" fill="#ff7ad9" opacity=".9"/>
+<rect x="58" y="38" width="20" height="44" rx="2" fill="#5a2f9c" stroke="none" stroke-width="0" />
+<rect x="70" y="44" width="3.5" height="4.5" fill="#ffffff" opacity=".9"/>
+<rect x="62" y="53" width="3.5" height="4.5" fill="#ff7ad9" opacity=".9"/>
+<rect x="70" y="53" width="3.5" height="4.5" fill="#7fe3ff" opacity=".9"/>
+<rect x="62" y="62" width="3.5" height="4.5" fill="#ff7ad9" opacity=".9"/>
+<rect x="62" y="71" width="3.5" height="4.5" fill="#ffd96a" opacity=".9"/>
+<rect x="70" y="71" width="3.5" height="4.5" fill="#ff7ad9" opacity=".9"/>
+<rect x="80" y="12" width="30" height="70" rx="2" fill="#2d62c0" stroke="none" stroke-width="0" />
+<rect x="84" y="18" width="3.5" height="4.5" fill="#ffffff" opacity=".9"/>
+<rect x="100" y="18" width="3.5" height="4.5" fill="#7fe3ff" opacity=".9"/>
+<rect x="84" y="27" width="3.5" height="4.5" fill="#7fe3ff" opacity=".9"/>
+<rect x="100" y="27" width="3.5" height="4.5" fill="#7fe3ff" opacity=".9"/>
+<rect x="84" y="36" width="3.5" height="4.5" fill="#ff7ad9" opacity=".9"/>
+<rect x="100" y="36" width="3.5" height="4.5" fill="#ff7ad9" opacity=".9"/>
+<rect x="84" y="45" width="3.5" height="4.5" fill="#ffd96a" opacity=".9"/>
+<rect x="100" y="45" width="3.5" height="4.5" fill="#7fe3ff" opacity=".9"/>
+<rect x="84" y="54" width="3.5" height="4.5" fill="#7fe3ff" opacity=".9"/>
+<rect x="92" y="54" width="3.5" height="4.5" fill="#ffd96a" opacity=".9"/>
+<rect x="100" y="54" width="3.5" height="4.5" fill="#ffd96a" opacity=".9"/>
+<rect x="92" y="72" width="3.5" height="4.5" fill="#ff7ad9" opacity=".9"/>
+<rect x="100" y="72" width="3.5" height="4.5" fill="#7fe3ff" opacity=".9"/>
+<rect x="108" y="42" width="22" height="40" rx="2" fill="#4a2a8a" stroke="none" stroke-width="0" />
+<rect x="120" y="48" width="3.5" height="4.5" fill="#ffd96a" opacity=".9"/>
+<rect x="112" y="57" width="3.5" height="4.5" fill="#7fe3ff" opacity=".9"/>
+<rect x="112" y="66" width="3.5" height="4.5" fill="#ff7ad9" opacity=".9"/>
+<rect x="120" y="66" width="3.5" height="4.5" fill="#7fe3ff" opacity=".9"/>
+<rect x="112" y="75" width="3.5" height="4.5" fill="#ffd96a" opacity=".9"/>
+<rect x="120" y="75" width="3.5" height="4.5" fill="#ffffff" opacity=".9"/>
+<rect x="132" y="20" width="28" height="62" rx="2" fill="#2a56b0" stroke="none" stroke-width="0" />
+<rect x="136" y="26" width="3.5" height="4.5" fill="#ff7ad9" opacity=".9"/>
+<rect x="136" y="35" width="3.5" height="4.5" fill="#7fe3ff" opacity=".9"/>
+<rect x="144" y="35" width="3.5" height="4.5" fill="#7fe3ff" opacity=".9"/>
+<rect x="152" y="35" width="3.5" height="4.5" fill="#ffd96a" opacity=".9"/>
+<rect x="136" y="44" width="3.5" height="4.5" fill="#7fe3ff" opacity=".9"/>
+<rect x="144" y="53" width="3.5" height="4.5" fill="#7fe3ff" opacity=".9"/>
+<rect x="152" y="53" width="3.5" height="4.5" fill="#ffd96a" opacity=".9"/>
+<rect x="136" y="62" width="3.5" height="4.5" fill="#ff7ad9" opacity=".9"/>
+<rect x="152" y="62" width="3.5" height="4.5" fill="#7fe3ff" opacity=".9"/>
+<rect x="136" y="71" width="3.5" height="4.5" fill="#7fe3ff" opacity=".9"/>
+<rect x="144" y="71" width="3.5" height="4.5" fill="#ffffff" opacity=".9"/>
+<rect x="152" y="71" width="3.5" height="4.5" fill="#ffffff" opacity=".9"/>
+<rect x="160" y="32" width="24" height="50" rx="2" fill="#5a2f9c" stroke="none" stroke-width="0" />
+<rect x="164" y="38" width="3.5" height="4.5" fill="#ffffff" opacity=".9"/>
+<rect x="164" y="47" width="3.5" height="4.5" fill="#ffd96a" opacity=".9"/>
+<rect x="172" y="47" width="3.5" height="4.5" fill="#ff7ad9" opacity=".9"/>
+<rect x="164" y="56" width="3.5" height="4.5" fill="#7fe3ff" opacity=".9"/>
+<rect x="164" y="65" width="3.5" height="4.5" fill="#ff7ad9" opacity=".9"/>
+<rect x="172" y="65" width="3.5" height="4.5" fill="#ffd96a" opacity=".9"/>
+<rect x="172" y="74" width="3.5" height="4.5" fill="#ffd96a" opacity=".9"/>
+<rect x="186" y="8" width="30" height="74" rx="2" fill="#2d62c0" stroke="none" stroke-width="0" />
+<rect x="198" y="14" width="3.5" height="4.5" fill="#ffd96a" opacity=".9"/>
+<rect x="206" y="14" width="3.5" height="4.5" fill="#ffd96a" opacity=".9"/>
+<rect x="190" y="23" width="3.5" height="4.5" fill="#7fe3ff" opacity=".9"/>
+<rect x="198" y="23" width="3.5" height="4.5" fill="#ffffff" opacity=".9"/>
+<rect x="206" y="32" width="3.5" height="4.5" fill="#ff7ad9" opacity=".9"/>
+<rect x="190" y="41" width="3.5" height="4.5" fill="#ffffff" opacity=".9"/>
+<rect x="206" y="41" width="3.5" height="4.5" fill="#ff7ad9" opacity=".9"/>
+<rect x="206" y="50" width="3.5" height="4.5" fill="#7fe3ff" opacity=".9"/>
+<rect x="198" y="59" width="3.5" height="4.5" fill="#ffd96a" opacity=".9"/>
+<rect x="198" y="68" width="3.5" height="4.5" fill="#ffffff" opacity=".9"/>
+<rect x="198" y="77" width="3.5" height="4.5" fill="#ffd96a" opacity=".9"/>
+<rect x="206" y="77" width="3.5" height="4.5" fill="#7fe3ff" opacity=".9"/>
+<rect x="214" y="40" width="22" height="42" rx="2" fill="#4a2a8a" stroke="none" stroke-width="0" />
+<rect x="218" y="46" width="3.5" height="4.5" fill="#ff7ad9" opacity=".9"/>
+<rect x="226" y="46" width="3.5" height="4.5" fill="#ffffff" opacity=".9"/>
+<rect x="226" y="64" width="3.5" height="4.5" fill="#ff7ad9" opacity=".9"/>
+<rect x="238" y="48" width="26" height="34" rx="2" fill="#2a56b0" stroke="none" stroke-width="0" />
+<rect x="258" y="54" width="3.5" height="4.5" fill="#ffd96a" opacity=".9"/>
+<rect x="242" y="63" width="3.5" height="4.5" fill="#ffd96a" opacity=".9"/>
+<rect x="250" y="63" width="3.5" height="4.5" fill="#ff7ad9" opacity=".9"/>
+<rect x="242" y="72" width="3.5" height="4.5" fill="#ff7ad9" opacity=".9"/>
+<rect x="250" y="72" width="3.5" height="4.5" fill="#ffd96a" opacity=".9"/>
+<rect x="258" y="72" width="3.5" height="4.5" fill="#ff7ad9" opacity=".9"/>
+<rect x="80" y="2" width="10" height="14" rx="1" fill="#4a2a8a" stroke="none" stroke-width="0" />
+<rect x="60" y="60" width="6" height="22" rx="1" fill="#2d62c0" stroke="none" stroke-width="0" />
+<path d="M285,50 L330,14 L1228,14 L1292,50 L1500,50" fill="none" stroke="#39d4ff" stroke-width="2.5"/>
+<path d="M290,50 L335,22 L1220,22 L1282,58 L1290,80 L300,80 Z" fill="#101a4a" stroke="#4a7bff" stroke-width="1.5" opacity=".95"/>
+<text text-anchor="middle" font-size="31" font-weight="700" fill="#ffffff" font-family="Menlo, 'Courier New', monospace"><tspan x="775" y="60.9">Blueprint City — Agent Behavior &amp; State Machines</tspan></text>
+<path d="M1388,78 L1418,16 L1440,16 L1410,78 Z" fill="#3f6bff"/>
+<path d="M1430,78 L1460,16 L1482,16 L1452,78 Z" fill="#5d86ff"/>
+<path d="M1472,78 L1502,16 L1524,16 L1494,78 Z" fill="#8aa9ff"/>
+<rect x="12" y="88" width="740" height="372" rx="16" fill="#0d1636" stroke="#4a8fe0" stroke-width="3"/>
+<rect x="12" y="88" width="740" height="52" rx="16" fill="#4a8fe0" fill-opacity=".28"/>
+<g stroke="#fff" stroke-width="4" stroke-linecap="round" fill="#fff"><circle cx="55" cy="104" r="5"/><path d="M54,112 L50,124 L42,136 M50,124 L58,130 L60,140 M54,114 L42,116 M54,114 L65,121" fill="none"/></g>
+<text text-anchor="start" font-size="25" font-weight="700" fill="#fff"><tspan x="90" y="126.8">1.  People — Need-Driven FSM</tspan></text>
+<rect x="18" y="140" width="730" height="312" rx="10" fill="#eef4fb" stroke="#4a8fe0" stroke-width="2" />
+<rect x="33" y="268" width="52" height="44" rx="9" fill="#1a2a5c" stroke="#0d1738" stroke-width="1.6" />
+<text text-anchor="middle" font-size="13" font-weight="600" fill="#fff"><tspan x="59.0" y="294.6">Start</tspan></text>
+<rect x="108" y="256" width="70" height="66" rx="9" fill="#bcd9f8" stroke="#4a7fc4" stroke-width="1.6" />
+<text text-anchor="middle" font-size="13" font-weight="600" fill="#16224d"><tspan x="143.0" y="286.1">Check</tspan><tspan x="143.0" y="301.0">Needs</tspan></text>
+<path d="M197.0,290 L258,228.0 L319.0,290 L258,352.0 Z" fill="#eaf2fd" stroke="#4a7fc4" stroke-width="1.8"/>
+<text text-anchor="middle" font-size="11.5" font-weight="600" fill="#16224d"><tspan x="258" y="280.8">What</tspan><tspan x="258" y="294.0">is the most</tspan><tspan x="258" y="307.2">urgent need?</tspan></text>
+<path d="M85,290 L108,290" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<path d="M178,290 L197,290" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<path d="M319,290 L343,290" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round"/>
+<path d="M343,173 L343,411" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round"/>
+<path d="M343,173 L365,173" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<rect x="365" y="159" width="70" height="28" rx="14" fill="#bcd9f8" stroke="#4a7fc4" stroke-width="1.6" />
+<text text-anchor="middle" font-size="12.5" font-weight="600" fill="#16224d"><tspan x="400" y="177.4">Thirst</tspan></text>
+<path d="M435,173 L468,173" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<rect x="468" y="152" width="127" height="42" rx="9" fill="#bcd9f8" stroke="#4a7fc4" stroke-width="1.6" />
+<text text-anchor="middle" font-size="12.5" font-weight="600" fill="#16224d"><tspan x="531.5" y="170.2">Walk</tspan><tspan x="531.5" y="184.6">Vending Machine</tspan></text>
+<path d="M595,173 L620,173" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<rect x="620" y="152" width="93" height="42" rx="9" fill="#bcd9f8" stroke="#4a7fc4" stroke-width="1.6" />
+<text text-anchor="middle" font-size="12" font-weight="600" fill="#16224d"><tspan x="666.5" y="177.2">Use</tspan></text>
+<path d="M713,173 L731,173" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round"/>
+<path d="M343,222 L365,222" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<rect x="365" y="208" width="70" height="28" rx="14" fill="#bfe6b9" stroke="#5aa55a" stroke-width="1.6" />
+<text text-anchor="middle" font-size="12.5" font-weight="600" fill="#16224d"><tspan x="400" y="226.4">Rest</tspan></text>
+<path d="M435,222 L468,222" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<rect x="468" y="201" width="127" height="42" rx="9" fill="#bcd9f8" stroke="#4a7fc4" stroke-width="1.6" />
+<text text-anchor="middle" font-size="12.5" font-weight="600" fill="#16224d"><tspan x="531.5" y="226.4">Walk to Bench</tspan></text>
+<path d="M595,222 L620,222" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<rect x="620" y="201" width="93" height="42" rx="9" fill="#bcd9f8" stroke="#4a7fc4" stroke-width="1.6" />
+<text text-anchor="middle" font-size="12" font-weight="600" fill="#16224d"><tspan x="666.5" y="226.2">Sit / Rest</tspan></text>
+<path d="M713,222 L731,222" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round"/>
+<path d="M343,268 L365,268" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<rect x="365" y="254" width="70" height="28" rx="14" fill="#cdbcf0" stroke="#7d5fc2" stroke-width="1.6" />
+<text text-anchor="middle" font-size="12.5" font-weight="600" fill="#16224d"><tspan x="400" y="272.4">Company</tspan></text>
+<path d="M435,268 L468,268" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<rect x="468" y="247" width="127" height="42" rx="9" fill="#bcd9f8" stroke="#4a7fc4" stroke-width="1.6" />
+<text text-anchor="middle" font-size="12.5" font-weight="600" fill="#16224d"><tspan x="531.5" y="265.2">Walk to Plaza /</tspan><tspan x="531.5" y="279.6">Fountain</tspan></text>
+<path d="M595,268 L620,268" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<rect x="620" y="247" width="93" height="42" rx="9" fill="#bcd9f8" stroke="#4a7fc4" stroke-width="1.6" />
+<text text-anchor="middle" font-size="12" font-weight="600" fill="#16224d"><tspan x="666.5" y="272.2">Chat</tspan></text>
+<path d="M713,268 L731,268" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round"/>
+<path d="M343,315 L365,315" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<rect x="365" y="301" width="70" height="28" rx="14" fill="#f9d3a2" stroke="#d28a2c" stroke-width="1.6" />
+<text text-anchor="middle" font-size="12.5" font-weight="600" fill="#16224d"><tspan x="400" y="319.4">Home</tspan></text>
+<path d="M435,315 L468,315" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<rect x="468" y="294" width="127" height="42" rx="9" fill="#bcd9f8" stroke="#4a7fc4" stroke-width="1.6" />
+<text text-anchor="middle" font-size="12.5" font-weight="600" fill="#16224d"><tspan x="531.5" y="319.4">Go Home</tspan></text>
+<path d="M595,315 L620,315" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<rect x="620" y="294" width="93" height="42" rx="9" fill="#bcd9f8" stroke="#4a7fc4" stroke-width="1.6" />
+<text text-anchor="middle" font-size="12" font-weight="600" fill="#16224d"><tspan x="666.5" y="319.2">Enter Home</tspan></text>
+<path d="M713,315 L731,315" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round"/>
+<path d="M343,361 L365,361" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<rect x="365" y="347" width="70" height="28" rx="14" fill="#a5e5e0" stroke="#35a8a0" stroke-width="1.6" />
+<text text-anchor="middle" font-size="12.5" font-weight="600" fill="#16224d"><tspan x="400" y="365.4">Bus</tspan></text>
+<path d="M435,361 L468,361" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<rect x="468" y="340" width="127" height="42" rx="9" fill="#bcd9f8" stroke="#4a7fc4" stroke-width="1.6" />
+<text text-anchor="middle" font-size="12.5" font-weight="600" fill="#16224d"><tspan x="531.5" y="365.4">Wait at Shelter</tspan></text>
+<path d="M595,361 L620,361" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<rect x="620" y="340" width="93" height="42" rx="9" fill="#bcd9f8" stroke="#4a7fc4" stroke-width="1.6" />
+<text text-anchor="middle" font-size="12" font-weight="600" fill="#16224d"><tspan x="666.5" y="358.3">Ride Bus</tspan><tspan x="666.5" y="372.1">→ Walk Home</tspan></text>
+<path d="M713,361 L731,361" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round"/>
+<path d="M343,411 L365,411" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<rect x="365" y="397" width="70" height="28" rx="14" fill="#f6b6b1" stroke="#d46464" stroke-width="1.6" />
+<text text-anchor="middle" font-size="12.5" font-weight="600" fill="#16224d"><tspan x="400" y="415.4">Taxi</tspan></text>
+<path d="M435,411 L468,411" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<rect x="468" y="390" width="127" height="42" rx="9" fill="#bcd9f8" stroke="#4a7fc4" stroke-width="1.6" />
+<text text-anchor="middle" font-size="12.5" font-weight="600" fill="#16224d"><tspan x="531.5" y="415.4">Hail a Taxi</tspan></text>
+<path d="M595,411 L620,411" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<rect x="620" y="390" width="93" height="42" rx="9" fill="#bcd9f8" stroke="#4a7fc4" stroke-width="1.6" />
+<text text-anchor="middle" font-size="12" font-weight="600" fill="#16224d"><tspan x="666.5" y="408.3">Ride Taxi</tspan><tspan x="666.5" y="422.1">→ Destination</tspan></text>
+<path d="M713,411 L731,411" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round"/>
+<path d="M731,173 L731,437 L143,437 L143,322" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<rect x="762" y="88" width="762" height="372" rx="16" fill="#0d1636" stroke="#7a5fd0" stroke-width="3"/>
+<rect x="762" y="88" width="762" height="52" rx="16" fill="#7a5fd0" fill-opacity=".28"/>
+<circle cx="802" cy="110" r="9" fill="#fff"/><path d="M784,136 Q784,122 802,122 Q820,122 820,136 Z" fill="#fff"/>
+<text text-anchor="start" font-size="25" font-weight="700" fill="#fff"><tspan x="840" y="126.8">2.  Person Daily Cycle</tspan></text>
+<rect x="768" y="140" width="750" height="312" rx="10" fill="#eeeafa" stroke="#7a5fd0" stroke-width="2" />
+<rect x="786" y="256" width="76" height="72" rx="9" fill="#cdbcf0" stroke="#7d5fc2" stroke-width="1.6" />
+<text text-anchor="middle" font-size="14" font-weight="600" fill="#16224d"><tspan x="824.0" y="288.8">At</tspan><tspan x="824.0" y="304.9">Home</tspan></text>
+<rect x="891" y="252" width="114" height="80" rx="9" fill="#bcd9f8" stroke="#4a7fc4" stroke-width="1.6" />
+<text text-anchor="middle" font-size="13.5" font-weight="600" fill="#16224d"><tspan x="948.0" y="281.2">Commute</tspan><tspan x="948.0" y="296.7">(walk / bus /</tspan><tspan x="948.0" y="312.3">taxi)</tspan></text>
+<rect x="1033" y="255" width="92" height="74" rx="9" fill="#cdbcf0" stroke="#7d5fc2" stroke-width="1.6" />
+<text text-anchor="middle" font-size="14.5" font-weight="600" fill="#16224d"><tspan x="1079.0" y="297.1">Working</tspan></text>
+<rect x="1152" y="252" width="110" height="78" rx="9" fill="#bcd9f8" stroke="#4a7fc4" stroke-width="1.6" />
+<text text-anchor="middle" font-size="13.5" font-weight="600" fill="#16224d"><tspan x="1207.0" y="288.0">Out</tspan><tspan x="1207.0" y="303.5">(needs FSM)</tspan></text>
+<rect x="1288" y="248" width="118" height="98" rx="9" fill="#bcd9f8" stroke="#4a7fc4" stroke-width="1.6" />
+<text text-anchor="middle" font-size="13.5" font-weight="600" fill="#16224d"><tspan x="1347.0" y="278.4">Commute</tspan><tspan x="1347.0" y="294.0">(break ends)</tspan><tspan x="1347.0" y="309.5">or</tspan><tspan x="1347.0" y="325.0">Going Home</tspan></text>
+<rect x="1432" y="256" width="68" height="72" rx="9" fill="#cdbcf0" stroke="#7d5fc2" stroke-width="1.6" />
+<text text-anchor="middle" font-size="14" font-weight="600" fill="#16224d"><tspan x="1466.0" y="288.8">At</tspan><tspan x="1466.0" y="304.9">Home</tspan></text>
+<path d="M862,290 L891,290" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<path d="M1005,290 L1033,290" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<path d="M1125,290 L1152,290" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<path d="M1262,290 L1288,290" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<path d="M1406,290 L1432,290" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<rect x="913" y="170" width="115" height="32" rx="14" fill="#d7cdf2" stroke="#9d86d8" stroke-width="1.3" />
+<text text-anchor="middle" font-size="12.5" font-weight="500" fill="#16224d"><tspan x="970" y="190.4">arrive at work</tspan></text>
+<rect x="1090" y="170" width="136" height="32" rx="14" fill="#d7cdf2" stroke="#9d86d8" stroke-width="1.3" />
+<text text-anchor="middle" font-size="12.5" font-weight="500" fill="#16224d"><tspan x="1158" y="190.4">break / shift ends</tspan></text>
+<rect x="1281" y="160" width="139" height="46" rx="14" fill="#d7cdf2" stroke="#9d86d8" stroke-width="1.3" />
+<text text-anchor="middle" font-size="12.5" font-weight="500" fill="#16224d"><tspan x="1350" y="180.2">home need due /</tspan><tspan x="1350" y="194.6">after stops</tspan></text>
+<path d="M970,202 L970,252" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<path d="M1158,202 L1158,252" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<path d="M1350,206 L1350,248" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<path d="M824,393 L824,330" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<path d="M824,393 L1467,393" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round"/>
+<path d="M1207,393 L1207,332" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<path d="M1467,393 L1467,330" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<text text-anchor="middle" font-size="14" font-weight="500" fill="#16224d"><tspan x="870" y="418.9">home stay ends</tspan></text>
+<text text-anchor="middle" font-size="14" font-weight="500" fill="#16224d"><tspan x="1200" y="418.9">break ends</tspan></text>
+<text text-anchor="middle" font-size="14" font-weight="500" fill="#16224d"><tspan x="1421" y="418.9">arrive home</tspan></text>
+<rect x="12" y="472" width="698" height="398" rx="16" fill="#0d1636" stroke="#2f9a68" stroke-width="3"/>
+<rect x="12" y="472" width="698" height="52" rx="16" fill="#2f9a68" fill-opacity=".28"/>
+<g fill="#fff"><ellipse cx="52" cy="510" rx="11" ry="9"/><ellipse cx="38" cy="497" rx="4.5" ry="6"/><ellipse cx="47" cy="489" rx="4.5" ry="6"/><ellipse cx="58" cy="489" rx="4.5" ry="6"/><ellipse cx="67" cy="497" rx="4.5" ry="6"/></g>
+<text text-anchor="start" font-size="25" font-weight="700" fill="#fff"><tspan x="90" y="510.8">3.  Animals</tspan></text>
+<rect x="18" y="526" width="686" height="338" rx="10" fill="#e9f4ec" stroke="#2f9a68" stroke-width="2" />
+<rect x="22" y="534" width="388" height="320" rx="8" fill="#eef7f1" stroke="#7fbf9a" stroke-width="1.2" />
+<rect x="418" y="534" width="284" height="320" rx="8" fill="#eef7f1" stroke="#7fbf9a" stroke-width="1.2" />
+<rect x="26" y="538" width="100" height="26" rx="6" fill="#dbe8e0" stroke="none" stroke-width="0" />
+<text text-anchor="middle" font-size="14" font-weight="700" fill="#16224d"><tspan x="76" y="555.9">Cat – FSM</tspan></text>
+<rect x="424" y="538" width="118" height="26" rx="6" fill="#dbe8e0" stroke="none" stroke-width="0" />
+<text text-anchor="middle" font-size="14" font-weight="700" fill="#16224d"><tspan x="483" y="555.9">Pigeon – FSM</tspan></text>
+<rect x="138" y="567" width="98" height="40" rx="9" fill="#bfe6b9" stroke="#5aa55a" stroke-width="1.6" />
+<text text-anchor="middle" font-size="13.5" font-weight="600" fill="#16224d"><tspan x="187.0" y="591.7">Prowl</tspan></text>
+<rect x="82" y="632" width="72" height="48" rx="9" fill="#bfe6b9" stroke="#5aa55a" stroke-width="1.6" />
+<text text-anchor="middle" font-size="12.5" font-weight="600" fill="#16224d"><tspan x="118.0" y="653.2">Hunt /</tspan><tspan x="118.0" y="667.6">Stalk</tspan></text>
+<rect x="218" y="632" width="100" height="48" rx="9" fill="#bfe6b9" stroke="#5aa55a" stroke-width="1.6" />
+<text text-anchor="middle" font-size="12.5" font-weight="600" fill="#16224d"><tspan x="268.0" y="653.2">Rest</tspan><tspan x="268.0" y="667.6">(sat down)</tspan></text>
+<rect x="32" y="705" width="140" height="56" rx="9" fill="#bfe6b9" stroke="#5aa55a" stroke-width="1.6" />
+<text text-anchor="middle" font-size="12.5" font-weight="600" fill="#16224d"><tspan x="102.0" y="730.2">Sprint</tspan><tspan x="102.0" y="744.6">(close enough)</tspan></text>
+<rect x="218" y="705" width="100" height="52" rx="9" fill="#bfe6b9" stroke="#5aa55a" stroke-width="1.6" />
+<text text-anchor="middle" font-size="12.5" font-weight="600" fill="#16224d"><tspan x="268.0" y="728.2">Prowl</tspan><tspan x="268.0" y="742.6">(rested)</tspan></text>
+<rect x="335" y="690" width="64" height="52" rx="9" fill="#bfe6b9" stroke="#5aa55a" stroke-width="1.6" />
+<text text-anchor="middle" font-size="12.5" font-weight="600" fill="#16224d"><tspan x="367.0" y="713.2">Rest</tspan><tspan x="367.0" y="727.6">(safe)</tspan></text>
+<rect x="127" y="790" width="158" height="56" rx="9" fill="#f6b6b1" stroke="#d46464" stroke-width="1.6" />
+<text text-anchor="middle" font-size="12.5" font-weight="600" fill="#16224d"><tspan x="206.0" y="815.2">Flee</tspan><tspan x="206.0" y="829.6">(person approaches)</tspan></text>
+<path d="M187,607 L187,618 L118,618 L118,632" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<path d="M187,618 L268,618 L268,632" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<path d="M102,680 L102,705" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<path d="M268,680 L268,705" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<path d="M101,761 L101,818 L127,818" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)" marker-start="url(#ahs)"/>
+<path d="M268,757 L268,790" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<path d="M285,818 L366,818 L366,743" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<path d="M366,690 L366,583 L237,583" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<rect x="488" y="567" width="134" height="48" rx="9" fill="#bcd9f8" stroke="#4a7fc4" stroke-width="1.6" />
+<text text-anchor="middle" font-size="12.5" font-weight="600" fill="#16224d"><tspan x="555.0" y="588.2">Ground</tspan><tspan x="555.0" y="602.6">(peck / hop)</tspan></text>
+<rect x="462" y="640" width="186" height="84" rx="9" fill="#bcd9f8" stroke="#4a7fc4" stroke-width="1.6" />
+<text text-anchor="middle" font-size="12.2" font-weight="600" fill="#16224d"><tspan x="555.0" y="665.2">Fly</tspan><tspan x="555.0" y="679.3">(startled by person,</tspan><tspan x="555.0" y="693.3">vehicle, cat, or</tspan><tspan x="555.0" y="707.3">flock alarm)</tspan></text>
+<rect x="462" y="757" width="186" height="54" rx="9" fill="#bcd9f8" stroke="#4a7fc4" stroke-width="1.6" />
+<text text-anchor="middle" font-size="12.5" font-weight="600" fill="#16224d"><tspan x="555.0" y="781.2">Land</tspan><tspan x="555.0" y="795.6">(quiet again)</tspan></text>
+<path d="M555,615 L555,640" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<path d="M555,724 L555,757" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<path d="M648,784 L678,784 L678,591 L622,591" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<rect x="718" y="472" width="806" height="398" rx="16" fill="#0d1636" stroke="#d49a1c" stroke-width="3"/>
+<rect x="718" y="472" width="806" height="52" rx="16" fill="#d49a1c" fill-opacity=".28"/>
+<g fill="#fff"><path d="M734,510 L736,500 L746,490 L768,490 L778,500 L784,504 L784,512 L734,512 Z"/></g><circle cx="746" cy="514" r="6" fill="#fff" stroke="#6b4a10" stroke-width="2"/><circle cx="772" cy="514" r="6" fill="#fff" stroke="#6b4a10" stroke-width="2"/>
+<text text-anchor="start" font-size="25" font-weight="700" fill="#fff"><tspan x="796" y="510.8">4.  Traffic &amp; Waste</tspan></text>
+<rect x="724" y="526" width="794" height="338" rx="10" fill="#faf1dc" stroke="#d49a1c" stroke-width="2" />
+<path d="M905,532 L905,858" stroke="#cdbb90" stroke-width="1.2" stroke-dasharray="3 4"/>
+<path d="M1077,532 L1077,858" stroke="#cdbb90" stroke-width="1.2" stroke-dasharray="3 4"/>
+<path d="M1278,532 L1278,858" stroke="#cdbb90" stroke-width="1.2" stroke-dasharray="3 4"/>
+<rect x="755.0" y="536" width="120" height="26" rx="6" fill="#e7d8b2" stroke="none" stroke-width="0" />
+<text text-anchor="middle" font-size="14.5" font-weight="700" fill="#16224d"><tspan x="815" y="554.1">Cars / Vans</tspan></text>
+<rect x="947.0" y="536" width="90" height="26" rx="6" fill="#e7d8b2" stroke="none" stroke-width="0" />
+<text text-anchor="middle" font-size="14.5" font-weight="700" fill="#16224d"><tspan x="992" y="554.1">Taxis</tspan></text>
+<rect x="1133.0" y="536" width="90" height="26" rx="6" fill="#e7d8b2" stroke="none" stroke-width="0" />
+<text text-anchor="middle" font-size="14.5" font-weight="700" fill="#16224d"><tspan x="1178" y="554.1">Buses</tspan></text>
+<rect x="1327.0" y="536" width="140" height="26" rx="6" fill="#e7d8b2" stroke="none" stroke-width="0" />
+<text text-anchor="middle" font-size="14.5" font-weight="700" fill="#16224d"><tspan x="1397" y="554.1">Garbage Truck</tspan></text>
+<rect x="775" y="580" width="98" height="40" rx="9" fill="#bcd9f8" stroke="#4a7fc4" stroke-width="1.6" />
+<text text-anchor="middle" font-size="12.5" font-weight="600" fill="#16224d"><tspan x="824.0" y="604.4">Drive</tspan></text>
+<rect x="760" y="642" width="130" height="42" rx="9" fill="#bcd9f8" stroke="#4a7fc4" stroke-width="1.6" />
+<text text-anchor="middle" font-size="12.5" font-weight="600" fill="#16224d"><tspan x="825.0" y="667.4">Random Turn</tspan></text>
+<rect x="775" y="702" width="98" height="42" rx="9" fill="#bcd9f8" stroke="#4a7fc4" stroke-width="1.6" />
+<text text-anchor="middle" font-size="12.5" font-weight="600" fill="#16224d"><tspan x="824.0" y="727.4">Drive</tspan></text>
+<path d="M824,620 L824,642" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<path d="M824,684 L824,702" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<path d="M775,723 L740,723 L740,600 L775,600" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<text text-anchor="middle" font-size="13.5" font-weight="500" fill="#16224d"><tspan x="815" y="829.0">Brake / yield</tspan><tspan x="815" y="844.5">for pedestrians.</tspan></text>
+<rect x="950" y="573" width="98" height="38" rx="9" fill="#bcd9f8" stroke="#4a7fc4" stroke-width="1.6" />
+<text text-anchor="middle" font-size="12.5" font-weight="600" fill="#16224d"><tspan x="999.0" y="596.4">Free</tspan></text>
+<rect x="943" y="621" width="112" height="50" rx="9" fill="#bcd9f8" stroke="#4a7fc4" stroke-width="1.6" />
+<text text-anchor="middle" font-size="12" font-weight="600" fill="#16224d"><tspan x="999.0" y="643.3">Dispatched</tspan><tspan x="999.0" y="657.1">to Fare</tspan></text>
+<rect x="941" y="688" width="114" height="38" rx="9" fill="#bcd9f8" stroke="#4a7fc4" stroke-width="1.6" />
+<text text-anchor="middle" font-size="12.5" font-weight="600" fill="#16224d"><tspan x="998.0" y="711.4">Pick Up</tspan></text>
+<rect x="941" y="740" width="114" height="38" rx="9" fill="#bcd9f8" stroke="#4a7fc4" stroke-width="1.6" />
+<text text-anchor="middle" font-size="12.5" font-weight="600" fill="#16224d"><tspan x="998.0" y="763.4">Drop Off</tspan></text>
+<rect x="950" y="792" width="98" height="36" rx="9" fill="#bcd9f8" stroke="#4a7fc4" stroke-width="1.6" />
+<text text-anchor="middle" font-size="12.5" font-weight="600" fill="#16224d"><tspan x="999.0" y="814.4">Free</tspan></text>
+<path d="M998,611 L998,621" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<path d="M998,671 L998,688" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<path d="M998,726 L998,740" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<path d="M998,778 L998,792" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<path d="M950,810 L922,810 L922,592 L950,592" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<rect x="1123" y="573" width="130" height="54" rx="9" fill="#bcd9f8" stroke="#4a7fc4" stroke-width="1.6" />
+<text text-anchor="middle" font-size="12.5" font-weight="600" fill="#16224d"><tspan x="1188.0" y="597.2">Follow Loop</tspan><tspan x="1188.0" y="611.6">Route</tspan></text>
+<rect x="1123" y="642" width="140" height="40" rx="9" fill="#bcd9f8" stroke="#4a7fc4" stroke-width="1.6" />
+<text text-anchor="middle" font-size="12.5" font-weight="600" fill="#16224d"><tspan x="1193.0" y="666.4">Stop at Shelter</tspan></text>
+<rect x="1123" y="698" width="140" height="40" rx="9" fill="#bcd9f8" stroke="#4a7fc4" stroke-width="1.6" />
+<text text-anchor="middle" font-size="12.5" font-weight="600" fill="#16224d"><tspan x="1193.0" y="722.4">Board / Alight</tspan></text>
+<rect x="1123" y="752" width="140" height="40" rx="9" fill="#bcd9f8" stroke="#4a7fc4" stroke-width="1.6" />
+<text text-anchor="middle" font-size="12.5" font-weight="600" fill="#16224d"><tspan x="1193.0" y="776.4">Continue Route</tspan></text>
+<path d="M1188,627 L1188,642" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<path d="M1188,682 L1188,698" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<path d="M1188,738 L1188,752" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<path d="M1123,772 L1096,772 L1096,600 L1123,600" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<rect x="1330" y="572" width="140" height="32" rx="9" fill="#bcd9f8" stroke="#4a7fc4" stroke-width="1.6" />
+<text text-anchor="middle" font-size="12.5" font-weight="600" fill="#16224d"><tspan x="1400.0" y="592.4">Depot</tspan></text>
+<rect x="1330" y="614" width="140" height="32" rx="9" fill="#bcd9f8" stroke="#4a7fc4" stroke-width="1.6" />
+<text text-anchor="middle" font-size="12.5" font-weight="600" fill="#16224d"><tspan x="1400.0" y="634.4">Drive to Bin</tspan></text>
+<rect x="1330" y="655" width="140" height="32" rx="9" fill="#bcd9f8" stroke="#4a7fc4" stroke-width="1.6" />
+<text text-anchor="middle" font-size="12.5" font-weight="600" fill="#16224d"><tspan x="1400.0" y="675.4">Collect</tspan></text>
+<path d="M1400,604 L1400,614" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<path d="M1400,646 L1400,655" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<path d="M1329.0,748 L1400,708.0 L1471.0,748 L1400,788.0 Z" fill="#eaf2fd" stroke="#4a7fc4" stroke-width="1.8"/>
+<text text-anchor="middle" font-size="12" font-weight="600" fill="#16224d"><tspan x="1400" y="738.4">Truck full /</tspan><tspan x="1400" y="752.2">no bins over</tspan><tspan x="1400" y="766.0">half?</tspan></text>
+<path d="M1400,687 L1400,708" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<rect x="1303" y="810" width="184" height="36" rx="9" fill="#bcd9f8" stroke="#4a7fc4" stroke-width="1.6" />
+<text text-anchor="middle" font-size="12.5" font-weight="600" fill="#16224d"><tspan x="1395.0" y="832.4">Incinerator → Unload</tspan></text>
+<path d="M1400,788 L1400,810" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<text text-anchor="start" font-size="12.5" font-weight="500" fill="#16224d"><tspan x="1420" y="804.4">Yes</tspan></text>
+<path d="M1471,748 L1505,748 L1505,828 L1487,828" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<text text-anchor="middle" font-size="12.5" font-weight="500" fill="#16224d"><tspan x="1490" y="731.4">No</tspan></text>
+<path d="M1329,748 L1296,748 L1296,588 L1330,588" fill="none" stroke="#14204a" stroke-width="2" stroke-linejoin="round" marker-end="url(#ah)"/>
+<rect x="12" y="888" width="1512" height="106" rx="16" fill="#0d1636" stroke="#7a5fd0" stroke-width="3"/>
+<g fill="#fff"><rect x="24" y="926" width="14" height="30" rx="3" fill="#7fa3ff"/><rect x="82" y="926" width="14" height="30" rx="3" fill="#7fa3ff"/><path d="M40,932 L58,928 L70,934 L80,932 L80,950 L68,958 L52,956 L40,948 Z"/><path d="M52,944 L64,952 M58,940 L70,948" stroke="#7fa3ff" stroke-width="2.5" fill="none"/></g>
+<text text-anchor="start" font-size="25" font-weight="700" fill="#fff"><tspan x="105" y="935.4">Interaction</tspan><tspan x="105" y="964.1">Overview</tspan></text>
+<rect x="248" y="905" width="164" height="70" rx="12" fill="#bcd9f8" stroke="#4a7fc4" stroke-width="1.6" />
+<text text-anchor="middle" font-size="17" font-weight="600" fill="#16224d"><tspan x="330.0" y="926.4">People</tspan><tspan x="330.0" y="946.0">startle Pigeons</tspan><tspan x="330.0" y="965.5">and Cats</tspan></text>
+<rect x="453" y="905" width="160" height="70" rx="12" fill="#bfe6b9" stroke="#5aa55a" stroke-width="1.6" />
+<text text-anchor="middle" font-size="17" font-weight="600" fill="#16224d"><tspan x="533.0" y="936.2">Cats hunt</tspan><tspan x="533.0" y="955.7">Pigeons</tspan></text>
+<rect x="630" y="905" width="164" height="70" rx="12" fill="#f9d3a2" stroke="#d28a2c" stroke-width="1.6" />
+<text text-anchor="middle" font-size="17" font-weight="600" fill="#16224d"><tspan x="712.0" y="936.2">Vehicles</tspan><tspan x="712.0" y="955.7">startle Pigeons</tspan></text>
+<rect x="827" y="905" width="136" height="70" rx="12" fill="#bcd9f8" stroke="#4a7fc4" stroke-width="1.6" />
+<text text-anchor="middle" font-size="17" font-weight="600" fill="#16224d"><tspan x="895.0" y="936.2">People</tspan><tspan x="895.0" y="955.7">fill Bins</tspan></text>
+<rect x="1005" y="905" width="188" height="70" rx="12" fill="#cdbcf0" stroke="#7d5fc2" stroke-width="1.6" />
+<text text-anchor="middle" font-size="17" font-weight="600" fill="#16224d"><tspan x="1099.0" y="936.2">Garbage Trucks</tspan><tspan x="1099.0" y="955.7">clear Bins</tspan></text>
+<path d="M412,940 L453,940" fill="none" stroke="#e8eeff" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#ahl)"/>
+<path d="M613,940 L630,940" fill="none" stroke="#e8eeff" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#ahl)"/>
+<path d="M794,940 L827,940" fill="none" stroke="#e8eeff" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#ahl)"/>
+<path d="M963,940 L1005,940" fill="none" stroke="#e8eeff" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#ahl)"/>
+<path d="M1230,908 L1230,974" stroke="#e8eeff" stroke-width="2"/>
+<circle cx="1279" cy="931" r="19" fill="#ffffff" stroke="#6a4fc8" stroke-width="3"/>
+<text text-anchor="middle" font-size="24" font-weight="800" fill="#4a2fb0"><tspan x="1279" y="939.4">!</tspan></text>
+<text text-anchor="start" font-size="15" font-weight="500" fill="#fff"><tspan x="1313" y="930.0">People wait at curbs</tspan><tspan x="1313" y="947.2">and step aside;</tspan><tspan x="1313" y="964.5">vehicles yield to pedestrians.</tspan></text>
+</svg>

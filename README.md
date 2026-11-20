@@ -92,6 +92,12 @@ flowchart TB
   Shader -.-> b2
 ```
 
+What the agents do and choose, each as a state machine:
+
+![Blueprint City: agent behavior and state machines. People choose by need and follow a daily cycle; pigeons, cats, cars, taxis, buses and garbage trucks each have their own machine, and they react to one another](docs/images/agent-behavior.svg)
+
+The details are in [Agents](docs/techniques/agents.md), and [Data and layers](docs/techniques/data-and-layers.md) shows what each agent reads.
+
 ---
 
 ## 3. Process log
