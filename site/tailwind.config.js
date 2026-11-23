@@ -14,6 +14,9 @@ export default {
         // Homepage headline and copy. Separate from `mono`, which the week panels use for values.
         technical: ['"JetBrains Mono"', "ui-monospace", '"SF Mono"', "Menlo", "monospace"],
       },
+      // The left panel's content swapping between Build and the debug view's layers.
+      keyframes: { swapIn: { from: { opacity: "0", transform: "translateY(6px)" }, to: { opacity: "1", transform: "none" } } },
+      animation: { swapIn: "swapIn 320ms ease-out both" },
       // Tailwind's default corner radii, all 10% smaller. `full` and `none` are untouched.
       borderRadius: {
         sm: "0.1125rem",

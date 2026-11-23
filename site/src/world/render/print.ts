@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { GRAY_FRAGMENT, GRAY_HEAD, grayUniforms } from "./gray";
 import { BLUEPRINT, URBAN_GROUND } from "../palette";
 import { CLAIM_COLORS } from "../terrain/claims";
 import { DISTRICTS, FRONTAGE_KINDS } from "../terrain/districts";
@@ -107,6 +108,7 @@ const LOOK_FRAGMENT = /* glsl */ `
     float h = fract(sin(dot(cell, vec2(12.9898, 78.233))) * 43758.5453);
     float lookShade = (1.0 - uLookGrid * 0.35 * line * fade) * (1.0 + uLookGrid * 0.12 * (h - 0.5) * fade);
     diffuseColor.rgb *= lookShade;
+    ${GRAY_FRAGMENT}
     // Strata: alternate bands down cliff sides, like the plinth's cut edge.
     if (an.y < 0.5) diffuseColor.rgb *= mix(1.0, 0.86, mod(floor(p.y / uLookStrata), 2.0));
     // The debug tints below skip the diorama's outer walls: those faces would read the edge
@@ -276,8 +278,14 @@ export function printMaterial(uniforms: PrintUniforms, options: THREE.MeshStanda
         );
     }
     shader.uniforms.uPrintColor = uniforms.uPrintColor;
+    if (!look) {
+      // No voxel look (the water): gray with the rest of the debug view.
+      grayUniforms(shader);
+      shader.fragmentShader = shader.fragmentShader.replace("#include <common>", `#include <common>\n${GRAY_HEAD}`).replace("#include <color_fragment>", `#include <color_fragment>\n${GRAY_FRAGMENT}`);
+    }
     if (look) {
       Object.assign(shader.uniforms, look);
+      grayUniforms(shader);
       shader.vertexShader = shader.vertexShader
         .replace("#include <common>", "#include <common>\nvarying vec3 vLookPos;\nvarying vec3 vLookNormal;")
         .replace(
@@ -285,7 +293,7 @@ export function printMaterial(uniforms: PrintUniforms, options: THREE.MeshStanda
           "#include <project_vertex>\nvLookPos = (modelMatrix * vec4(transformed, 1.0)).xyz;\nvLookNormal = normalize((modelMatrix * vec4(objectNormal, 0.0)).xyz);",
         );
       shader.fragmentShader = shader.fragmentShader
-        .replace("#include <common>", `#include <common>\nuniform float uLookGrid;\nuniform float uLookStrata;\nuniform sampler2D uClaims;\nuniform float uClaimSize;\nuniform float uShowClaims;\nuniform sampler2D uSuit;\nuniform float uShowSuit;\nuniform sampler2D uDistricts;\nuniform float uShowDistricts;\nuniform sampler2D uLots;\nuniform float uShowLots;\nuniform sampler2D uFrontage;\nuniform float uShowFrontage;\nuniform sampler2D uHeights;\nuniform float uShowHeights;\nuniform vec3 uHeightColors[4];\nuniform sampler2D uParks;\nuniform float uShowParks;\nuniform vec3 uParkColor;\nuniform sampler2D uBuild;\nuniform float uBuildT;\nuniform vec3 uUnbuilt;\nuniform vec3 uGrassHigh;\nuniform float uGroundTop;\nuniform vec3 uBuildGlow;\n#define DISTRICT_COUNT ${look.uDistrictColors.value.length}\nuniform vec3 uDistrictColors[DISTRICT_COUNT];\n#define FRONTAGE_COUNT ${look.uFrontageColors.value.length}\nuniform vec3 uFrontageColors[FRONTAGE_COUNT];\n#define CLAIM_COUNT ${look.uClaimColors.value.length}\nuniform vec3 uClaimColors[CLAIM_COUNT];\nvarying vec3 vLookPos;\nvarying vec3 vLookNormal;`)
+        .replace("#include <common>", `#include <common>\n${GRAY_HEAD}\nuniform float uLookGrid;\nuniform float uLookStrata;\nuniform sampler2D uClaims;\nuniform float uClaimSize;\nuniform float uShowClaims;\nuniform sampler2D uSuit;\nuniform float uShowSuit;\nuniform sampler2D uDistricts;\nuniform float uShowDistricts;\nuniform sampler2D uLots;\nuniform float uShowLots;\nuniform sampler2D uFrontage;\nuniform float uShowFrontage;\nuniform sampler2D uHeights;\nuniform float uShowHeights;\nuniform vec3 uHeightColors[4];\nuniform sampler2D uParks;\nuniform float uShowParks;\nuniform vec3 uParkColor;\nuniform sampler2D uBuild;\nuniform float uBuildT;\nuniform vec3 uUnbuilt;\nuniform vec3 uGrassHigh;\nuniform float uGroundTop;\nuniform vec3 uBuildGlow;\n#define DISTRICT_COUNT ${look.uDistrictColors.value.length}\nuniform vec3 uDistrictColors[DISTRICT_COUNT];\n#define FRONTAGE_COUNT ${look.uFrontageColors.value.length}\nuniform vec3 uFrontageColors[FRONTAGE_COUNT];\n#define CLAIM_COUNT ${look.uClaimColors.value.length}\nuniform vec3 uClaimColors[CLAIM_COUNT];\nvarying vec3 vLookPos;\nvarying vec3 vLookNormal;`)
         .replace("#include <color_fragment>", "#include <color_fragment>\n" + LOOK_FRAGMENT);
     }
     if (extras.plain) return;

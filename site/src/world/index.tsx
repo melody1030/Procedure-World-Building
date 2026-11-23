@@ -14,6 +14,7 @@ import { Spinner } from "./ui/icons";
 import { GLASS } from "./ui/kit";
 import { TerrainPanel } from "./ui/TerrainPanel";
 import { Inspector } from "./ui/Inspector";
+import { DebugMarks, HoverCard } from "./ui/Lens";
 import { HelpDialog } from "./ui/Help";
 import { Tour, tourSeen } from "./ui/Tour";
 import type { Selection } from "./render/select";
@@ -34,6 +35,14 @@ export default function WorldPage() {
   const mountRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<WorldView | null>(null);
   const [overlays, setOverlays] = useState(true);
+  /** The debug view (key D or the toolbar): off until asked for, so the city reads clean. */
+  const [debug, setDebug] = useState(false);
+  const debugToggle = useMemo(() => ({ on: debug, onToggle: () => setDebug((v) => !v) }), [debug]);
+  // Turning it on fades the world to gray, and opens the left panel, which turns to the layers.
+  useEffect(() => {
+    viewRef.current?.setDebug(debug);
+    if (debug) setPanelOpen(true);
+  }, [debug]);
   const [panelOpen, setPanelOpen] = useState(() => window.matchMedia("(min-width: 1024px)").matches);
   useShortcutToggle(overlays, () => setOverlays((v) => !v));
   /** The camera preset the view is at, or null once it has been moved by hand. */
@@ -197,8 +206,8 @@ export default function WorldPage() {
       <div ref={mountRef} className="absolute inset-0" />
       {/* The whole interface is drawn at UI_SCALE (90%), so it takes less of the view. */}
       <div className="pointer-events-none absolute inset-0" style={{ zoom: UI_SCALE }}>
-        <TerrainPanel terrain={terrain} life={life} ctl={ctl} open={panelOpen} onToggle={() => setPanelOpen((v) => !v)} busy={busy} />
-        <CameraBar view={view} available={available} onFly={flyTo} shown={overlays} follow={follow} onHelp={openHelp} />
+        <TerrainPanel terrain={terrain} life={life} ctl={ctl} open={panelOpen} onToggle={() => setPanelOpen((v) => !v)} busy={busy} debug={debug} />
+        <CameraBar view={view} available={available} onFly={flyTo} shown={overlays} follow={follow} onHelp={openHelp} debug={debugToggle} />
         {/* Not hidden with E: the card stays with its agent while the panels and toolbars go. */}
         <Inspector
           view={viewRef.current}
@@ -229,6 +238,9 @@ export default function WorldPage() {
           <PrintBar replayKey={terrain.seed} onChange={setPrint} />
         </div>
       </div>
+      {/* Outside the zoom, which it applies to itself: it sits at the mouse. */}
+      <DebugMarks on={debug} scale={UI_SCALE} />
+      {debug && <HoverCard view={viewRef.current} terrain={terrain} zoning={zoning} tint={state.groundTint} scale={UI_SCALE} />}
       {/* Outside the zoom: a modal dialog in the top layer takes clicks in the wrong place under it. */}
       <HelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} onTour={() => setTouring(true)} />
     </div>

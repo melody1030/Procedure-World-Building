@@ -17,6 +17,7 @@ import { fitBuilding, fitGrammar, type BuildingPlan } from "../city/placement";
 import type { Park, Parks } from "../city/parks";
 import { buildParkModel, type ParkModel } from "../city/parkModels";
 import { VOXEL_LOOK, patchVoxelLook } from "./voxelLook";
+import { GRAY, installGray } from "./gray";
 import { BUILD_PHASES, PAVING_FROM, PAVING_TO, type BuildUp } from "../terrain/buildup";
 import { createLookUniforms, createPrintUniforms, printDepthMaterial, printMaterial } from "./print";
 import { LifeView } from "./life";
@@ -24,6 +25,20 @@ import { RING_PAD, SelectionMark, locate, pick, sameSelection, type Selection } 
 import type { Life } from "../life/agents";
 import type { GroundTint } from "../state";
 import { HEIGHT_TINT_ENCODE, type Zoning } from "../city/zoning";
+
+/** The ground column under the mouse (columns), and the mouse on the screen (pixels). */
+export interface GroundHover {
+  x: number;
+  z: number;
+  px: number;
+  py: number;
+}
+
+/** A color's gray: its luminance on every channel. */
+const grayOf = (c: THREE.Color) => new THREE.Color().setScalar(0.299 * c.r + 0.587 * c.g + 0.114 * c.b);
+
+/** How long the debug view takes to turn the world gray (seconds). */
+const GRAY_SECONDS = 0.6;
 
 /** Diorama framing: looking down on the whole table-top from a raised corner. */
 const VIEW_AZIMUTH = THREE.MathUtils.degToRad(38);
@@ -196,6 +211,14 @@ export class WorldView {
   /** What is selected (clicked), its mark, and whether the camera follows it. */
   private selection: Selection | null = null;
   private onSelect: ((selection: Selection | null) => void) | null = null;
+  /** Tells React which ground column the mouse is over (null: none, or something else is). */
+  private onHover: ((hit: GroundHover | null) => void) | null = null;
+  private hovered = false;
+  /** The debug view: the world goes gray (GRAY.uGray eases to 1) so the lenses' colors read. */
+  private debug = false;
+  private readonly skyColor = new THREE.Color(SKY.background);
+  private readonly skyGray = grayOf(new THREE.Color(SKY.background)).multiplyScalar(0.62);
+  private hoverEvent: PointerEvent | null = null;
   private readonly mark = new SelectionMark();
   /** The Waste tint: whether it is on, whether the buildings carry it now, and a color to work in. */
   private wasteTint = false;
@@ -214,7 +237,8 @@ export class WorldView {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     mount.appendChild(this.renderer.domElement);
-    this.scene.background = new THREE.Color(SKY.background);
+    installGray();
+    this.scene.background = this.skyColor.clone();
 
     this.camera = new THREE.PerspectiveCamera(FOV, 1, 1, EXTENT * 14);
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
@@ -256,6 +280,7 @@ export class WorldView {
       ["pointermove", (e) => this.onPointerMove(e), false],
       ["pointerup", (e) => this.onPointerUp(e), false],
       ["pointercancel", (e) => this.onPointerUp(e), false],
+      ["pointerleave", () => this.hoverAt(null, false), false],
     ];
     for (const [type, handler, capture] of this.pointerHandlers) this.renderer.domElement.addEventListener(type, handler as EventListener, capture);
 
@@ -269,6 +294,7 @@ export class WorldView {
         else this.life.life.prepare();
       }
       this.tintWaste();
+      this.easeGray(dt);
       // The selection went out of sight (indoors, onto a bus or into a taxi, off the island, into
       // the depot, or Life hidden): let it go, and its card with it.
       if (this.selection && !locate(this.selection, this.lifeNow(), WORLD_SIZE / 2)) this.select(null);
@@ -364,6 +390,45 @@ export class WorldView {
   /** Tells React what was clicked (null: empty ground, or the selection went away). */
   setSelectHandler(handler: (selection: Selection | null) => void) {
     this.onSelect = handler;
+  }
+
+  /** Turns the debug view on or off: the world fades to gray (or back) over about a second. */
+  setDebug(on: boolean) {
+    if (on === this.debug) return;
+    this.debug = on;
+  }
+
+  /**
+   * Where the gray spreads from: the plaza, as it is on the screen now (drawing-buffer pixels), and
+   * how far the farthest corner is from it, so the front reaches every corner exactly at the end.
+   */
+  private aimGray() {
+    const plaza = this.streetData?.plazas[0];
+    const res = GRAY.uGrayRes.value;
+    const half = WORLD_SIZE / 2;
+    const p = plaza ? new THREE.Vector3(plaza.x - half + 0.5, plaza.level, plaza.z - half + 0.5).project(this.camera) : new THREE.Vector3(0, 0, 0);
+    const cx = ((p.x + 1) / 2) * res.x;
+    const cy = ((p.y + 1) / 2) * res.y;
+    GRAY.uGrayCenter.value.set(cx, cy);
+    GRAY.uGrayReach.value = Math.max(1, Math.hypot(Math.max(cx, res.x - cx), Math.max(cy, res.y - cy)));
+  }
+
+  /** Eases the gray toward its target: gray in the debug view, except with the Waste tint (the buildings are the lens). */
+  private easeGray(dt: number) {
+    this.renderer.getDrawingBufferSize(GRAY.uGrayRes.value);
+    this.aimGray();
+    const target = this.debug && !this.wasteTint ? 1 : 0;
+    const now = GRAY.uGray.value;
+    if (now === target) return;
+    const next = now + Math.sign(target - now) * Math.min(Math.abs(target - now), dt / GRAY_SECONDS);
+    GRAY.uGray.value = next;
+    (this.scene.background as THREE.Color).lerpColors(this.skyColor, this.skyGray, next * next * (3 - 2 * next));
+  }
+
+  /** Tells React which ground column the mouse is over, and where on screen. */
+  setHoverHandler(handler: ((hit: GroundHover | null) => void) | null) {
+    this.onHover = handler;
+    if (!handler) this.hovered = false;
   }
 
   /** Tells React whether the camera follows the selection. */
@@ -1270,6 +1335,53 @@ transformed = aGrow.xyz + (transformed - aGrow.xyz) * popped;`,
     this.onPathEdit = handler;
   }
 
+  /**
+   * Reports the ground column under the mouse to React (null when it is over an agent, a building,
+   * the sky, or a button is down). Checked at most once a frame.
+   */
+  private hoverAt(e: PointerEvent | null, onAgent: boolean) {
+    if (!this.onHover) return;
+    if (!e || onAgent) {
+      this.hoverEvent = null;
+      if (this.hovered) {
+        this.hovered = false;
+        this.onHover(null);
+      }
+      return;
+    }
+    const first = this.hoverEvent === null;
+    this.hoverEvent = e;
+    if (!first) return;
+    requestAnimationFrame(() => {
+      const ev = this.hoverEvent;
+      this.hoverEvent = null;
+      if (!ev || !this.onHover) return;
+      const hit = this.groundUnder(ev);
+      if (hit || this.hovered) this.onHover(hit);
+      this.hovered = !!hit;
+    });
+  }
+
+  /** The ground column the pointer is over, unless a building is in front of it. */
+  private groundUnder(e: PointerEvent): GroundHover | null {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    const ndc = new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
+    this.raycaster.setFromCamera(ndc, this.camera);
+    const ray = this.raycaster.ray;
+    const t = this.groundAlong(ray);
+    if (!Number.isFinite(t)) return null;
+    if (this.city.visible && this.built) {
+      const box = new THREE.Vector3();
+      for (const b of this.buildingBoxes) if (b && ray.intersectBox(b, box) && box.distanceTo(ray.origin) < t) return null;
+    }
+    const half = WORLD_SIZE / 2;
+    const p = ray.at(t, new THREE.Vector3());
+    const x = Math.floor(p.x + half);
+    const z = Math.floor(p.z + half);
+    if (x < 0 || z < 0 || x >= WORLD_SIZE || z >= WORLD_SIZE) return null;
+    return { x, z, px: e.clientX, py: e.clientY };
+  }
+
   /** The dot under the pointer (within 14 px on screen), or −1. */
   private pickDot(e: PointerEvent): number {
     if (!this.path?.visible) return -1;
@@ -1309,7 +1421,10 @@ transformed = aGrow.xyz + (transformed - aGrow.xyz) * popped;`,
     const canvas = this.renderer.domElement;
     if (this.dragging < 0) {
       // Over something that can be clicked: a pointer (not while a button is down, orbiting).
-      canvas.style.cursor = this.pickDot(e) >= 0 ? "grab" : e.buttons === 0 && e.pointerType === "mouse" && this.pickAt(e) ? "pointer" : "";
+      const idle = e.buttons === 0 && e.pointerType === "mouse";
+      const over = this.pickDot(e) < 0 && idle ? this.pickAt(e) : null;
+      canvas.style.cursor = this.pickDot(e) >= 0 ? "grab" : over ? "pointer" : "";
+      this.hoverAt(idle ? e : null, !!over);
       return;
     }
     // Move the dot across a flat plane at its own height; the river is rebuilt on release.

@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { SidePanel } from "../../components/SidePanel";
 import type { Life } from "../life/agents";
-import { Button, GLASS, Legend, NOTE, Note, Row, RULE, Section, Segmented, Select, Slider, Subheading, Switch, Tabs } from "./kit";
+import { Button, GLASS, Legend, NOTE, Note, Row, RULE, Section, Segmented, Select, Slider, Subheading, Switch } from "./kit";
 import type { GroundTint, WorldController } from "../state";
 import { DEFAULT_PARAMS, PARAM_SPECS, RIVER_VISIBLE, type ParamKey, type ParamSpec, type RangeSpec, type TerrainParams } from "../terrain/params";
 import { CLAIM_COLORS } from "../terrain/claims";
@@ -12,11 +12,12 @@ import { TitleBlock } from "./TitleCard";
 import { HEIGHT_TIERS, HEIGHT_TINT_BOTTOM, HEIGHT_TINT_COLORS, heightTintShare } from "../city/zoning";
 
 /**
- * The world's one panel, on the left: the title and seed at the top, then two tabs. **Build** holds
- * the terrain's settings, laid out like the weekly studios (icon sections in pipeline order, each
- * with a count of its changed settings and its own reset) and Reset all. Sliders apply when
- * released, since the terrain takes a moment to rebuild; selects apply at once. **Layers** holds
- * what only changes the drawing: one ground tint at a time, and the layers drawn on top.
+ * The world's one panel, on the left: the title and seed at the top, then **Build**: the terrain's
+ * settings, laid out like the weekly studios (icon sections in pipeline order, each with a count of
+ * its changed settings and its own reset) and Reset all. Sliders apply when released, since the
+ * terrain takes a moment to rebuild; selects apply at once. What only changes the drawing (one
+ * ground tint at a time, and the layers drawn on top) is `LayersTab`, which takes this panel's
+ * place in the debug view (key D).
  */
 
 const SECTIONS: { title: string; icon: ReactNode; keys: ParamKey[] }[] = [
@@ -89,18 +90,6 @@ const CLAIM_LEGEND: [string, number][] = [
 
 /** Every key Reset restores: the panel's controls plus the hand-placed river points. */
 const ALL_KEYS: ParamKey[] = [...SECTIONS.flatMap((s) => s.keys), ["river", "control"]];
-
-/** A setting's name, and a spinner while the rebuild it started runs. */
-/** The panel's tabs; the open one is remembered in this browser. */
-type Tab = "build" | "layers";
-const TAB_KEY = "world.panelTab";
-function savedTab(): Tab {
-  try {
-    return localStorage.getItem(TAB_KEY) === "layers" ? "layers" : "build";
-  } catch {
-    return "build";
-  }
-}
 
 /** The ground tints, in the order the segmented control shows them. */
 const TINT_OPTIONS: { value: GroundTint; label: string }[] = [
@@ -175,29 +164,20 @@ function ParamControl({ spec, value, fallback, onChange, pending }: { spec: Para
 const read = (params: TerrainParams, [g, key]: ParamKey) => (params[g] as unknown as Record<string, Value>)[key];
 const specOf = ([g, key]: ParamKey) => (PARAM_SPECS[g] as Record<string, ParamSpec>)[key];
 
-export function TerrainPanel({ terrain, life, ctl, open, onToggle, busy }: { terrain: Terrain; life: Life | null; ctl: WorldController; open: boolean; onToggle: () => void; busy: boolean }) {
-  const [tab, setTab] = useState<Tab>(savedTab);
-  const pickTab = (next: Tab) => {
-    setTab(next);
-    try {
-      localStorage.setItem(TAB_KEY, next);
-    } catch {
-      // Private windows may refuse storage; the tab just isn't remembered.
-    }
-  };
-
+export function TerrainPanel({ terrain, life, ctl, open, onToggle, busy, debug }: { terrain: Terrain; life: Life | null; ctl: WorldController; open: boolean; onToggle: () => void; busy: boolean; debug: boolean }) {
   return (
     <SidePanel side="left" open={open} onToggle={onToggle} widthRem={16.2} label="settings panel" glass={GLASS} bodyClassName="gap-3.5 p-4">
       <TitleBlock seed={ctl.state.seed} onSeed={ctl.setSeed} />
-      <Tabs
-        label="Panel"
-        value={tab}
-        onChange={pickTab}
-        tabs={[
-          { id: "build", label: "Build", panel: <BuildTab ctl={ctl} busy={busy} /> },
-          { id: "layers", label: "Layers", panel: <LayersTab terrain={terrain} life={life} ctl={ctl} /> },
-        ]}
-      />
+      {/* Build normally; the debug view (key D) swaps it for the layers. Keyed, so each swap fades in. */}
+      {debug ? (
+        <div key="debug" className="flex animate-swapIn flex-col gap-3.5 motion-reduce:animate-none">
+          <LayersTab terrain={terrain} life={life} ctl={ctl} />
+        </div>
+      ) : (
+        <div key="build" data-tour="build" className="flex animate-swapIn flex-col gap-3.5 motion-reduce:animate-none">
+          <BuildTab ctl={ctl} busy={busy} />
+        </div>
+      )}
     </SidePanel>
   );
 }
@@ -303,7 +283,7 @@ function HeightLegend() {
 }
 
 /** Everything that only changes what is drawn: one ground tint, then the layers on top. */
-function LayersTab({ terrain, life, ctl }: { terrain: Terrain; life: Life | null; ctl: WorldController }) {
+export function LayersTab({ terrain, life, ctl }: { terrain: Terrain; life: Life | null; ctl: WorldController }) {
   const { state } = ctl;
   const tint = state.groundTint;
   return (

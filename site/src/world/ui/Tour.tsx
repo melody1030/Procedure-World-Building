@@ -47,16 +47,9 @@ const STEPS: Step[] = [
     text: "Type any word, or roll the dice, and a different island grows: its river, streets, buildings and people.",
   },
   {
-    target: '[role="tablist"][aria-label="Panel"] [data-tab="build"]',
-    beside: '[role="tablist"][aria-label="Panel"]',
+    target: '[data-tour="build"]',
     title: "Build",
     text: "The settings, in the order the city is made: noise, shaping, terraces, the river, surfaces and zoning. Change one and the city rebuilds.",
-  },
-  {
-    target: '[role="tablist"][aria-label="Panel"] [data-tab="layers"]',
-    beside: '[role="tablist"][aria-label="Panel"]',
-    title: "Layers",
-    text: "What is drawn, not what is built: tint the ground by district or claim, and show or hide lots, parks, buildings and people.",
   },
   {
     target: '[data-tour="timeline"]',
@@ -66,7 +59,7 @@ const STEPS: Step[] = [
   {
     target: '[data-tour="camera"]',
     title: "Fly around",
-    text: "Keys 1 to 5 fly to a view. Street level is where the people are; hide Buildings in Layers to see the streets from above.",
+    text: "Keys 1 to 5 fly to a view. Street level is where the people are. The magnifier (key D) opens the debug view: the layers, and a reading of whatever the mouse is over.",
   },
   {
     target: null,

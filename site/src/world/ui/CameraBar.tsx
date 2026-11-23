@@ -61,6 +61,13 @@ const HELP_ICON = (
   </svg>
 );
 
+const DEBUG_ICON = (
+  <svg {...iconProps}>
+    <circle cx="10.5" cy="10.5" r="6.5" />
+    <path d="M15.5 15.5L21 21M7.5 10.5h6M10.5 7.5v6" />
+  </svg>
+);
+
 export const PRESETS: { id: CameraPreset; label: string; key: string }[] = [
   { id: "overview", label: "Overview", key: "1" },
   { id: "plaza", label: "Plaza", key: "2" },
@@ -106,6 +113,7 @@ export function CameraBar({
   shown,
   follow,
   onHelp,
+  debug,
 }: {
   view: CameraPreset | null;
   available: Record<CameraPreset, boolean>;
@@ -115,6 +123,8 @@ export function CameraBar({
   follow: { can: boolean; on: boolean; onToggle: () => void };
   /** Opens the shortcuts sheet (also the ? key). */
   onHelp: () => void;
+  /** The debug view (key D): hover the ground to read what each ground color shows there. */
+  debug: { on: boolean; onToggle: () => void };
 }) {
   // Keys 1–5 fly to the presets, 6 toggles Follow and ? opens the shortcuts (not while typing,
   // e.g. in the seed field).
@@ -124,6 +134,11 @@ export function CameraBar({
       if (e.key === "?") {
         e.preventDefault();
         onHelp();
+        return;
+      }
+      if (e.key === "d" || e.key === "D") {
+        e.preventDefault();
+        debug.onToggle();
         return;
       }
       if (e.key === "6") {
@@ -139,7 +154,7 @@ export function CameraBar({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [available, onFly, follow, onHelp]);
+  }, [available, onFly, follow, onHelp, debug]);
 
   if (!shown) return null;
 
@@ -151,6 +166,7 @@ export function CameraBar({
       <span aria-hidden className="mx-1.5 my-0.5 h-px bg-[#7db4e6]/20" />
       <ToolButton label={follow.can ? (follow.on ? "Stop following" : "Follow") : "Follow (select someone first)"} keyName="6" icon={FOLLOW_ICON} active={follow.on} disabled={!follow.can} onClick={follow.onToggle} />
       <span aria-hidden className="mx-1.5 my-0.5 h-px bg-[#7db4e6]/20" />
+      <ToolButton label={debug.on ? "Hide debug view" : "Debug view"} keyName="D" icon={DEBUG_ICON} active={debug.on} onClick={debug.onToggle} />
       <ToolButton label="Shortcuts" keyName="?" icon={HELP_ICON} onClick={onHelp} />
     </div>
   );

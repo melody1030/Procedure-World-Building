@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { GRAY_FRAGMENT, GRAY_HEAD, grayUniforms } from "./gray";
 
 /**
  * The voxel look on everything but the ground (docs/plans/voxel-look-plan.md): the ground's line
@@ -23,8 +24,9 @@ import * as THREE from "three";
 export const VOXEL_LOOK = { uVoxelGrid: { value: 0.35 } };
 
 const VERTEX_HEAD = "attribute vec4 aVoxel;\nvarying vec4 vVoxel;";
-const FRAGMENT_HEAD = "uniform float uVoxelGrid;\nvarying vec4 vVoxel;";
+const FRAGMENT_HEAD = `uniform float uVoxelGrid;\n${GRAY_HEAD}\nvarying vec4 vVoxel;`;
 const FRAGMENT = /* glsl */ `
+  ${GRAY_FRAGMENT}
   if (vVoxel.w > 0.5) {
     vec3 q = vVoxel.xyz;
     vec3 fw = fwidth(q);
@@ -47,6 +49,7 @@ const FRAGMENT = /* glsl */ `
 /** Adds the voxel look to a lit material's shader (call it from `onBeforeCompile`). */
 export function patchVoxelLook(shader: THREE.WebGLProgramParametersWithUniforms) {
   shader.uniforms.uVoxelGrid = VOXEL_LOOK.uVoxelGrid;
+  grayUniforms(shader);
   shader.vertexShader = shader.vertexShader.replace("#include <common>", `#include <common>\n${VERTEX_HEAD}`).replace("#include <begin_vertex>", "#include <begin_vertex>\nvVoxel = aVoxel;");
   shader.fragmentShader = shader.fragmentShader.replace("#include <common>", `#include <common>\n${FRAGMENT_HEAD}`).replace("#include <color_fragment>", `#include <color_fragment>\n${FRAGMENT}`);
 }

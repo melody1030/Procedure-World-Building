@@ -32,6 +32,7 @@ const KEYS: [ReactNode, string][] = [
     "Fly to Overview, Plaza, Park, River, Street",
   ],
   [<Key>6</Key>, "Follow what is selected"],
+  [<Key>D</Key>, "Debug view: layers, and read the ground under the mouse"],
   [<Key>Esc</Key>, "Close the inspector, or this sheet"],
   [<Key>?</Key>, "Open this sheet"],
 ];

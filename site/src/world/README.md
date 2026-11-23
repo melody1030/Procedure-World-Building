@@ -2113,3 +2113,41 @@ a pass (no change to the city):
 - **Tour:** two new steps, the timeline (Space, click a step, drag to scrub) and the camera bar
   (keys 1 to 5); the card flips above a control when there is no room below it, and the last step
   says to fly to Street first.
+
+## 2026-11-20: Hover reading on the ground (debug view, D1)
+
+First step of `docs/plans/debug-view-plan.md`. Point at the ground and a card at the mouse reads
+what the active ground color shows there:
+
+| Ground color | The card reads |
+|---|---|
+| None, Waste | Height, slope (rise over run, and degrees), what owns the column |
+| Claims | What owns the column, height, slope |
+| Districts | The district, and the lot's number and area |
+| Frontage | The lot's kind (avenue, side street, corner, through) and its front length |
+| Height | The limit in meters and its tier |
+| Suitability | The score for the city center (0 to 1) and whether it can be built on |
+
+The card is `ui/Lens.tsx`; `WorldView.setHoverHandler` reports the column under the mouse, at most
+once a frame. It goes away over an agent, a building or the sky, and while a button is down (so
+dragging the camera never shows it). The ground height is the graded one, as drawn.
+
+The debug view is off until asked for: key **D**, or the magnifier button on the camera toolbar
+(lit while on). While it is off no card shows and nothing is read under the mouse. The shortcuts
+sheet lists the key.
+
+Opening it:
+
+- **The world goes gray, spreading out from the plaza,** over about 0.6 s, with a faint, thin cyan line
+  at the front of the wave; the camera does not move. Shared uniforms (`render/gray.ts`: `uGray`,
+  how far the wave has got, and `uGrayCenter` and `uGrayReach`, the plaza's place on the screen and
+  the distance to the farthest corner, set each frame by `WorldView.aimGray`) take the color out of
+  the ground, the buildings, the people, the vehicles, the park props and the water, and make them
+  a little darker, before the lenses' tints are applied; the sky eases to a darker gray. Lights
+  (windows, signs) stay colored. With the Waste ground color the buildings are the lens, so nothing
+  goes gray. Nothing is rebuilt.
+- **It stays marked.** A cyan frame round the view and a badge at the top (`DebugMarks` in
+  `ui/Lens.tsx`: a pulsing dot, "Debug view", and the key to leave) fade in as the sweep ends.
+- **The left panel swaps.** Normally it shows only the Build settings, with no tab bar (the Layers tab and the "Build" tab heading are gone). In the debug
+  view it shows the layers (ground color, drawn on top) in its place, with no heading, fading in, and opens if it was
+  closed. D again brings Build back.
