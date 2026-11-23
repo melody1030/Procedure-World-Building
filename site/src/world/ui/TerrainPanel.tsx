@@ -7,6 +7,7 @@ import { DEFAULT_PARAMS, PARAM_SPECS, RIVER_VISIBLE, type ParamKey, type ParamSp
 import { CLAIM_COLORS } from "../terrain/claims";
 import { DISTRICTS, FRONTAGE_KINDS, frontageKind } from "../terrain/districts";
 import type { Terrain } from "../terrain/pipeline";
+import { STATES } from "../life/states";
 import { ZoningIcon, NoiseIcon, ResetIcon, RiverIcon, ShapingIcon, Spinner, SurfaceIcon, TerraceIcon } from "./icons";
 import { TitleBlock } from "./TitleCard";
 import { HEIGHT_TIERS, HEIGHT_TINT_BOTTOM, HEIGHT_TINT_COLORS, heightTintShare } from "../city/zoning";
@@ -100,6 +101,7 @@ const TINT_OPTIONS: { value: GroundTint; label: string }[] = [
   { value: "claims", label: "Claims" },
   { value: "suitability", label: "Suitability" },
   { value: "waste", label: "Waste" },
+  { value: "agents", label: "Agents" },
 ];
 
 function SettingLabel({ label, pending }: { label: string; pending: boolean }) {
@@ -282,6 +284,44 @@ function HeightLegend() {
   );
 }
 
+/** What the active ground color means: its legend, under the ground color control. */
+export function LensLegend({ terrain, tint }: { terrain: Terrain; tint: GroundTint }) {
+  return (
+    <>
+      {tint === "districts" && <Legend items={DISTRICTS.map((d, i) => [`${d.name} ${Math.round(terrain.districts.shares[i] * 100)}%`, d.color])} />}
+      {tint === "frontage" && <Legend items={frontageLegend(terrain)} />}
+      {tint === "heights" && <HeightLegend />}
+      {tint === "claims" && <Legend items={CLAIM_LEGEND} />}
+      {tint === "suitability" && (
+        <div className="flex flex-col gap-1">
+          <span className="h-1.5 rounded-full bg-gradient-to-r from-[#33296b] to-[#ffb82e]" aria-hidden />
+          <span className="flex justify-between">
+            <Note>Less suited</Note>
+            <Note>Best for the center</Note>
+          </span>
+          <Note>Dark ground can't be built on.</Note>
+        </div>
+      )}
+      {tint === "agents" && (
+        <div className="flex flex-col gap-1.5">
+          <Legend items={STATES.map((s) => [s.name, s.color])} />
+          <Note>People, pigeons, cats and vehicles, colored by what each is doing now. Point at one for the reason.</Note>
+        </div>
+      )}
+      {tint === "waste" && (
+        <div className="flex flex-col gap-1">
+          <span className="h-1.5 rounded-full bg-gradient-to-r from-[#2f9e6a] via-[#e0b040] to-[#d8432e]" aria-hidden />
+          <span className="flex justify-between">
+            <Note>Bin empty</Note>
+            <Note>Bin full</Note>
+          </span>
+          <Note>Each building is tinted by the bin it shares with its neighbors.</Note>
+        </div>
+      )}
+    </>
+  );
+}
+
 /** Everything that only changes what is drawn: one ground tint, then the layers on top. */
 export function LayersTab({ terrain, life, ctl }: { terrain: Terrain; life: Life | null; ctl: WorldController }) {
   const { state } = ctl;
@@ -293,30 +333,7 @@ export function LayersTab({ terrain, life, ctl }: { terrain: Terrain; life: Life
           Ground color
         </Subheading>
         <Segmented label="Ground color" options={TINT_OPTIONS} value={tint} onChange={ctl.setGroundTint} columns={3} />
-        {tint === "districts" && <Legend items={DISTRICTS.map((d, i) => [`${d.name} ${Math.round(terrain.districts.shares[i] * 100)}%`, d.color])} />}
-        {tint === "frontage" && <Legend items={frontageLegend(terrain)} />}
-        {tint === "heights" && <HeightLegend />}
-        {tint === "claims" && <Legend items={CLAIM_LEGEND} />}
-        {tint === "suitability" && (
-          <div className="flex flex-col gap-1">
-            <span className="h-1.5 rounded-full bg-gradient-to-r from-[#33296b] to-[#ffb82e]" aria-hidden />
-            <span className="flex justify-between">
-              <Note>Less suited</Note>
-              <Note>Best for the center</Note>
-            </span>
-            <Note>Dark ground can't be built on.</Note>
-          </div>
-        )}
-        {tint === "waste" && (
-          <div className="flex flex-col gap-1">
-            <span className="h-1.5 rounded-full bg-gradient-to-r from-[#2f9e6a] via-[#e0b040] to-[#d8432e]" aria-hidden />
-            <span className="flex justify-between">
-              <Note>Bin empty</Note>
-              <Note>Bin full</Note>
-            </span>
-            <Note>Each building is tinted by the bin it shares with its neighbors.</Note>
-          </div>
-        )}
+        <LensLegend terrain={terrain} tint={tint} />
       </div>
 
       <div className={"flex flex-col gap-3.5 border-t pt-3.5 " + RULE}>

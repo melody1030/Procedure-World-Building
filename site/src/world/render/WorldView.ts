@@ -18,6 +18,7 @@ import type { Park, Parks } from "../city/parks";
 import { buildParkModel, type ParkModel } from "../city/parkModels";
 import { VOXEL_LOOK, patchVoxelLook } from "./voxelLook";
 import { GRAY, installGray } from "./gray";
+import type { Selection as AgentRef } from "./select";
 import { BUILD_PHASES, PAVING_FROM, PAVING_TO, type BuildUp } from "../terrain/buildup";
 import { createLookUniforms, createPrintUniforms, printDepthMaterial, printMaterial } from "./print";
 import { LifeView } from "./life";
@@ -32,6 +33,8 @@ export interface GroundHover {
   z: number;
   px: number;
   py: number;
+  /** An agent under the mouse (then x and z are −1), or null for the ground. */
+  agent: AgentRef | null;
 }
 
 /** A color's gray: its luminance on every channel. */
@@ -219,9 +222,11 @@ export class WorldView {
   private readonly skyColor = new THREE.Color(SKY.background);
   private readonly skyGray = grayOf(new THREE.Color(SKY.background)).multiplyScalar(0.62);
   private hoverEvent: PointerEvent | null = null;
+  private hoverAgent: AgentRef | null = null;
   private readonly mark = new SelectionMark();
   /** The Waste tint: whether it is on, whether the buildings carry it now, and a color to work in. */
   private wasteTint = false;
+  private agentTint = false;
   private wasteTinted = false;
   private readonly tintColor = new THREE.Color();
   private following = false;
@@ -280,7 +285,7 @@ export class WorldView {
       ["pointermove", (e) => this.onPointerMove(e), false],
       ["pointerup", (e) => this.onPointerUp(e), false],
       ["pointercancel", (e) => this.onPointerUp(e), false],
-      ["pointerleave", () => this.hoverAt(null, false), false],
+      ["pointerleave", () => this.hoverAt(null, null), false],
     ];
     for (const [type, handler, capture] of this.pointerHandlers) this.renderer.domElement.addEventListener(type, handler as EventListener, capture);
 
@@ -963,7 +968,10 @@ transformed = aGrow.xyz + (transformed - aGrow.xyz) * popped;`,
       this.life.dispose();
     }
     this.life = life ? new LifeView(life, life.map.n / 2) : null;
-    if (this.life) this.scene.add(this.life.group);
+    if (this.life) {
+      this.life.setStateLens(this.agentTint);
+      this.scene.add(this.life.group);
+    }
   }
 
   setShowLife(on: boolean) {
@@ -1314,6 +1322,10 @@ transformed = aGrow.xyz + (transformed - aGrow.xyz) * popped;`,
     this.look.uShowHeights.value = tint === "heights" ? 1 : 0;
     this.look.uShowClaims.value = tint === "claims" ? 1 : 0;
     this.look.uShowSuit.value = tint === "suitability" ? 1 : 0;
+    // The Agents lens: people, animals and vehicles colored by state, and kept out of the gray.
+    this.agentTint = tint === "agents";
+    GRAY.uKeepAgents.value = this.agentTint ? 1 : 0;
+    this.life?.setStateLens(this.agentTint);
   }
 
   setShowLots(on: boolean) {
@@ -1339,9 +1351,9 @@ transformed = aGrow.xyz + (transformed - aGrow.xyz) * popped;`,
    * Reports the ground column under the mouse to React (null when it is over an agent, a building,
    * the sky, or a button is down). Checked at most once a frame.
    */
-  private hoverAt(e: PointerEvent | null, onAgent: boolean) {
+  private hoverAt(e: PointerEvent | null, onAgent: AgentRef | null) {
     if (!this.onHover) return;
-    if (!e || onAgent) {
+    if (!e) {
       this.hoverEvent = null;
       if (this.hovered) {
         this.hovered = false;
@@ -1351,12 +1363,14 @@ transformed = aGrow.xyz + (transformed - aGrow.xyz) * popped;`,
     }
     const first = this.hoverEvent === null;
     this.hoverEvent = e;
+    this.hoverAgent = onAgent;
     if (!first) return;
     requestAnimationFrame(() => {
       const ev = this.hoverEvent;
+      const agent = this.hoverAgent;
       this.hoverEvent = null;
       if (!ev || !this.onHover) return;
-      const hit = this.groundUnder(ev);
+      const hit = agent ? { x: -1, z: -1, px: ev.clientX, py: ev.clientY, agent } : this.groundUnder(ev);
       if (hit || this.hovered) this.onHover(hit);
       this.hovered = !!hit;
     });
@@ -1379,7 +1393,7 @@ transformed = aGrow.xyz + (transformed - aGrow.xyz) * popped;`,
     const x = Math.floor(p.x + half);
     const z = Math.floor(p.z + half);
     if (x < 0 || z < 0 || x >= WORLD_SIZE || z >= WORLD_SIZE) return null;
-    return { x, z, px: e.clientX, py: e.clientY };
+    return { x, z, px: e.clientX, py: e.clientY, agent: null };
   }
 
   /** The dot under the pointer (within 14 px on screen), or −1. */
@@ -1424,7 +1438,7 @@ transformed = aGrow.xyz + (transformed - aGrow.xyz) * popped;`,
       const idle = e.buttons === 0 && e.pointerType === "mouse";
       const over = this.pickDot(e) < 0 && idle ? this.pickAt(e) : null;
       canvas.style.cursor = this.pickDot(e) >= 0 ? "grab" : over ? "pointer" : "";
-      this.hoverAt(idle ? e : null, !!over);
+      this.hoverAt(idle ? e : null, over);
       return;
     }
     // Move the dot across a flat plane at its own height; the river is rebuilt on release.

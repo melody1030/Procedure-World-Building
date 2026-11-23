@@ -7,9 +7,9 @@ export const MAX_SEED_LENGTH = 32;
 /**
  * The ground tints: by district, by what each lot fronts (avenue, side street, corner, through),
  * by what owns each column (river, bank, roads…), or by how well each column suits a city center.
- * And one that tints the buildings rather than the ground: by how full their bin is (Waste).
+ * And two that tint what stands on it rather than the ground: the buildings by how full their bin is (Waste), and the people, animals and vehicles by what they are doing (Agents).
  */
-export const GROUND_TINTS = ["none", "districts", "frontage", "heights", "claims", "suitability", "waste"] as const;
+export const GROUND_TINTS = ["none", "districts", "frontage", "heights", "claims", "suitability", "waste", "agents"] as const;
 export type GroundTint = (typeof GROUND_TINTS)[number];
 
 export interface WorldState {

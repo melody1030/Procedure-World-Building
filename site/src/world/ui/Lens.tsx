@@ -7,6 +7,8 @@ import { DISTRICTS, FRONTAGE_KINDS, NO_DISTRICT, frontageKind } from "../terrain
 import { HEIGHT_TIERS, type Zoning } from "../city/zoning";
 import { VOXEL_M } from "../scale";
 import type { GroundTint } from "../state";
+import type { Life } from "../life/agents";
+import { describe } from "./Inspector";
 import { GLASS } from "./kit";
 
 /**
@@ -27,6 +29,7 @@ const TITLES: Record<GroundTint, string> = {
   claims: "Claim",
   suitability: "Suitability",
   waste: "Ground",
+  agents: "Ground",
 };
 
 type Reading = { title: string; rows: [string, string][] };
@@ -84,7 +87,7 @@ export function readColumn(terrain: Terrain, zoning: Zoning, tint: GroundTint, x
 }
 
 /** The card, following the mouse. `scale` is the interface's zoom, which positions are given in. */
-export function HoverCard({ view, terrain, zoning, tint, scale }: { view: WorldView | null; terrain: Terrain; zoning: Zoning; tint: GroundTint; scale: number }) {
+export function HoverCard({ view, terrain, zoning, tint, scale, life }: { view: WorldView | null; terrain: Terrain; zoning: Zoning; tint: GroundTint; scale: number; life: Life | null }) {
   const [hit, setHit] = useState<GroundHover | null>(null);
   useEffect(() => {
     view?.setHoverHandler(setHit);
@@ -93,9 +96,18 @@ export function HoverCard({ view, terrain, zoning, tint, scale }: { view: WorldV
       setHit(null);
     };
   }, [view]);
-  // Not over a lot's building walls, and not while the waste lens colors buildings only.
-  const reading = useMemo(() => (hit && tint !== "waste" ? readColumn(terrain, zoning, tint, hit.x, hit.z) : null), [hit, terrain, zoning, tint]);
-  if (!hit || !reading) return null;
+  // An agent under the mouse: its state and the reason, refreshed a few times a second.
+  const [, setTick] = useState(0);
+  const agent = hit?.agent ?? null;
+  useEffect(() => {
+    if (!agent) return;
+    const timer = setInterval(() => setTick((t) => t + 1), 250);
+    return () => clearInterval(timer);
+  }, [agent]);
+  const said = agent ? describe(agent, life) : null;
+  // On the ground: not over a lot's building walls, and not while the waste lens colors buildings only.
+  const reading = useMemo(() => (hit && !hit.agent && tint !== "waste" ? readColumn(terrain, zoning, tint, hit.x, hit.z) : null), [hit, terrain, zoning, tint]);
+  if (!hit || (!reading && !said)) return null;
   const flipX = hit.px > window.innerWidth - 240;
   const flipY = hit.py > window.innerHeight - 140;
   return (
@@ -109,9 +121,15 @@ export function HoverCard({ view, terrain, zoning, tint, scale }: { view: WorldV
         transform: `translate(${flipX ? "-100%" : "0"}, ${flipY ? "-100%" : "0"})`,
       }}
     >
-      <div className="font-display text-[11px] font-bold uppercase tracking-[0.14em] text-[#8ba1b8]">{reading.title}</div>
+      <div className="font-display text-[11px] font-bold uppercase tracking-[0.14em] text-[#8ba1b8]">{said ? said.name : reading?.title}</div>
+      {said && (
+        <div className="mt-1.5 grid gap-1 text-[12px]">
+          <span className="text-[#ffd27a]">{said.badges.join(" · ")}</span>
+          {said.why && <span className="leading-snug text-[#dce8f5]">{said.why}</span>}
+        </div>
+      )}
       <dl className="m-0 mt-1.5 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[12px]">
-        {reading.rows.map(([name, value]) => (
+        {(reading?.rows ?? []).map(([name, value]) => (
           <div key={name} className="contents">
             <dt className="text-[#9db2c8]">{name}</dt>
             <dd className="m-0 text-right font-mono text-[11px] tabular-nums text-[#ffd27a]">{value}</dd>

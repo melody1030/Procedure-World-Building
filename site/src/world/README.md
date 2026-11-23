@@ -2151,3 +2151,18 @@ Opening it:
 - **The left panel swaps.** Normally it shows only the Build settings, with no tab bar (the Layers tab and the "Build" tab heading are gone). In the debug
   view it shows the layers (ground color, drawn on top) in its place, with no heading, fading in, and opens if it was
   closed. D again brings Build back.
+
+## 2026-11-20: The Agents lens (debug view, D2 and D3)
+
+Next steps of `docs/plans/debug-view-plan.md`:
+
+- **Agents,** a ground color of its own, colors the people, pigeons, cats and vehicles by what each
+  is doing now, in five broad states (`life/states.ts`): Moving, Using or resting, Waiting, On a
+  task, Alarmed. They are the only color left in the gray city (`GRAY.uKeepAgents`), and the legend
+  is under the ground color in the panel.
+- **Hover someone** and the card at the mouse says who they are, what they are doing and why (the
+  Inspector's text, refreshed four times a second); a click still opens the Inspector.
+- **The ground colors apply only in the debug view,** so out of it the city shows as it is.
+- **The tour** has a step for the debug view; the shortcuts sheet lists D.
+- **Cost:** none. At Street view, debug off and debug on with the Agents lens and the cursor moving
+  the whole time are both 16.7 ms median (the display's rate), p95 about 25 ms.

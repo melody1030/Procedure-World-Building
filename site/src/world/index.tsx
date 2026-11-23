@@ -136,7 +136,8 @@ export default function WorldPage() {
   useEffect(() => viewRef.current?.setPathVisible(state.showPath), [state.showPath]);
   useEffect(() => viewRef.current?.setClaims(terrain.districts.claims.claim, terrain.districts.claims.n), [terrain.districts]);
   useEffect(() => viewRef.current?.setDistricts(terrain.districts), [terrain.districts]);
-  useEffect(() => viewRef.current?.setGroundTint(state.groundTint), [state.groundTint]);
+  // The ground colors belong to the debug view: out of it the city shows as it is.
+  useEffect(() => viewRef.current?.setGroundTint(debug ? state.groundTint : "none"), [state.groundTint, debug]);
   useEffect(() => viewRef.current?.setShowLots(state.showLots), [state.showLots]);
   useEffect(() => viewRef.current?.setShowParks(state.showParks), [state.showParks]);
   useEffect(() => viewRef.current?.setShowBuildings(state.showBuildings), [state.showBuildings]);
@@ -240,7 +241,7 @@ export default function WorldPage() {
       </div>
       {/* Outside the zoom, which it applies to itself: it sits at the mouse. */}
       <DebugMarks on={debug} scale={UI_SCALE} />
-      {debug && <HoverCard view={viewRef.current} terrain={terrain} zoning={zoning} tint={state.groundTint} scale={UI_SCALE} />}
+      {debug && <HoverCard view={viewRef.current} terrain={terrain} zoning={zoning} tint={state.groundTint} scale={UI_SCALE} life={life} />}
       {/* Outside the zoom: a modal dialog in the top layer takes clicks in the wrong place under it. */}
       <HelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} onTour={() => setTouring(true)} />
     </div>

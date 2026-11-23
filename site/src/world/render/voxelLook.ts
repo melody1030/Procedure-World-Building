@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { GRAY_FRAGMENT, GRAY_HEAD, grayUniforms } from "./gray";
+import { GRAY, GRAY_FRAGMENT, GRAY_HEAD, grayUniforms } from "./gray";
 
 /**
  * The voxel look on everything but the ground (docs/plans/voxel-look-plan.md): the ground's line
@@ -48,8 +48,17 @@ const FRAGMENT = /* glsl */ `
 
 /** Adds the voxel look to a lit material's shader (call it from `onBeforeCompile`). */
 export function patchVoxelLook(shader: THREE.WebGLProgramParametersWithUniforms) {
+  patchLook(shader);
+}
+
+/** The same, for the agents: in the Agents lens they keep their state colors instead of going gray. */
+export function patchAgentLook(shader: THREE.WebGLProgramParametersWithUniforms) {
+  patchLook(shader, GRAY.uKeepAgents);
+}
+
+function patchLook(shader: THREE.WebGLProgramParametersWithUniforms, keep?: { value: number }) {
   shader.uniforms.uVoxelGrid = VOXEL_LOOK.uVoxelGrid;
-  grayUniforms(shader);
+  grayUniforms(shader, keep);
   shader.vertexShader = shader.vertexShader.replace("#include <common>", `#include <common>\n${VERTEX_HEAD}`).replace("#include <begin_vertex>", "#include <begin_vertex>\nvVoxel = aVoxel;");
   shader.fragmentShader = shader.fragmentShader.replace("#include <common>", `#include <common>\n${FRAGMENT_HEAD}`).replace("#include <color_fragment>", `#include <color_fragment>\n${FRAGMENT}`);
 }

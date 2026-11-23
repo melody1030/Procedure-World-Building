@@ -15,24 +15,28 @@ import * as THREE from "three";
  * `installGray`, which patches every material that doesn't patch itself. Unlit ones (the network's
  * lines, the selection ring) and lights (windows, signs) keep their colors.
  */
-export const GRAY = { uGray: { value: 0 }, uGrayRes: { value: new THREE.Vector2(1, 1) }, uGrayCenter: { value: new THREE.Vector2(0, 0) }, uGrayReach: { value: 1 } };
+export const GRAY = { uKeepAgents: { value: 0 }, uGray: { value: 0 }, uGrayRes: { value: new THREE.Vector2(1, 1) }, uGrayCenter: { value: new THREE.Vector2(0, 0) }, uGrayReach: { value: 1 } };
 
 /** How soft the sweep's edge is, as a share of the screen's diagonal. */
 const SOFT = 0.11;
 
-export const GRAY_HEAD = "uniform float uGray;\nuniform vec2 uGrayCenter;\nuniform float uGrayReach;";
+export const GRAY_HEAD = "uniform float uGrayKeep;\nuniform float uGray;\nuniform vec2 uGrayCenter;\nuniform float uGrayReach;";
 /** Before the lenses' tints: the color gone to its luminance (and a little darker), behind the front. */
 export const GRAY_FRAGMENT = `{
     float grayAt = distance(gl_FragCoord.xy, uGrayCenter) / uGrayReach;
     float grayAmount = clamp((uGray * ${(1 + SOFT).toFixed(2)} - grayAt) / ${SOFT.toFixed(2)}, 0.0, 1.0);
+    grayAmount *= 1.0 - uGrayKeep;
     float grayLuma = dot(diffuseColor.rgb, vec3(0.299, 0.587, 0.114));
     diffuseColor.rgb = mix(diffuseColor.rgb, vec3(grayLuma * 0.78), grayAmount);
     // The front: a cyan line where the gray is arriving.
     diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.35, 0.85, 1.0), 0.4 * pow(4.0 * grayAmount * (1.0 - grayAmount), 16.0));
   }`;
 
-/** Sets the gray's uniforms on a shader. */
-export function grayUniforms(shader: THREE.WebGLProgramParametersWithUniforms) {
+const NO_KEEP = { value: 0 };
+
+/** Sets the gray's uniforms on a shader. `keep` (0 or 1) lets a material keep its own colors in the debug view (the agents in the Agents lens). */
+export function grayUniforms(shader: THREE.WebGLProgramParametersWithUniforms, keep: { value: number } = NO_KEEP) {
+  shader.uniforms.uGrayKeep = keep;
   shader.uniforms.uGray = GRAY.uGray;
   shader.uniforms.uGrayCenter = GRAY.uGrayCenter;
   shader.uniforms.uGrayReach = GRAY.uGrayReach;

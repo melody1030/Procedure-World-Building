@@ -127,7 +127,7 @@ function title(kind: string, n: number) {
 }
 
 /** What the card says about the selection, or null if it is gone. */
-function describe(sel: Selection, life: Life | null): { name: string; badges: string[]; why?: string; since?: number; body?: ReactNode } | null {
+export function describe(sel: Selection, life: Life | null): { name: string; badges: string[]; why?: string; since?: number; body?: ReactNode } | null {
   if (!life) return null;
   if (sel.kind === "person") {
     const p = life.people[sel.index];

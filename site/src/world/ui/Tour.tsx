@@ -59,7 +59,12 @@ const STEPS: Step[] = [
   {
     target: '[data-tour="camera"]',
     title: "Fly around",
-    text: "Keys 1 to 5 fly to a view. Street level is where the people are. The magnifier (key D) opens the debug view: the layers, and a reading of whatever the mouse is over.",
+    text: "Keys 1 to 5 fly to a view. Street level is where the people are.",
+  },
+  {
+    target: '[aria-keyshortcuts="D"]',
+    title: "Debug view",
+    text: "Press D and the city goes gray. Pick a ground color, or Agents to color everyone by what they are doing, then point at the ground or at anyone to read what and why.",
   },
   {
     target: null,

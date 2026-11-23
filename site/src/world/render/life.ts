@@ -3,7 +3,8 @@ import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js
 import type { Life } from "../life/agents";
 import type { VehicleKind } from "../life/traffic";
 import { FINE } from "../buildings/kit";
-import { patchVoxelLook, voxelBox, withVoxelLook } from "./voxelLook";
+import { patchAgentLook, patchVoxelLook, voxelBox, withVoxelLook } from "./voxelLook";
+import { STATES, catState, personState, pigeonState, vehicleState } from "../life/states";
 import { VoxelModel } from "./voxelModel";
 
 /**
@@ -225,11 +226,12 @@ class Part {
   private used = 0;
   private readonly color = new THREE.Color();
 
-  constructor(geometry: THREE.BufferGeometry, max: number, shadow = true, look: THREE.Material = material()) {
+  /** `agent`: a person, animal or vehicle, which keeps its colors in the debug view's Agents lens. */
+  constructor(geometry: THREE.BufferGeometry, max: number, shadow = true, look: THREE.Material = material(), agent = false) {
     // Lit parts drawn as voxels; the lights stay clean.
     if (look instanceof THREE.MeshStandardMaterial) {
-      look.onBeforeCompile = patchVoxelLook;
-      look.customProgramCacheKey = () => "life-voxel";
+      look.onBeforeCompile = agent ? patchAgentLook : patchVoxelLook;
+      look.customProgramCacheKey = () => (agent ? "life-voxel-agent" : "life-voxel");
     }
     // A voxel model's colors, times the instance's.
     if (geometry.getAttribute("color")) (look as THREE.MeshStandardMaterial).vertexColors = true;
@@ -295,6 +297,8 @@ export class LifeView {
   private readonly bin: Part;
   private readonly pile: Part;
   private readonly tint = new THREE.Color();
+  /** The Agents lens: everyone is colored by what they are doing (life/states.ts). */
+  private stateLens = false;
   private readonly shelters = new THREE.Group();
   private readonly m = new THREE.Matrix4();
   private readonly base = new THREE.Matrix4();
@@ -306,25 +310,25 @@ export class LifeView {
     private readonly half: number,
   ) {
     const people = life.people.length;
-    this.torso = new Part(box(1.3, TORSO, 0.8, 0, 0, 0), people);
-    this.head = new Part(box(0.95, 0.95, 0.95), people);
-    this.hair = new Part(mergeGeometries([box(1.05, 0.3, 1.05, 0, 0.8, -0.02), box(1.05, 0.65, 0.28, 0, 0.3, -0.4)]), people);
-    this.leg = new Part(box(0.58, HIP, 0.68, 0, 0, 0, true), people * 2);
+    this.torso = new Part(box(1.3, TORSO, 0.8, 0, 0, 0), people, true, material(), true);
+    this.head = new Part(box(0.95, 0.95, 0.95), people, true, material(), true);
+    this.hair = new Part(mergeGeometries([box(1.05, 0.3, 1.05, 0, 0.8, -0.02), box(1.05, 0.65, 0.28, 0, 0.3, -0.4)]), people, true, material(), true);
+    this.leg = new Part(box(0.58, HIP, 0.68, 0, 0, 0, true), people * 2, true, material(), true);
     // An arm hangs from the shoulder (its top at the origin).
-    this.arm = new Part(box(0.42, ARM, 0.48, 0, 0, 0, true), people * 2);
+    this.arm = new Part(box(0.42, ARM, 0.48, 0, 0, 0, true), people * 2, true, material(), true);
     // Seated: the thigh forward along the seat, the shin down to the ground (a seat is about 1.9
     // voxels up) clear of the seat's front edge.
-    this.seatedLeg = new Part(mergeGeometries([box(0.58, 0.6, 1.7, 0, 0, 0.6), box(0.56, 2.5, 0.6, 0, 0.6, 1.2, true)]), people * 2);
+    this.seatedLeg = new Part(mergeGeometries([box(0.58, 0.6, 1.7, 0, 0, 0.6), box(0.56, 2.5, 0.6, 0, 0.6, 1.2, true)]), people * 2, true, material(), true);
     const birds = life.pigeons.length;
-    this.pigeon = new Part(pigeon(), birds);
-    this.wing = new Part(wing(), birds * 2);
-    this.cat = new Part(cat(), life.cats.length);
+    this.pigeon = new Part(pigeon(), birds, true, material(), true);
+    this.wing = new Part(wing(), birds * 2, true, material(), true);
+    this.cat = new Part(cat(), life.cats.length, true, material(), true);
     this.phone = new Part(box(0.4, 0.65, 0.12), people, false, glow());
     // Vehicles: a shell and glass per kind; wheels, lamps and the rest shared.
     const traffic = life.traffic;
     const count = (k: VehicleKind) => traffic.vehicles.filter((v) => v.kind === k).length;
     for (const k of KINDS) {
-      this.shells[k] = new Part(this.models[k].shell, count(k), true, paint());
+      this.shells[k] = new Part(this.models[k].shell, count(k), true, paint(), true);
       this.glasses[k] = new Part(this.models[k].glass, count(k), false, new THREE.MeshStandardMaterial({ color: GLASS, roughness: 0.15, metalness: 0.6 }));
     }
     const fleet = traffic.vehicles.length;
@@ -375,6 +379,11 @@ export class LifeView {
     }
   }
 
+  /** Colors the people, animals and vehicles by their state (the debug view's Agents lens), or by themselves. */
+  setStateLens(on: boolean) {
+    this.stateLens = on;
+  }
+
   /** Steps the simulation and poses everything. */
   update(dt: number) {
     this.life.step(dt);
@@ -385,52 +394,54 @@ export class LifeView {
     for (const p of this.life.people) {
       if (p.activity === "away" || p.activity === "ride") continue;
       const seated = p.activity === "use" && p.use === "seat";
+      const lens = this.stateLens ? STATES[personState(p)].color : -1;
       const bob = p.moving ? Math.abs(Math.sin(p.phase)) * 0.18 : 0;
       base.makeRotationY(p.heading).setPosition(p.x - half, p.y + bob, p.z - half);
       if (seated) {
         // On the seat: the body from the seat up, a little back; legs bent forward and down, hands
         // on the knees.
-        this.torso.add(m.multiplyMatrices(base, t.makeTranslation(0, 0, -0.3)), p.shirt);
-        this.head.add(m.multiplyMatrices(base, t.makeTranslation(0, TORSO + 0.05, -0.3)), p.skin);
-        this.hair.add(m.multiplyMatrices(base, t.makeTranslation(0, TORSO + 0.05, -0.3)), p.hair);
+        this.torso.add(m.multiplyMatrices(base, t.makeTranslation(0, 0, -0.3)), lens < 0 ? p.shirt : lens);
+        this.head.add(m.multiplyMatrices(base, t.makeTranslation(0, TORSO + 0.05, -0.3)), lens < 0 ? p.skin : lens);
+        this.hair.add(m.multiplyMatrices(base, t.makeTranslation(0, TORSO + 0.05, -0.3)), lens < 0 ? p.hair : lens);
         for (const s of [-1, 1]) {
-          this.seatedLeg.add(m.multiplyMatrices(base, t.makeTranslation(s * 0.33, 0, -0.3)), p.pants);
+          this.seatedLeg.add(m.multiplyMatrices(base, t.makeTranslation(s * 0.33, 0, -0.3)), lens < 0 ? p.pants : lens);
           m.multiplyMatrices(base, t.makeTranslation(s * SHOULDER, TORSO - 0.1, -0.3)).multiply(r.makeRotationX(-0.75));
-          this.arm.add(m, p.shirt);
+          this.arm.add(m, lens < 0 ? p.shirt : lens);
         }
         continue;
       }
-      this.torso.add(m.multiplyMatrices(base, t.makeTranslation(0, HIP, 0)), p.shirt);
-      this.head.add(m.multiplyMatrices(base, t.makeTranslation(0, HIP + TORSO + 0.05, 0)), p.skin);
-      this.hair.add(m.multiplyMatrices(base, t.makeTranslation(0, HIP + TORSO + 0.05, 0)), p.hair);
+      this.torso.add(m.multiplyMatrices(base, t.makeTranslation(0, HIP, 0)), lens < 0 ? p.shirt : lens);
+      this.head.add(m.multiplyMatrices(base, t.makeTranslation(0, HIP + TORSO + 0.05, 0)), lens < 0 ? p.skin : lens);
+      this.hair.add(m.multiplyMatrices(base, t.makeTranslation(0, HIP + TORSO + 0.05, 0)), lens < 0 ? p.hair : lens);
       // Legs swing as they walk, arms the other way; hailing a taxi, the right arm holds a glowing
       // phone up (the right is -x).
       const swing = p.moving ? Math.sin(p.phase) * 0.55 : 0;
       const hailing = p.activity === "use" && p.use === "curb";
       for (const s of [-1, 1]) {
         m.multiplyMatrices(base, t.makeTranslation(s * 0.33, HIP, 0)).multiply(r.makeRotationX(swing * s));
-        this.leg.add(m, p.pants);
+        this.leg.add(m, lens < 0 ? p.pants : lens);
         const raised = hailing && s < 0;
         m.multiplyMatrices(base, t.makeTranslation(s * SHOULDER, HIP + TORSO - 0.1, 0)).multiply(r.makeRotationX(raised ? -2.5 : -swing * s * 0.8));
-        this.arm.add(m, p.shirt);
+        this.arm.add(m, lens < 0 ? p.shirt : lens);
         if (raised) this.phone.add(m.multiply(t.makeTranslation(0, -ARM - 0.6, 0.05)), PHONE);
       }
     }
 
     for (const b of this.life.pigeons) {
+      const color = this.stateLens ? STATES[pigeonState(b)].color : b.color;
       base.makeRotationY(b.heading).setPosition(b.x - half, b.y, b.z - half);
       if (b.activity !== "ground") {
         const pitch = -Math.atan2(b.vy, Math.hypot(b.vx, b.vz) || 1) * 0.6;
         base.multiply(r.makeRotationX(pitch));
-        this.pigeon.add(base, b.color);
+        this.pigeon.add(base, color);
         const beat = Math.sin(b.flap) * (b.activity === "land" ? 0.5 : 0.9);
         for (const s of [-1, 1]) {
           m.multiplyMatrices(base, t.makeTranslation(s * 0.375, 0.6, 0.1)).multiply(r.makeRotationZ(s > 0 ? beat : Math.PI - beat));
-          this.wing.add(m, b.color);
+          this.wing.add(m, color);
         }
       } else {
         // Pecking: the body tips forward.
-        this.pigeon.add(m.multiplyMatrices(base, r.makeRotationX(b.peck * 0.7)), b.color);
+        this.pigeon.add(m.multiplyMatrices(base, r.makeRotationX(b.peck * 0.7)), color);
       }
     }
 
@@ -440,14 +451,14 @@ export class LifeView {
       else if (c.activity === "hunt" && c.stage === "stalk") m.multiplyMatrices(base, t.makeScale(1, 0.7, 1.08));
       else if (c.activity === "hunt" || c.activity === "flee") m.multiplyMatrices(base, t.makeTranslation(0, Math.abs(Math.sin(c.phase)) * 0.4, 0)).multiply(r.makeScale(1, 0.85, 1.2));
       else m.copy(base).multiply(t.makeTranslation(0, Math.abs(Math.sin(c.phase)) * 0.08, 0));
-      this.cat.add(m, c.color);
+      this.cat.add(m, this.stateLens ? STATES[catState(c)].color : c.color);
     }
 
     for (const v of this.life.traffic.vehicles) {
       if (v.activity === "off") continue;
       const model = this.models[v.kind];
       base.makeRotationY(v.heading).setPosition(v.x - half, v.y, v.z - half).multiply(r.makeRotationX(-v.pitch));
-      this.shells[v.kind].add(base, v.color);
+      this.shells[v.kind].add(base, this.stateLens ? STATES[vehicleState(v)].color : v.color);
       this.glasses[v.kind].add(base, GLASS);
       const { x: lx, y: ly, z: lz } = model.lamp;
       for (const s of [-1, 1]) {

@@ -74,8 +74,8 @@ flowchart TB
   plans --> buildings[buildings]
 ```
 
-The viewer's **Layers** tab does not build anything: it chooses which of these to draw
-([`state.ts`](../../site/src/world/state.ts)).
+The debug view (key **D**) does not build anything: it turns the world gray and, in the left panel, chooses which of these to draw
+([`state.ts`](../../site/src/world/state.ts)). Point at the ground in it and a card reads the data under the mouse; point at someone and it says what they are doing and why.
 
 | Layers tab | Draws | From |
 |---|---|---|
@@ -85,6 +85,7 @@ The viewer's **Layers** tab does not build anything: it chooses which of these t
 | Ground color: Claims | River, bank, road, verge, plaza, lot, park | `claims` |
 | Ground color: Suitability | How well a cell suits a center | `hubs` |
 | Ground color: Waste | Each building by how full its bin is | `life` |
+| Ground color: Agents | Everyone by what they are doing: moving, using or resting, waiting, on a task, alarmed | `life` |
 | Network, Lots, Parks | Lines and outlines over the ground | `streets`, `lots`, `parks` |
 | Buildings, People | The models | `plans`, `life` |
 
