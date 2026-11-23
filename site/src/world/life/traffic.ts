@@ -582,6 +582,37 @@ export class Traffic {
     });
   }
 
+  /**
+   * The largest set of `lanes` a bus can drive between in both directions (never round the ring,
+   * never off the island, as in `path`): from each lane, what it can reach and what can reach it.
+   */
+  private busReach(lanes: number[]): Set<number> {
+    const count = this.segs.length;
+    const onward = (i: number) => {
+      const s = this.segs[i];
+      if ((!s.link && this.nodes[s.b].kind === "exit") || this.stub(s)) return [];
+      return s.next.filter((j) => this.segs[j].fits !== "small");
+    };
+    const back: number[][] = Array.from({ length: count }, () => []);
+    for (let i = 0; i < count; i++) for (const j of onward(i)) back[j].push(i);
+    const reach = (root: number, edges: (i: number) => number[]) => {
+      const seen = new Set([root]);
+      const todo = [root];
+      while (todo.length) {
+        for (const j of edges(todo.pop()!)) if (!seen.has(j)) (seen.add(j), todo.push(j));
+      }
+      return seen;
+    };
+    let best = new Set<number>();
+    for (const root of lanes) {
+      const there = reach(root, onward);
+      const home = reach(root, (i) => back[i]);
+      const both = new Set([...there].filter((i) => home.has(i)));
+      if (both.size > best.size) best = both;
+    }
+    return best;
+  }
+
   /** Bus routes: shelters on long lanes far apart; one route round them each way. */
   private buildRoutes() {
     // The largest part of the graph.
@@ -597,7 +628,11 @@ export class Traffic {
       if (s.link || s.street === RING || s.part !== part || s.len < SHELTER_LANE || this.nodes[s.a].kind === "exit" || this.nodes[s.b].kind === "exit") return;
       streets.set(s.street, [...(streets.get(s.street) ?? []), i]);
     });
-    const pairs = [...streets.values()].filter((l) => l.length === 2);
+    // Only streets the buses can come back from: with the plaza a roundabout they can't cross it,
+    // so some streets (those joined only through the plaza) can be reached but not left, and a
+    // route round the city that touched one would have no way on.
+    const joined = this.busReach([...streets.values()].flat());
+    const pairs = [...streets.values()].filter((l) => l.length === 2 && l.every((i) => joined.has(i)));
     if (pairs.length < 3) return;
     const mid = (l: number) => this.at(this.segs[l], this.segs[l].len / 2);
     const picked: number[][] = [pairs[Math.floor(this.rng.next() * pairs.length)]];

@@ -2166,3 +2166,17 @@ Next steps of `docs/plans/debug-view-plan.md`:
 - **The tour** has a step for the debug view; the shortcuts sheet lists D.
 - **Cost:** none. At Street view, debug off and debug on with the Agents lens and the cursor moving
   the whole time are both 16.7 ms median (the display's rate), p95 about 25 ms.
+
+## 2026-11-22: The buses run again
+
+With the plaza a roundabout (2026-11-18), the cities that have one (`blueprint`, `atlas`) had no bus
+routes at all: the panel said "0 bus routes (0 stops)", no bus ever drove and nobody took one.
+Buses and garbage trucks can't take the ring, so some streets, joined to the rest only through the
+plaza, could be reached but not left. `buildRoutes` picks six streets far apart and links them
+round the center, and one unreachable hop threw the whole route away, both ways.
+
+It now picks only from the streets a bus can drive between in both directions (`busReach`: the
+largest set of lanes that reach each other without the ring, never off the island). Checked in the
+page: `blueprint` and `atlas` have 2 routes, 12 stops and 8 buses (0, 0 and 4 before); `harbor` and
+`river`, with no ring, are unchanged at 2 routes. Over 90 simulated seconds on `blueprint` all 8
+buses drove 180 to 467 columns, stopped at their shelters, and up to 3 people rode one at a time.
