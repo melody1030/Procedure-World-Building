@@ -2167,6 +2167,11 @@ Next steps of `docs/plans/debug-view-plan.md`:
 - **Cost:** none. At Street view, debug off and debug on with the Agents lens and the cursor moving
   the whole time are both 16.7 ms median (the display's rate), p95 about 25 ms.
 
+| In the debug view | Pointing at a bus, Agents lens |
+|---|---|
+| ![The city gray, with the layers in the left panel](screenshots/2026-11-22-debug-gray.webp) | ![A blue bus at the street with its card](screenshots/2026-11-22-debug-agents-hover.webp) |
+
+
 ## 2026-11-22: The buses run again
 
 With the plaza a roundabout (2026-11-18), the cities that have one (`blueprint`, `atlas`) had no bus

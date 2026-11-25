@@ -126,6 +126,8 @@ The full dated log with every screenshot is in
 | 2026-11-18    | **Street lamps**: a few along every street, side to side, one every 48 m on each side; amber in the homes, cyan in the core |
 | 2026-11-18    | **Everything in voxels**: the buildings, plants, people, animals and vehicles share the ground's cube grid and lines, drawn by the shader, with no slower frame; the plaza is a roundabout round the Landmark |
 | 2026-11-19    | **Interface pass**: the overlay at 90%, more readable notes, bigger hit areas, and two new tour steps (the timeline and the camera) |
+| 2026-11-20/22 | **Debug view** (key D): the city turns gray in a wave from the plaza and the left panel swaps to the layers; point at the ground to read what the ground color shows there, or at anyone to read what they are doing and why; an Agents lens colors everyone by state |
+| 2026-11-22    | **Buses run again**: with the plaza a roundabout, cities such as `blueprint` had no bus routes; routes are now chosen only from streets a bus can come back from |
 
 | Version 1, rainy night (Oct 7) | Districts and parks (Oct 12) |
 |---|---|
@@ -186,6 +188,34 @@ bus with the blue line of the way it means to take:
 Street lamps (Nov 18):
 
 ![A street lamp at the top of a stepped street, its amber lantern over the road](site/src/world/screenshots/2026-11-18-street-lamp.webp)
+
+### The debug view (Nov 20–22)
+
+Press **D**, or the magnifier on the camera toolbar, and the city turns gray in a wave that spreads
+out from the plaza (0.6 s), so the only color left is the debug view's own. The left panel, which
+holds only the Build settings the rest of the time, swaps to the layers: one **ground color** at a
+time (districts, frontage, height limit, claims, suitability, waste, or agents), its legend, and
+what is drawn on top. A cyan frame and a badge at the top say you are in it; D again leaves.
+
+| The city as it is | In the debug view |
+|---|---|
+| ![The city as it is, in color](site/src/world/screenshots/2026-11-22-debug-before.webp) | ![The same view after pressing D: the city is gray and the layers are in the left panel](site/src/world/screenshots/2026-11-22-debug-gray.webp) |
+
+**Point at the ground** and a card at the mouse reads the data under it, from what the stages
+already made (nothing is looked up from the picture): the district and lot for Districts, the
+limit and its tier for Height, the score for Suitability, the owner, height and slope for the
+rest.
+
+**Agents** colors the people, pigeons, cats and vehicles by what each is doing now (Moving, Using
+or resting, Waiting, On a task, Alarmed), and they are the only color left in the gray city.
+Point at one and the card says who it is, what it is doing and why, the same text the inspector
+shows.
+
+| Pointing at the ground: Districts | Pointing at a bus: Agents |
+|---|---|
+| ![The Districts ground color, with a card reading Corporate core and the lot's number and area](site/src/world/screenshots/2026-11-22-debug-districts-hover.webp) | ![At the street, a blue bus with a card reading Bus, route 1, Driving, no one else waiting](site/src/world/screenshots/2026-11-22-debug-agents-hover.webp) |
+
+How it is built: [the plan](docs/plans/debug-view-plan.md) · [the development log](site/src/world/README.md#2026-11-20-hover-reading-on-the-ground-debug-view-d1) · [data and layers](docs/techniques/data-and-layers.md)
 
 Plans: [terrain plan](docs/plans/terrain-plan.md) · [town plan](docs/plans/town-plan.md) · [shader studio plan](docs/plans/shader-studio-plan.md) · [city controls plan](docs/plans/city-controls-plan.md) · [building grammar plan](docs/plans/building-grammar-plan.md) · [grammar city plan](docs/plans/grammar-city-plan.md) · [city simulation plan](docs/plans/city-simulation-plan.md) · [street furniture plan](docs/plans/street-furniture-plan.md) · [voxel look plan](docs/plans/voxel-look-plan.md)
 
