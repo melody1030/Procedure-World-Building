@@ -46,6 +46,13 @@ what the column is, with a dot of that kind's color, and its rows say what matte
 | Plaza | Size, height |
 | Park | Kind, size, benches, vending machines, trees or flower beds |
 
+| Building | District, use, storeys, height, limit, homes or jobs, who is inside, how full its bin is |
+
+Every card ends with a sentence on **why** the place is as it is, from what the stages decided (a
+building's cap, whether ground can be built on, how its street was made). What the card is about
+lights up in the city (`WorldView.setHighlight`): a lot's outline, a street's or the river's
+line, the plaza's or a park's rectangle, a building's box.
+
 A ground color with something of its own to say replaces the rows:
 
 | Lens | The card reads |
@@ -58,7 +65,7 @@ Done when moving the cursor reads a different place every frame without a hitch,
 agrees with the tint under it.
 
 **Built 2026-11-20.** `WorldView` finds the column under the mouse (at most once a frame, and not
-when a building or the sky is under it, or a button is down) and tells `ui/Lens.tsx`, whose card
+when the sky is under it, or a button is down) and tells `ui/Lens.tsx`, whose card
 reads the stages' own data. Heights come from the graded ground, as drawn, not the ground
 before the lots were dug. With the Waste tint there is no ground card (the buildings are the lens). Checked on `blueprint` against the five tints.
 

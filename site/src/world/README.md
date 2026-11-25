@@ -2216,3 +2216,19 @@ frontage row on a lot's card). The lots still record what they front, which the 
 The **None** ground color was removed too: the debug view opens on **Districts**. Outside the debug
 view the city shows with no tint, as before.
 
+## 2026-11-24: Why, buildings, and what lights up (debug view)
+
+- **Why:** every card ends with a sentence on why the place is as it is. A building's comes from its
+  plan's cap (the lot too narrow for its limit, no building of its district near the limit, or
+  built to the limit); open ground that can't be built on says it is too
+  steep or river-side.
+- **Buildings** can be hovered: district, use, storeys, height and limit, homes or jobs, who is
+  inside now and how full its bin is, refreshed while the mouse rests. The nearest building box
+  along the ray wins over the ground.
+- **What the card is about lights up:** a lot's outline, a street's or the river's line, the
+  plaza's or a park's rectangle, a 2 m cell for open ground; a building, its box alone. Thin, dashed unlit yellow lines,
+  hidden where something stands in front of them (`WorldView.setHighlight`); being unlit, the gray
+  never takes them.
+- Under Districts, ground with no district (streets, river, plaza) keeps its own rows rather than
+  reading "None".
+

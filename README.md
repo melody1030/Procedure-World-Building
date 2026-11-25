@@ -206,7 +206,11 @@ verge, the plaza, a park, the river, its bank or open ground) and reads the data
 what the stages already made (nothing is looked up from the picture): a lot's district, area,
 height limit and built height; a street's width; a park's benches, vending machines and
 trees; the river's water level and depth. A ground color with something of its own to say
-(Districts, Height, Suitability) shows that instead.
+(Districts, Height, Suitability) shows that instead. Over a **building** the card reads its use,
+storeys, height and limit, homes or jobs, who is inside and how full its bin is. Every card ends
+with **why** the place is as it is (a lot too narrow for its height limit, ground too steep to
+build on), and what it is about lights up in the city: the lot, the street, the river, the
+building.
 
 **Agents** colors the people, pigeons, cats and vehicles by what each is doing now (Moving, Using
 or resting, Waiting, On a task, Alarmed), and they are the only color left in the gray city.

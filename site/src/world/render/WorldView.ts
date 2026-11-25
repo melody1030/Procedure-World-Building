@@ -33,8 +33,17 @@ export interface GroundHover {
   z: number;
   px: number;
   py: number;
-  /** An agent under the mouse (then x and z are −1), or null for the ground. */
+  /** An agent under the mouse (then x and z are −1), or null. */
   agent: AgentRef | null;
+  /** A building under the mouse, by its plan's index (then x and z are −1), or null. */
+  building: number | null;
+}
+
+/** A line to light up under the debug view's hover: points in columns (x, z) and voxels (y). */
+export interface HoverLine {
+  points: { x: number; y: number; z: number }[];
+  /** Its width, in voxels. */
+  width: number;
 }
 
 /** A color's gray: its luminance on every channel. */
@@ -42,6 +51,12 @@ const grayOf = (c: THREE.Color) => new THREE.Color().setScalar(0.299 * c.r + 0.5
 
 /** How long the debug view takes to turn the world gray (seconds). */
 const GRAY_SECONDS = 0.6;
+
+/** The debug view's hover lines: a yellow that stands out from the gray and from every district color. */
+const HIGHLIGHT = 0xffe600;
+/** Their dashes and the gaps between, in voxels. */
+const DASH = 4;
+const DASH_GAP = 2;
 
 /** Diorama framing: looking down on the whole table-top from a raised corner. */
 const VIEW_AZIMUTH = THREE.MathUtils.degToRad(38);
@@ -221,6 +236,9 @@ export class WorldView {
   private readonly skyGray = grayOf(new THREE.Color(SKY.background)).multiplyScalar(0.62);
   private hoverEvent: PointerEvent | null = null;
   private hoverAgent: AgentRef | null = null;
+  /** What the debug view's hover lights up (see setHighlight), and what it is drawn with. */
+  private highlight: THREE.Group | null = null;
+  private readonly highlightMaterial = new THREE.MeshBasicMaterial({ color: HIGHLIGHT, toneMapped: false });
   private readonly mark = new SelectionMark();
   /** The Waste tint: whether it is on, whether the buildings carry it now, and a color to work in. */
   private wasteTint = false;
@@ -1354,30 +1372,90 @@ transformed = aGrow.xyz + (transformed - aGrow.xyz) * popped;`,
       const agent = this.hoverAgent;
       this.hoverEvent = null;
       if (!ev || !this.onHover) return;
-      const hit = agent ? { x: -1, z: -1, px: ev.clientX, py: ev.clientY, agent } : this.groundUnder(ev);
+      const hit = agent ? { x: -1, z: -1, px: ev.clientX, py: ev.clientY, agent, building: null } : this.groundUnder(ev);
       if (hit || this.hovered) this.onHover(hit);
       this.hovered = !!hit;
     });
   }
 
-  /** The ground column the pointer is over, unless a building is in front of it. */
+  /** The building or, with none in front of it, the ground column the pointer is over. */
   private groundUnder(e: PointerEvent): GroundHover | null {
     const rect = this.renderer.domElement.getBoundingClientRect();
     const ndc = new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
     this.raycaster.setFromCamera(ndc, this.camera);
     const ray = this.raycaster.ray;
     const t = this.groundAlong(ray);
-    if (!Number.isFinite(t)) return null;
     if (this.city.visible && this.built) {
-      const box = new THREE.Vector3();
-      for (const b of this.buildingBoxes) if (b && ray.intersectBox(b, box) && box.distanceTo(ray.origin) < t) return null;
+      const at = new THREE.Vector3();
+      let building = -1;
+      let near = t;
+      this.buildingBoxes.forEach((box, i) => {
+        if (!box || !ray.intersectBox(box, at)) return;
+        const d = at.distanceTo(ray.origin);
+        if (d < near) [building, near] = [i, d];
+      });
+      if (building >= 0) return { x: -1, z: -1, px: e.clientX, py: e.clientY, agent: null, building };
     }
+    if (!Number.isFinite(t)) return null;
     const half = WORLD_SIZE / 2;
     const p = ray.at(t, new THREE.Vector3());
     const x = Math.floor(p.x + half);
     const z = Math.floor(p.z + half);
     if (x < 0 || z < 0 || x >= WORLD_SIZE || z >= WORLD_SIZE) return null;
-    return { x, z, px: e.clientX, py: e.clientY, agent: null };
+    return { x, z, px: e.clientX, py: e.clientY, agent: null, building: null };
+  }
+
+  /**
+   * Lights up what the hover card is about: lines over the ground, and a building's box. Unlit, so
+   * it keeps its color in the gray; hidden, like anything else, where something stands in front of
+   * it. Empty clears it.
+   */
+  setHighlight(lines: HoverLine[], building: number | null) {
+    if (this.highlight) {
+      this.scene.remove(this.highlight);
+      this.highlight.traverse((o) => o instanceof THREE.Mesh && o.geometry.dispose());
+      this.highlight = null;
+    }
+    const box = building === null ? null : this.buildingBoxes[building];
+    if (!lines.length && !box) return;
+    const group = new THREE.Group();
+    const half = WORLD_SIZE / 2;
+    const bar = (a: THREE.Vector3, b: THREE.Vector3, width: number) => {
+      const length = a.distanceTo(b);
+      if (length < 1e-3) return;
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(width, width * 0.4, length), this.highlightMaterial);
+      mesh.position.addVectors(a, b).multiplyScalar(0.5);
+      mesh.lookAt(b);
+      group.add(mesh);
+    };
+    /** A dashed line through the points: the dashes run on round its bends. */
+    const dashed = (points: THREE.Vector3[], width: number) => {
+      const period = DASH + DASH_GAP;
+      let run = 0;
+      for (let i = 1; i < points.length; i++) {
+        const from = points[i - 1];
+        const to = points[i];
+        const length = from.distanceTo(to);
+        for (let at = 0; at < length - 1e-3; ) {
+          const phase = (run + at) % period;
+          const on = phase < DASH - 1e-3;
+          const next = Math.min(length, at + Math.max(1e-2, (on ? DASH : period) - phase));
+          if (on) bar(new THREE.Vector3().lerpVectors(from, to, at / length), new THREE.Vector3().lerpVectors(from, to, next / length), width);
+          at = next;
+        }
+        run += length;
+      }
+    };
+    for (const line of lines) dashed(line.points.map((q) => new THREE.Vector3(q.x - half, q.y, q.z - half)), line.width * 0.75);
+    if (box) {
+      // A little proud of the walls, so the edges in view are not buried in them.
+      const { min, max } = box.clone().expandByScalar(1);
+      const corner = (i: number) => new THREE.Vector3(i & 1 ? max.x : min.x, i & 2 ? max.y : min.y, i & 4 ? max.z : min.z);
+      // The box's twelve edges: corners that differ in one coordinate.
+      for (let i = 0; i < 8; i++) for (const bit of [1, 2, 4]) if (!(i & bit)) dashed([corner(i), corner(i | bit)], 1.25);
+    }
+    this.highlight = group;
+    this.scene.add(group);
   }
 
   /** The dot under the pointer (within 14 px on screen), or −1. */
