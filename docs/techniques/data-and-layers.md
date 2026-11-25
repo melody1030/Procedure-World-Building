@@ -80,7 +80,6 @@ The debug view (key **D**) does not build anything: it turns the world gray and,
 | Layers tab | Draws | From |
 |---|---|---|
 | Ground color: Districts | One color per district | `districts` |
-| Ground color: Frontage | Avenue, side, corner, through | `lots` |
 | Ground color: Heights | The zoning map's height limit | `zoning` |
 | Ground color: Claims | River, bank, road, verge, plaza, lot, park | `claims` |
 | Ground color: Suitability | How well a cell suits a center | `hubs` |

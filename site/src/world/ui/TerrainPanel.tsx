@@ -5,7 +5,7 @@ import { Button, GLASS, Legend, NOTE, Note, Row, RULE, Section, Segmented, Selec
 import type { GroundTint, WorldController } from "../state";
 import { DEFAULT_PARAMS, PARAM_SPECS, RIVER_VISIBLE, type ParamKey, type ParamSpec, type RangeSpec, type TerrainParams } from "../terrain/params";
 import { CLAIM_COLORS } from "../terrain/claims";
-import { DISTRICTS, FRONTAGE_KINDS, frontageKind } from "../terrain/districts";
+import { DISTRICTS } from "../terrain/districts";
 import type { Terrain } from "../terrain/pipeline";
 import { STATES } from "../life/states";
 import { ZoningIcon, NoiseIcon, ResetIcon, RiverIcon, ShapingIcon, Spinner, SurfaceIcon, TerraceIcon } from "./icons";
@@ -94,9 +94,7 @@ const ALL_KEYS: ParamKey[] = [...SECTIONS.flatMap((s) => s.keys), ["river", "con
 
 /** The ground tints, in the order the segmented control shows them. */
 const TINT_OPTIONS: { value: GroundTint; label: string }[] = [
-  { value: "none", label: "None" },
   { value: "districts", label: "Districts" },
-  { value: "frontage", label: "Frontage" },
   { value: "heights", label: "Height" },
   { value: "claims", label: "Claims" },
   { value: "suitability", label: "Suitability" },
@@ -241,14 +239,6 @@ function BuildTab({ ctl, busy }: { ctl: WorldController; busy: boolean }) {
   );
 }
 
-/** Each frontage kind with its share of the lots. */
-function frontageLegend(terrain: Terrain): [string, number][] {
-  const { lots } = terrain.districts;
-  const counts = FRONTAGE_KINDS.map(() => 0);
-  for (const lot of lots) counts[frontageKind(lot)]++;
-  return FRONTAGE_KINDS.map((k, i) => [`${k.name} ${lots.length ? Math.round((counts[i] / lots.length) * 100) : 0}%`, k.color]);
-}
-
 /** The Height limit tint's legend: the heat bar with the tiers marked, and the tiers listed. */
 function HeightLegend() {
   const hex = (c: number) => `#${c.toString(16).padStart(6, "0")}`;
@@ -289,7 +279,6 @@ export function LensLegend({ terrain, tint }: { terrain: Terrain; tint: GroundTi
   return (
     <>
       {tint === "districts" && <Legend items={DISTRICTS.map((d, i) => [`${d.name} ${Math.round(terrain.districts.shares[i] * 100)}%`, d.color])} />}
-      {tint === "frontage" && <Legend items={frontageLegend(terrain)} />}
       {tint === "heights" && <HeightLegend />}
       {tint === "claims" && <Legend items={CLAIM_LEGEND} />}
       {tint === "suitability" && (

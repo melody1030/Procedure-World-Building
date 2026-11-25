@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import type { WorldView, GroundHover } from "../render/WorldView";
 import type { Terrain } from "../terrain/pipeline";
-import { CLAIM } from "../terrain/claims";
+import { CLAIM, CLAIM_COLORS } from "../terrain/claims";
+import { NO_WATER } from "../terrain/voxelize";
+import type { Street } from "../terrain/streets";
+import type { BuildingPlan } from "../city/placement";
 import { CELL } from "../terrain/hubs";
-import { DISTRICTS, FRONTAGE_KINDS, NO_DISTRICT, frontageKind } from "../terrain/districts";
+import { DISTRICTS, NO_DISTRICT } from "../terrain/districts";
 import { HEIGHT_TIERS, type Zoning } from "../city/zoning";
 import { VOXEL_M } from "../scale";
 import type { GroundTint } from "../state";
@@ -17,77 +20,122 @@ import { GLASS } from "./kit";
  * mouse, and goes away over an agent, a building, or while a button is down.
  */
 
-const CLAIM_NAMES = Object.fromEntries(Object.entries(CLAIM).map(([name, v]) => [v, name])) as Record<number, string>;
 const TIER_NAMES = ["low", "mid", "high"] as const;
+/** The dot for ground nothing has claimed. */
+const UNUSED_COLOR = 0x8b95a5;
 
-/** What the card is titled, by lens. */
-const TITLES: Record<GroundTint, string> = {
-  none: "Ground",
-  districts: "District",
-  frontage: "Frontage",
-  heights: "Height limit",
-  claims: "Claim",
-  suitability: "Suitability",
-  waste: "Ground",
-  agents: "Ground",
-};
+/** What a card is titled and the rows under it; `color` is the dot beside the title. */
+type Reading = { title: string; color: number; rows: [string, string][] };
 
-type Reading = { title: string; rows: [string, string][] };
-
-const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 const meters = (voxels: number) => `${(voxels * VOXEL_M).toFixed(1)} m`;
 
-/** What the lens reads at one column. */
-export function readColumn(terrain: Terrain, zoning: Zoning, tint: GroundTint, x: number, z: number): Reading {
+/** The street whose center line passes nearest a column (road and verge columns belong to one). */
+function streetAt(terrain: Terrain, x: number, z: number): Street | null {
+  let best: Street | null = null;
+  let near = Infinity;
+  for (const street of terrain.streets.streets) {
+    for (const q of street.curve) {
+      const d = (q.x - x) ** 2 + (q.z - z) ** 2;
+      if (d < near) [best, near] = [street, d];
+    }
+  }
+  return best;
+}
+
+/** What stands in the park a column is in: its seats, vending machines and plants. */
+function parkRows(terrain: Terrain, x: number, z: number): [string, string][] {
+  const rect = terrain.districts.parkRects.find((r) => x >= r.x0 && x < r.x1 && z >= r.z0 && z < r.z1);
+  const parks = terrain.parks?.parks ?? [];
+  const park = rect && parks.find((p) => p.x >= rect.x0 && p.x < rect.x1 && p.z >= rect.z0 && p.z < rect.z1);
+  if (!rect || !park) return [];
+  const count = (...kinds: string[]) => String(park.props.filter((p) => kinds.includes(p.kind)).length);
+  const size: [string, string] = ["Size", `${Math.round((rect.x1 - rect.x0) * VOXEL_M)} × ${Math.round((rect.z1 - rect.z0) * VOXEL_M)} m`];
+  const kind: [string, string] = ["Kind", park.garden ? "Flower garden" : "Park"];
+  return park.garden
+    ? [kind, size, ["Flower beds", count("flowerbed")], ["Benches", count("bench")]]
+    : [kind, size, ["Benches", count("bench")], ["Vending machines", count("vending")], ["Trees", count("broadleaf", "conifer", "blossom")]];
+}
+
+/**
+ * What is at one column: the title says what it is (a river, a street, a lot…), and the rows say
+ * what the active lens knows about it, or with no lens of its own, what matters for that kind.
+ */
+export function readColumn(terrain: Terrain, zoning: Zoning, plans: BuildingPlan[], tint: GroundTint, x: number, z: number): Reading {
   const { districts, hubs } = terrain;
   // The ground as drawn: with each lot dug level, once the districts are done.
   const columns = terrain.grading?.ground ?? terrain.columns;
   const n = columns.n;
   const k = z * n + x;
   const claim = districts.claims.claim[k];
-  const claimName = cap(CLAIM_NAMES[claim] ?? "free");
-  const lot = districts.lotId[k] ? districts.lots[districts.lotId[k] - 1] : null;
+  const index = districts.lotId[k] - 1;
+  const lot = index >= 0 ? districts.lots[index] : null;
   const cell = Math.floor(z / CELL) * districts.cells + Math.floor(x / CELL);
-  const title = TITLES[tint];
+  const district = districts.district[cell];
+  const height: [string, string] = ["Height", meters(columns.height[k])];
 
-  const ground = (): [string, string][] => {
-    const h = (xx: number, zz: number) => columns.height[Math.min(n - 1, Math.max(0, zz)) * n + Math.min(n - 1, Math.max(0, xx))];
-    const slope = Math.hypot(h(x + 1, z) - h(x - 1, z), h(x, z + 1) - h(x, z - 1)) / 2;
-    return [
-      ["Height", meters(columns.height[k])],
-      ["Slope", `${slope.toFixed(2)} · ${Math.round((Math.atan(slope) * 180) / Math.PI)}°`],
+  let title = "Open ground";
+  let color: number = UNUSED_COLOR;
+  let rows: [string, string][] = [height];
+  if (lot) {
+    title = `Lot #${lot.id}`;
+    color = DISTRICTS[lot.district].color;
+    const built = plans.find((p) => p.lot === lot.id);
+    const limit = zoning.lots[index].limit;
+    rows = [
+      ["District", DISTRICTS[lot.district].name],
+      ["Area", `${Math.round(lot.area)} m²`],
+      ["Height limit", limit > 0 ? `${Math.round(limit)} m` : "None"],
+      ["Built", built ? `${Math.round(built.height)} m` : "Empty"],
     ];
-  };
-
-  switch (tint) {
-    case "claims":
-      return { title, rows: [["Owned by", claimName], ...ground()] };
-    case "districts": {
-      const d = districts.district[cell];
-      const rows: [string, string][] = [["District", d === NO_DISTRICT ? `None (${claimName.toLowerCase()})` : DISTRICTS[d].name]];
-      if (lot) rows.push(["Lot", `#${lot.id} · ${Math.round(lot.area)} m²`]);
-      return { title, rows };
-    }
-    case "frontage":
-      if (!lot) return { title, rows: [["Lot", "None"]] };
-      return { title, rows: [["Kind", FRONTAGE_KINDS[frontageKind(lot)].name], ["Front", `${Math.round(lot.frontage)} m, facing ${lot.street === "avenue" ? "an avenue" : "a side street"}`]] };
-    case "heights": {
-      const limit = lot ? zoning.lots[districts.lotId[k] - 1].limit : claim === CLAIM.free ? zoning.limit[cell] : 0;
-      if (!(limit > 0)) return { title, rows: [["Limit", "None"], ["Owned by", claimName]] };
-      const tier = limit < HEIGHT_TIERS[0] ? 0 : limit <= HEIGHT_TIERS[1] ? 1 : 2;
-      return { title, rows: [["Limit", `${Math.round(limit)} m`], ["Tier", TIER_NAMES[tier]]] };
-    }
-    case "suitability": {
-      const score = hubs.suitability[cell];
-      return { title, rows: [["Score", score.toFixed(2)], ["Center", hubs.buildable[cell] ? "can be built on" : "can't be built on"]] };
-    }
-    default:
-      return { title, rows: [...ground(), ["Owned by", claimName]] };
+  } else if (claim === CLAIM.river) {
+    title = "River";
+    color = CLAIM_COLORS.river;
+    const water = columns.water[k];
+    rows = water === NO_WATER ? [height] : [["Water level", meters(water)], ["Depth", meters(Math.max(0, water - columns.height[k]))]];
+  } else if (claim === CLAIM.bank) {
+    title = "River bank";
+    color = CLAIM_COLORS.bank;
+  } else if (claim === CLAIM.road || claim === CLAIM.verge) {
+    const street = streetAt(terrain, x, z);
+    const main = street?.kind === "main";
+    title = claim === CLAIM.verge ? "Verge" : main ? "Main street" : "Side street";
+    color = CLAIM_COLORS[claim === CLAIM.verge ? "verge" : "road"];
+    if (street) rows = [claim === CLAIM.verge ? ["Beside", main ? "a main street" : "a side street"] : ["Width", meters(street.width)], height];
+  } else if (claim === CLAIM.plaza) {
+    title = "Plaza";
+    color = CLAIM_COLORS.plaza;
+    const plaza = terrain.streets.plazas[0];
+    if (plaza) rows = [["Size", `${Math.round(plaza.half * 2 * VOXEL_M)} m square`], height];
+  } else if (claim === CLAIM.park) {
+    title = "Park";
+    color = CLAIM_COLORS.park;
+    const found = parkRows(terrain, x, z);
+    if (found.length) rows = found;
+  } else if (district !== NO_DISTRICT) {
+    rows = [["District", DISTRICTS[district].name], height];
   }
+
+  // A lens that knows something of its own replaces the rows.
+  if (tint === "districts") {
+    rows = [["District", district === NO_DISTRICT ? "None" : DISTRICTS[lot ? lot.district : district].name]];
+    if (lot) rows.push(["Area", `${Math.round(lot.area)} m²`]);
+  } else if (tint === "heights") {
+    const limit = lot ? zoning.lots[index].limit : claim === CLAIM.free ? zoning.limit[cell] : 0;
+    if (!(limit > 0)) rows = [["Height limit", "None"]];
+    else {
+      const tier = limit < HEIGHT_TIERS[0] ? 0 : limit <= HEIGHT_TIERS[1] ? 1 : 2;
+      rows = [["Height limit", `${Math.round(limit)} m`], ["Tier", TIER_NAMES[tier]]];
+      const built = lot && plans.find((p) => p.lot === lot.id);
+      if (built) rows.push(["Built", `${Math.round(built.height)} m`]);
+    }
+  } else if (tint === "suitability") {
+    rows = [["Score", hubs.suitability[cell].toFixed(2)], ["Center", hubs.buildable[cell] ? "can be built on" : "can't be built on"]];
+  }
+  return { title, color, rows };
 }
 
 /** The card, following the mouse. `scale` is the interface's zoom, which positions are given in. */
-export function HoverCard({ view, terrain, zoning, tint, scale, life }: { view: WorldView | null; terrain: Terrain; zoning: Zoning; tint: GroundTint; scale: number; life: Life | null }) {
+export function HoverCard({ view, terrain, zoning, plans, tint, scale, life }: { view: WorldView | null; terrain: Terrain; zoning: Zoning; plans: BuildingPlan[]; tint: GroundTint; scale: number; life: Life | null }) {
   const [hit, setHit] = useState<GroundHover | null>(null);
   useEffect(() => {
     view?.setHoverHandler(setHit);
@@ -106,7 +154,7 @@ export function HoverCard({ view, terrain, zoning, tint, scale, life }: { view: 
   }, [agent]);
   const said = agent ? describe(agent, life) : null;
   // On the ground: not over a lot's building walls, and not while the waste lens colors buildings only.
-  const reading = useMemo(() => (hit && !hit.agent && tint !== "waste" ? readColumn(terrain, zoning, tint, hit.x, hit.z) : null), [hit, terrain, zoning, tint]);
+  const reading = useMemo(() => (hit && !hit.agent && tint !== "waste" ? readColumn(terrain, zoning, plans, tint, hit.x, hit.z) : null), [hit, terrain, zoning, plans, tint]);
   if (!hit || (!reading && !said)) return null;
   const flipX = hit.px > window.innerWidth - 240;
   const flipY = hit.py > window.innerHeight - 140;
@@ -121,7 +169,10 @@ export function HoverCard({ view, terrain, zoning, tint, scale, life }: { view: 
         transform: `translate(${flipX ? "-100%" : "0"}, ${flipY ? "-100%" : "0"})`,
       }}
     >
-      <div className="font-display text-[11px] font-bold uppercase tracking-[0.14em] text-[#8ba1b8]">{said ? said.name : reading?.title}</div>
+      <div className="flex items-center gap-1.5 font-display text-[11px] font-bold uppercase tracking-[0.14em] text-[#dce8f5]">
+        {!said && reading && <span aria-hidden className="h-2 w-2 shrink-0 rounded-sm" style={{ background: `#${reading.color.toString(16).padStart(6, "0")}` }} />}
+        {said ? said.name : reading?.title}
+      </div>
       {said && (
         <div className="mt-1.5 grid gap-1 text-[12px]">
           <span className="text-[#ffd27a]">{said.badges.join(" · ")}</span>

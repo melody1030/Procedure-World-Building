@@ -2144,8 +2144,8 @@ Opening it:
   the distance to the farthest corner, set each frame by `WorldView.aimGray`) take the color out of
   the ground, the buildings, the people, the vehicles, the park props and the water, and make them
   a little darker, before the lenses' tints are applied; the sky eases to a darker gray. Lights
-  (windows, signs) stay colored. With the Waste ground color the buildings are the lens, so nothing
-  goes gray. Nothing is rebuilt.
+  (windows, signs) stay colored. The Waste ground color paints its colors on the walls over
+  the gray. Nothing is rebuilt.
 - **It stays marked.** A cyan frame round the view and a badge at the top (`DebugMarks` in
   `ui/Lens.tsx`: a pulsing dot, "Debug view", and the key to leave) fade in as the sweep ends.
 - **The left panel swaps.** Normally it shows only the Build settings, with no tab bar (the Layers tab and the "Build" tab heading are gone). In the debug
@@ -2185,3 +2185,34 @@ largest set of lanes that reach each other without the ring, never off the islan
 page: `blueprint` and `atlas` have 2 routes, 12 stops and 8 buses (0, 0 and 4 before); `harbor` and
 `river`, with no ring, are unchanged at 2 routes. Over 90 simulated seconds on `blueprint` all 8
 buses drove 180 to 467 columns, stopped at their shelters, and up to 3 people rode one at a time.
+
+## 2026-11-24: The hover card says what you point at
+
+The card listed data (height, slope, owner) and left you to work out what the place was. Now its
+title is the thing itself, with a dot of its color: Lot #12, Main street, Side street, Verge,
+Plaza, Park, River, River bank or Open ground. The rows follow the kind: a lot's district, area,
+height limit and built height; a street's width; a park's benches, vending machines and
+trees; the river's water level and depth. Slope is gone (it read 0.00 on everything graded flat).
+A ground color with something of its own (Districts, Height, Suitability) replaces the
+rows and keeps the title. Checked on `blueprint` with the buildings hidden: every kind appeared.
+
+## 2026-11-24: The left panel could not be clicked in the debug view
+
+Seen once in the browser pane: the panel looked open, but clicks fell through to the city. Its
+slide-in was left `pending` by the browser and never started, so hit testing still saw the panel off
+screen. The trigger could not be reproduced on demand. `components/SidePanel.tsx` now finishes any
+slide still unfinished 0.35 s after the panel opens or closes (the slide takes 0.3 s). Checked by
+pausing the slide at its start: the panel was unclickable, then recovered by itself.
+
+## 2026-11-24: Waste no longer looks like leaving the debug view
+
+Picking the Waste ground color took the whole gray away, so it read as the debug view closing. The
+world now stays gray and only the walls take the bin colors: the buildings' Waste tint is applied
+after the gray (`buildings/print.ts`).
+
+The **Frontage** ground color was removed the same day (its button, legend, ground tint and the
+frontage row on a lot's card). The lots still record what they front, which the buildings use.
+
+The **None** ground color was removed too: the debug view opens on **Districts**. Outside the debug
+view the city shows with no tint, as before.
+

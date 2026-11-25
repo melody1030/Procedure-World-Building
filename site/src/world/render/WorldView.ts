@@ -4,7 +4,7 @@ import type { GeometryData } from "../geometry";
 import { BLUEPRINT, SKY } from "../palette";
 import { CLAIM } from "../terrain/claims";
 import type { Hubs } from "../terrain/hubs";
-import { NO_DISTRICT, frontageKind, type Districts } from "../terrain/districts";
+import { NO_DISTRICT, type Districts } from "../terrain/districts";
 import type { Streets } from "../terrain/streets";
 import type { RiverPath } from "../terrain/river";
 import { BASE, WORLD_SIZE, voxels } from "../scale";
@@ -57,8 +57,6 @@ const DIG_SHARE = 0.2;
 /** Park props: how much of the buildings' phase one park's props are staggered over (middle first), and how long each takes to grow. */
 const PARK_SPREAD = 0.25;
 const PARK_GROW = 0.15;
-/** How deep (columns) the Frontage tint's bright front edge runs into each lot. */
-const FRONT_STRIP = voxels(1.5);
 
 
 function toGeometry(data: GeometryData): THREE.BufferGeometry {
@@ -418,11 +416,11 @@ export class WorldView {
     GRAY.uGrayReach.value = Math.max(1, Math.hypot(Math.max(cx, res.x - cx), Math.max(cy, res.y - cy)));
   }
 
-  /** Eases the gray toward its target: gray in the debug view, except with the Waste tint (the buildings are the lens). */
+  /** Eases the gray toward its target: gray in the debug view, whatever the ground color. */
   private easeGray(dt: number) {
     this.renderer.getDrawingBufferSize(GRAY.uGrayRes.value);
     this.aimGray();
-    const target = this.debug && !this.wasteTint ? 1 : 0;
+    const target = this.debug ? 1 : 0;
     const now = GRAY.uGray.value;
     if (now === target) return;
     const next = now + Math.sign(target - now) * Math.min(Math.abs(target - now), dt / GRAY_SECONDS);
@@ -1202,8 +1200,6 @@ transformed = aGrow.xyz + (transformed - aGrow.xyz) * popped;`,
    *   them. Paving and water stay clear. Parks are ignored here: they are a layer of their own.
    * - Parks: 1 per park column, 2 on its edge (Show parks).
    * - Lots: district + 1 per lot column, plus 64 on columns at a lot's edge.
-   * - Frontage: the lot's frontage kind + 1 per lot column, plus 64 on its front edge (the strip
-   *   FRONT_STRIP deep along the side facing its street).
    */
   setDistricts(districts: Districts) {
     const { lotId, lots, cells, district } = districts;
@@ -1213,13 +1209,6 @@ transformed = aGrow.xyz + (transformed - aGrow.xyz) * popped;`,
     const areas = new Uint8Array(n * n);
     const marks = new Uint8Array(n * n);
     const parks = new Uint8Array(n * n);
-    const fronts = new Uint8Array(n * n);
-    // Each lot's front-left corner and the unit vector from its front toward its back.
-    const backward = lots.map((lot) => {
-      const [a, , , d] = lot.corners;
-      const deep = Math.hypot(d.x - a.x, d.z - a.z) || 1;
-      return { a, mx: (d.x - a.x) / deep, mz: (d.z - a.z) / deep, kind: frontageKind(lot) + 1 };
-    });
     const isPark = (x: number, z: number) => x >= 0 && z >= 0 && x < n && z < n && claim[z * n + x] === CLAIM.park;
     for (let z = 0; z < n; z++) {
       const cz = Math.floor(z / cell);
@@ -1256,9 +1245,6 @@ transformed = aGrow.xyz + (transformed - aGrow.xyz) * popped;`,
         if (!id) continue;
         const edge = x === 0 || z === 0 || x === n - 1 || z === n - 1 || lotId[k - 1] !== id || lotId[k + 1] !== id || lotId[k - n] !== id || lotId[k + n] !== id;
         marks[k] = lots[id - 1].district + 1 + (edge ? 64 : 0);
-        const f = backward[id - 1];
-        const behind = (x + 0.5 - f.a.x) * f.mx + (z + 0.5 - f.a.z) * f.mz;
-        fronts[k] = f.kind + (behind < FRONT_STRIP ? 64 : 0);
       }
     }
     const upload = (data: Uint8Array<ArrayBuffer>, old: THREE.Texture | null) => {
@@ -1272,7 +1258,6 @@ transformed = aGrow.xyz + (transformed - aGrow.xyz) * popped;`,
     };
     this.look.uDistricts.value = upload(areas, this.look.uDistricts.value);
     this.look.uLots.value = upload(marks, this.look.uLots.value);
-    this.look.uFrontage.value = upload(fronts, this.look.uFrontage.value);
     this.look.uParks.value = upload(parks, this.look.uParks.value);
   }
 
@@ -1314,11 +1299,10 @@ transformed = aGrow.xyz + (transformed - aGrow.xyz) * popped;`,
     this.look.uShowParks.value = on ? 1 : 0;
   }
 
-  /** Color the ground by one thing at a time: districts, frontage, claims, city-center suitability, or nothing; or the buildings by their bins (Waste). */
+  /** Color the ground by one thing at a time: districts, claims, city-center suitability, or nothing; or the buildings by their bins (Waste). */
   setGroundTint(tint: GroundTint) {
     this.wasteTint = tint === "waste";
     this.look.uShowDistricts.value = tint === "districts" ? 1 : 0;
-    this.look.uShowFrontage.value = tint === "frontage" ? 1 : 0;
     this.look.uShowHeights.value = tint === "heights" ? 1 : 0;
     this.look.uShowClaims.value = tint === "claims" ? 1 : 0;
     this.look.uShowSuit.value = tint === "suitability" ? 1 : 0;

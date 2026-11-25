@@ -76,10 +76,11 @@ float steel = max(pole, max(ledger, brace));
 // The deck at the frame top is bare concrete; the faces are scaffolding.
 vec3 site = mix(mix(uScaffold, uSteel, steel), uConcrete, vDeck);
 diffuseColor.rgb = mix(diffuseColor.rgb, site, onSite);
-diffuseColor.rgb = mix(diffuseColor.rgb, uTint.rgb, uTint.a);
 float workLight = onSite * (1.0 - vDeck) * (1.0 - smoothstep(0.0, 0.6, uFrameTop - vSitePos.y)) * step(0.5, fract(along * 0.5));`,
         )
-        .replace("#include <emissivemap_fragment>", "#include <emissivemap_fragment>\ntotalEmissiveRadiance += uWorkLight * workLight * 0.9;");
+        .replace("#include <emissivemap_fragment>", "#include <emissivemap_fragment>\ntotalEmissiveRadiance += uWorkLight * workLight * 0.9;")
+        // The Waste tint goes on after the color chunk, so the debug view's gray (applied there) does not take it out.
+        .replace("#include <emissivemap_fragment>", "diffuseColor.rgb = mix(diffuseColor.rgb, uTint.rgb, uTint.a);\n#include <emissivemap_fragment>");
     }
   };
 }

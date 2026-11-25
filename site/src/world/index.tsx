@@ -241,7 +241,7 @@ export default function WorldPage() {
       </div>
       {/* Outside the zoom, which it applies to itself: it sits at the mouse. */}
       <DebugMarks on={debug} scale={UI_SCALE} />
-      {debug && <HoverCard view={viewRef.current} terrain={terrain} zoning={zoning} tint={state.groundTint} scale={UI_SCALE} life={life} />}
+      {debug && <HoverCard view={viewRef.current} terrain={terrain} zoning={zoning} plans={plans} tint={state.groundTint} scale={UI_SCALE} life={life} />}
       {/* Outside the zoom: a modal dialog in the top layer takes clicks in the wrong place under it. */}
       <HelpDialog open={helpOpen} onClose={() => setHelpOpen(false)} onTour={() => setTouring(true)} />
     </div>

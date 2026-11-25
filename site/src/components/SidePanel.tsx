@@ -84,6 +84,9 @@ export function useShortcutToggle(open: boolean, onToggle: () => void) {
   useEffect(() => registerPanel({ isOpen: () => latest.current.open, toggle: () => latest.current.onToggle() }), []);
 }
 
+/** The slide's duration (Tailwind's duration-300 on the panel and its button). */
+const SLIDE_MS = 300;
+
 /**
  * Shared floating side panel used by every week's views. Pressing E toggles every mounted panel together, on either edge. Left and right use the
  * same card style, the same slide-in/out animation and the same round toggle button, so the
@@ -116,9 +119,21 @@ export function SidePanel({
   const isLeft = side === "left";
   useShortcutToggle(open, onToggle);
 
+  // A browser can leave a slide pending and never start it: the panel looks open while clicks still
+  // see it off screen. Once the slide's time is up, finish whatever has not.
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      for (const el of [bodyRef.current, buttonRef.current]) for (const a of el?.getAnimations() ?? []) a.finish();
+    }, SLIDE_MS + 50);
+    return () => clearTimeout(timer);
+  }, [open]);
+
   return (
     <>
       <button
+        ref={buttonRef}
         onClick={onToggle}
         aria-label={`${open ? "Close" : "Open"} ${label}`}
         title={`${open ? "Close" : "Open"} ${label} (E)`}
@@ -128,6 +143,7 @@ export function SidePanel({
         {open ? isLeft ? <ChevronLeft /> : <ChevronRight /> : closedIcon}
       </button>
       <div
+        ref={bodyRef}
         className={
           "pointer-events-auto absolute top-4 flex max-h-[calc(100%-2rem)] max-w-[85vw] flex-col overflow-hidden rounded-2xl border text-slate-200 backdrop-blur-xl transition-transform duration-300 ease-in-out " +
           (glass ?? "border-slate-700/50 bg-slate-900/70 shadow-2xl shadow-black/40") +

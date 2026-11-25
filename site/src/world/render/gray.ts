@@ -13,7 +13,8 @@ import * as THREE from "three";
  * The ground and everything with the voxel look take it where they already patch their color
  * (render/print.ts, render/voxelLook.ts); the other lit materials (the water, the plinth) through
  * `installGray`, which patches every material that doesn't patch itself. Unlit ones (the network's
- * lines, the selection ring) and lights (windows, signs) keep their colors.
+ * lines, the selection ring) and lights (windows, signs) keep their colors, as does the Waste tint on
+ * the walls (buildings/print.ts applies it after the gray).
  */
 export const GRAY = { uKeepAgents: { value: 0 }, uGray: { value: 0 }, uGrayRes: { value: new THREE.Vector2(1, 1) }, uGrayCenter: { value: new THREE.Vector2(0, 0) }, uGrayReach: { value: 1 } };
 

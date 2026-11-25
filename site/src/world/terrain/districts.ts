@@ -191,24 +191,6 @@ export interface Lot {
 
 export type Frontage = "avenue" | "side";
 
-/**
- * The kinds of frontage the Frontage tint shows, one per lot: a corner lot first (it fronts two
- * streets), then a through lot, then by the street its front faces. Names and colors for the legend.
- */
-export const FRONTAGE_KINDS: { name: string; color: number }[] = [
-  { name: "Avenue", color: 0xf59e0b },
-  { name: "Side street", color: 0x38bdf8 },
-  { name: "Corner", color: 0xf472b6 },
-  { name: "Through", color: 0xa3e635 },
-];
-
-/** A lot's index in FRONTAGE_KINDS. */
-export function frontageKind(lot: Lot): number {
-  if (lot.corner) return 2;
-  if (lot.through) return 3;
-  return lot.street === "avenue" ? 0 : 1;
-}
-
 export interface Districts {
   /** Cells per side (the hubs grid). */
   cells: number;

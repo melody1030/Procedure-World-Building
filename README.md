@@ -194,17 +194,19 @@ Street lamps (Nov 18):
 Press **D**, or the magnifier on the camera toolbar, and the city turns gray in a wave that spreads
 out from the plaza (0.6 s), so the only color left is the debug view's own. The left panel, which
 holds only the Build settings the rest of the time, swaps to the layers: one **ground color** at a
-time (districts, frontage, height limit, claims, suitability, waste, or agents), its legend, and
+time (districts, height limit, claims, suitability, waste, or agents), its legend, and
 what is drawn on top. A cyan frame and a badge at the top say you are in it; D again leaves.
 
 | The city as it is | In the debug view |
 |---|---|
 | ![The city as it is, in color](site/src/world/screenshots/2026-11-22-debug-before.webp) | ![The same view after pressing D: the city is gray and the layers are in the left panel](site/src/world/screenshots/2026-11-22-debug-gray.webp) |
 
-**Point at the ground** and a card at the mouse reads the data under it, from what the stages
-already made (nothing is looked up from the picture): the district and lot for Districts, the
-limit and its tier for Height, the score for Suitability, the owner, height and slope for the
-rest.
+**Point at the ground** and a card at the mouse says what it is (a lot, a main or side street, a
+verge, the plaza, a park, the river, its bank or open ground) and reads the data under it, from
+what the stages already made (nothing is looked up from the picture): a lot's district, area,
+height limit and built height; a street's width; a park's benches, vending machines and
+trees; the river's water level and depth. A ground color with something of its own to say
+(Districts, Height, Suitability) shows that instead.
 
 **Agents** colors the people, pigeons, cats and vehicles by what each is doing now (Moving, Using
 or resting, Waiting, On a task, Alarmed), and they are the only color left in the gray city.

@@ -21,8 +21,8 @@ the debug layer". Before this the Layers tab only recolored the ground; you coul
 - **Opening it turns the world gray, spreading from the plaza.** Over about 0.6 seconds a wave
   runs out from the plaza across the screen (`render/gray.ts`): behind its front every lit material
   is gray and a little darker, the sky with it, and a faint cyan line rides the front. The camera
-  does not move. Windows and signs keep their lights. With the Waste lens the buildings are the
-  lens, so they keep their color; with the Agents lens the people, animals and vehicles do.
+  does not move. Windows and signs keep their lights. With the Waste lens the walls take the bin
+  colors over the gray; with the Agents lens the people, animals and vehicles keep theirs.
 - **It stays marked.** A cyan frame round the view and a badge at the top ("Debug view · press D to
   leave", with a pulsing dot) fade in as the sweep ends and stay until it is left.
 - **The left panel swaps.** Normally it holds only **Build**. In the debug view it holds the
@@ -34,25 +34,33 @@ the debug layer". Before this the Layers tab only recolored the ground; you coul
 
 ## D1. Hover reading on the ground
 
-Raycast the cursor to the terrain, take the column, and show a card at the cursor for the active
-lens:
+Raycast the cursor to the terrain, take the column, and show a card at the cursor. Its title says
+what the column is, with a dot of that kind's color, and its rows say what matters for it:
+
+| Pointed at | The card reads |
+|---|---|
+| Lot | District, area, height limit, built height |
+| Main or side street | Width, height |
+| Verge, river bank, open ground | Height (a verge also its street, open ground its district) |
+| River | Water level, depth |
+| Plaza | Size, height |
+| Park | Kind, size, benches, vending machines, trees or flower beds |
+
+A ground color with something of its own to say replaces the rows:
 
 | Lens | The card reads |
 |---|---|
-| Claims | What owns the column (river, bank, road, verge, plaza, lot, park) |
-| Districts | The district, its lot's id, frontage and area |
-| Heights | The height limit (m), its tier, and what held a building below it |
+| Districts | The district, a lot's area |
+| Height | The height limit (m), its tier, and the built height |
 | Suitability | The score for the center, 0 to 1, and whether it can be built on |
-| Ground | Height in meters, and the slope |
 
 Done when moving the cursor reads a different place every frame without a hitch, and the card
 agrees with the tint under it.
 
 **Built 2026-11-20.** `WorldView` finds the column under the mouse (at most once a frame, and not
 when a building or the sky is under it, or a button is down) and tells `ui/Lens.tsx`, whose card
-reads the stages' own data. Ground height and slope come from the graded ground, as drawn, not the
-ground before the lots were dug. With no tint, or the Waste tint, the card reads the ground
-itself. Checked on `blueprint` against the five tints.
+reads the stages' own data. Heights come from the graded ground, as drawn, not the ground
+before the lots were dug. With the Waste tint there is no ground card (the buildings are the lens). Checked on `blueprint` against the five tints.
 
 ## D2. A lens for the agents
 
